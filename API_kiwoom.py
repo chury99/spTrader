@@ -20,7 +20,7 @@ import pickle
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
-# noinspection PyShadowingNames
+# noinspection PyShadowingNames,PyStatementEffect
 class KiwoomAPI(QAxWidget):
     def __init__(self):
         # QAxWidget init 설정 상속
@@ -262,69 +262,74 @@ class KiwoomAPI(QAxWidget):
 
         return dic_조건검색_검색식명2종목코드
 
-        # [ 실시간 요청 모듈 (real_get) ]
+    # [ 실시간 데이터 요청 모듈 (real) ]
+    def real_실시간종목등록(self, s_종목코드, s_등록형태):
+        """ 실시간 데이터 감시 종목에 등록 요청 (장중일 때만 요청 전송) \n
+        # 등록형태 : '신규', '추가' 중 선택 """
+        # 등록형태 정의
+        dic_등록형태 = {'신규': '0', '추가': '1'}
 
-        def tset_real_reg(self, s_code, s_type):
-            ''' 실시간 데이터 감시 요청하는 함수 (장중일 때만 요청 전송, 아닐 때는 현재가 1원 리턴) '''
-            # 실시간 등록타입 설정 ('0'이면 갱신, '1'이면 추가)
-            if s_type in ['0', 'w', 'new', 'reset']:
-                s_reg_type = '0'
-            elif s_type in ['1', 'a', 'append', 'add']:
-                s_reg_type = '1'
-            else:
-                s_reg_type = '0'
+        # FID 정의
+        dic_fid = {'종목코드': 9001, '현재가': 10, '호가시간': 21, '매도호가총잔량': 121, '매수호가총잔량': 125,
+                   '계좌번호': 9201, '주문번호': 9203, '주문상태': 913, '종목명': 302, '주문수량': 900,
+                   '주문가격': 901, '미체결수량': 902, '체결누계금액': 903, '원주문번호': 904, '주문구분': 905, '매매구분': 906,
+                   '매도수구분': 907, '주문체결시간': 908, '체결번호': 909, '체결가': 910, '체결량': 911,
+                   '(최우선)매도호가': 27, '(최우선)매수호가': 28, '단위체결가': 914, '단위체결량': 915, '거부사유': 919,
+                   '화면번호': 920, '신용구분': 917, '대출일': 916, '보유수량': 930, '매입단가': 931, '총매입가': 932,
+                   '주문가능수량': 933, '당일순매수수량': 945, '매도매수구분': 946, '당일총매도손일': 950, '기준가': 307,
+                   '손익율': 8019, '신용금액': 957, '신용이자': 958, '만기일': 918, '당일실현손익(유가)': 990,
+                   '당일실현손익률(유가)': 991, '당일실현손익(신용)': 992, '당일실현손익률(신용)': 993, '파생상품거래단위': 397,
+                   '상한가': 305, '하한가': 306}
 
-            # dic 초기화
-            if s_reg_type == '0':
-                self.dic_contract_real = {}
-                self.dic_hogajan_real = {}
+        # dic 초기화 (신규일때만)
+        if s_등록형태 == '신규':
+            self.dic_실시간_현재가 = dict()
+            self.dic_실시간_체결 = dict()
+            self.dic_실시간_호가잔량 = dict()
 
-            # 장중에만 동작
-            dt_now = pd.Timestamp('now')
-            s_weekday_now = dt_now.strftime('%a')
+        # 요일, 시간 확인하여 장중일 때만 실시간 등록 요청
+        dt_현재 = pd.Timestamp('now')
+        s_요일 = dt_현재.strftime('%a')
 
-            if ((s_weekday_now in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'])
-                    and (dt_now >= pd.Timestamp('09:00:00')) and (dt_now <= pd.Timestamp('15:30:00'))):
-                # 실시간 데이터 감시 요청 (장중일 시)
-                self.set_real_reg(s_screen_no='0001', s_code=s_code, s_fid='9001;10;21;121;125', s_reg_type=s_reg_type)
+        if ((s_요일 in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'])
+                and (dt_현재 >= pd.Timestamp('09:00:00')) and (dt_now <= pd.Timestamp('15:30:00'))):
+            # 실시간 데이터 감시 요청 (장중일 시)
+            s_fid = f"{dic_fid['종목코드']};{dic_fid['현재가']};{dic_fid['호가시간']};" \
+                    f"{dic_fid['매도호가총잔량']};{dic_fid['매도호가총잔량']}"
+            self.set_real_reg('1001', s_종목코드, s_fid, dic_등록형태[s_등록형태])
 
-        def tset_real_remove(self, s_code):
-            ''' 실시간 데이터 감시 종료하는 함수 '''
-            self.set_real_remove(s_screen_no='0001', s_code=s_code)
+    def real_실시간종목해제(self, s_종목코드):
+        """ 실시간 데이터 감시 종료 """
+        self.set_real_remove('1001', s_종목코드)
 
-        def tget_price_real(self, s_code):
-            ''' 실시간 체결정보(누적)에서 마지막 체결가 가져와서 int로 리턴 '''
-            if s_code in self.dic_contract_real.keys():
-                # 데이터 가져오기
-                li_contract = self.dic_contract_real[s_code]
-                n_price_real = li_contract[-1][2]
-            else:
-                # 데이터 없을 시 1 리턴
-                n_price_real = 1
+    def get_실시간_현재가(self, s_종목코드):
+        """ 실시간 현재가(갱신) 가져와서 int 리턴 (데이터 없으면 None 리턴) """
+        n_실시간_현재가 = self.dic_실시간_현재가[s_종목코드] if s_종목코드 in self.dic_실시간_현재가.keys() else None
 
-            return n_price_real
+        return n_실시간_현재가
 
-        def tget_contract_real(self, s_code):
-            ''' 실시간 체결정보(누적)을 가져와서 df로 리턴 '''
-            # 데이터 가져오기
-            li_contract = self.dic_contract_real[s_code]
+    def get_실시간_체결(self, s_종목코드):
+        """ 실시간 체결정보(누적) 가져와서 df로 리턴 """
+        # 데이터 가져오기
+        li_체결 = self.dic_실시간_체결[s_종목코드]
 
-            # df 형식으로 정리
-            df = pd.DataFrame(li_contract, columns=['code', 'time', 'price', 'volume', 'buysell', 'cash'])
-            df['time'] = df['time'].astype('datetime64')
-            return df
+        # df 형식으로 정리
+        df_체결 = pd.DataFrame(li_체결, columns=['종목코드', '체결시간', '현재가', '거래량', '매수매도', '거래대금'])
+        df_체결['체결시간'] = df_체결['체결시간'].astype('datetime64')
+        return df_체결
 
-        def tget_hogajan_real(self, s_code):
-            ''' 실시간 호가잔량(갱신)을 가져와서 dic으로 리턴 '''
-            # 데이터 가져오기
-            dic = self.dic_hogajan_real[s_code]
-            return dic
-
-
+    def get_실시간_호가잔량(self, s_종목코드):
+        """ 실시간 호가잔량(갱신)을 가져와서 dict 리턴 """
+        # 데이터 가져오기
+        dic_호가잔량 = self.dic_실시간_호가잔량[s_종목코드]
+        return dic_호가잔량
 
     # [ TR 요청 모듈 (tr_get) ]
     def tr_get_일봉조회(self, s_종목코드, s_기준일=None):
         """ 종목코드별 일봉 데이터 조회하여 df 리턴 """
+        # 변수 정의
+        s_기준일 = self.s_오늘 if s_기준일 is None else s_기준일
+
         # TR 요청
         self.set_input_value('종목코드', s_종목코드)
         self.set_input_value('기준일자', s_기준일)
@@ -500,24 +505,7 @@ class KiwoomAPI(QAxWidget):
 
 
     ### 실시간 데이터 처리
-    def set_real_reg(self, s_screen_no, s_code, s_fid, s_reg_type):
-        ''' 실시간 데이터 요청 (OnReceiveRealData 이벤트 자동 호출 '''
-        ''' [screen_no]화면번호, [code]종목코드, [fid]FID 번호(';'로 구분),
-            [reg_type] 0-이전등록 해지(replace), 1-이전등록 유지(append) '''
-        self.dynamicCall('SetRealReg(QString, QString, QString, QString)', s_screen_no, s_code, s_fid, s_reg_type)
 
-        ''' 실시간 데이터에서는 eventloop 사용 안함 (사용 시 이후 loop 종료시까지 대기) '''
-        # self.eventloop_real = QEventLoop()
-        # self.eventloop_real.exec_()
-
-        ''' !! 호출 전 결과 dic 초기화 필요 !! '''
-        ''' self.dic_contract_real  : 실시간 체결정보(누적)
-            self.dic_hogajan_real   : 실시간 호가잔량(갱신) '''
-
-    def set_real_remove(self, s_screen_no, s_code):
-        ''' 실시간 데이터 종료 '''
-        ''' [screen_no]화면번호 or 'ALL', [code]종목코드 or 'ALL' '''
-        self.dynamicCall('SetRealRemove(QString, QString)', s_screen_no, s_code)
 
     ### TR 데이터 처리
 
@@ -650,9 +638,65 @@ class KiwoomAPI(QAxWidget):
         except AttributeError:
             pass
 
-    def on_receive_real_data(self):
-        pass
+    def set_real_reg(self, s_화면번호, s_종목코드, s_fid, s_등록형태):
+        """ 실시간 데이터 요청 (OnReceiveRealData 이벤트 자동 호출) \n
+        # fid : ;으로 구분 \n
+        # 등록형태 : ['0']이전등록 해지(신규), ['1']이전등록 유지(추가) """
 
+        self.dynamicCall('SetRealReg(QString, QString, QString, QString)', s_화면번호, s_종목코드, s_fid, s_등록형태)
+
+    def set_real_remove(self, s_화면번호, s_종목코드):
+        """ 실시간 데이터 종료 \n
+        # [screen_no]화면번호 or 'ALL', [code]종목코드 or 'ALL' """
+        self.dynamicCall('SetRealRemove(QString, QString)', s_화면번호, s_종목코드)
+
+    def on_receive_real_data(self, s_종목코드, s_실시간타입, s_실시간데이터):
+        """ 실시간 데이터 받아오기 (OnReceiveRealData 이벤트 연결) """
+        # 현재가 관리 (갱신)
+        if s_실시간타입 == '주식시세':
+            s_현재가 = self._get_comm_real_data(s_종목코드, 10)
+            n_현재가 = abs(int(s_현재가))
+            # dict 저장
+            self.dic_실시간_현재가[s_종목코드] = n_현재가
+
+        # 주식체결 데이터 수집 (누적)
+        if s_실시간타입 == "주식체결":
+            s_체결시간 = self._get_comm_real_data(s_종목코드, 20)
+            s_현재가 = self._get_comm_real_data(s_종목코드, 10)
+            s_거래량 = self._get_comm_real_data(s_종목코드, 15)
+
+            # 데이터 정리
+            s_체결시간 = f'{s_체결시간[0:2]}:{s_체결시간[2:4]}:{s_체결시간[4:6]}'
+            n_현재가 = abs(int(s_현재가))
+            s_매수매도 = '매수' if int(s_거래량) > 0 else '매도'
+            n_거래량 = abs(int(volume))
+            n_거래대금 = n_현재가 * n_거래량
+
+            # dict 저장
+            if s_code in self.dic_실시간_체결.keys():
+                self.dic_실시간_체결[s_종목코드].append([s_종목코드, s_체결시간, n_현재가, n_거래량, s_매수매도, n_거래대금])
+            else:
+                self.dic_실시간_체결[s_종목코드] = [[s_종목코드, s_체결시간, n_현재가, n_거래량, s_매수매도, n_거래대금]]
+
+        # 호가잔량 데이터 수집 (갱신)
+        if s_실시간타입 == "주식호가잔량":
+            s_호가시간 = self._get_comm_real_data(s_종목코드, 21)
+            s_매도호가잔량 = self._get_comm_real_data(s_종목코드, 121)
+            s_매수호가잔량 = self._get_comm_real_data(s_종목코드, 125)
+
+            # 데이터 정리
+            s_호가시간 = f'{s_호가시간[0:2]}:{s_호가시간[2:4]}:{s_호가시간[4:6]}'
+            n_매도호가잔량 = abs(int(s_매도호가잔량))
+            n_매수호가잔량 = abs(int(s_매수호가잔량))
+
+            # dict 저장
+            self.dic_실시간_호가잔량[s_종목코드] = {'종목코드': s_종목코드, '호가시간': s_호가시간,
+                                         '매도호가잔량': n_매도호가잔량, '매수호가잔량': n_매수호가잔량}
+
+    def _get_comm_real_data(self, s_종목코드, n_fid):
+        """ 실시간 데이터 값 요청 (OnReceiveRealData 내부에서 사용) """
+        ret = self.dynamicCall('GetCommRealData(QString, int)', s_종목코드, n_fid)
+        return ret.strip()
 
     def set_input_value(self, s_항목명, s_설정값):
         """ TR 요청을 위한 input 값 설정 """
