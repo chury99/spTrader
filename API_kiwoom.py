@@ -20,7 +20,7 @@ import pickle
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
-# noinspection PyShadowingNames,PyStatementEffect
+# noinspection PyShadowingNames
 class KiwoomAPI(QAxWidget):
     def __init__(self):
         # QAxWidget init 설정 상속
@@ -32,19 +32,27 @@ class KiwoomAPI(QAxWidget):
 
         # 폴더 정의
         folder_work = dic_config['folder_work']
-        self.folder_run = os.path.join(folder_work, 'run')
-        os.makedirs(self.folder_run, exist_ok=True)
+        self.folder_이력 = os.path.join(folder_work, '이력')
+        os.makedirs(self.folder_이력, exist_ok=True)
 
         # 기준정보 정의
         self.s_오늘 = pd.Timestamp('now').strftime('%Y%m%d')
         self.n_딜레이 = 0.2
 
         # 체결잔고 정보 불러오기
-        self.path_체결잔고 = os.path.join(self.folder_run, f'체결잔고_{self.s_오늘}.csv')
+        folder_체결잔고 = os.path.join(self.folder_이력, '체결잔고')
+        os.makedirs(folder_체결잔고, exist_ok=True)
+        self.path_체결잔고 = os.path.join(folder_체결잔고, f'체결잔고_{self.s_오늘}.csv')
         try:
             self.df_체결잔고 = pd.read_csv(self.path_체결잔고, encoding='cp949')
         except FileNotFoundError:
             self.df_체결잔고 = pd.DataFrame()
+
+        # 이벤트루프 생성
+        self.eventloop_로그인 = QEventLoop()
+        self.eventloop_주문조회 = QEventLoop()
+        self.eventloop_조건검색 = QEventLoop()
+        self.eventloop_tr조회 = QEventLoop()
 
         # 키움 API 연결
         self.setControl("KHOPENAPI.KHOpenAPICtrl.1")
@@ -65,7 +73,7 @@ class KiwoomAPI(QAxWidget):
 
     ###################################################################################################################
 
-    # [ 접속 및 로그인 모듈 ]
+    # ***** [ 접속 및 로그인 모듈 ] *****
     def comm_connect(self):
         """ 통신 연결 및 로그인 \n
         OnEventConnect 발생 대기 """
@@ -73,10 +81,9 @@ class KiwoomAPI(QAxWidget):
         self.dynamicCall("CommConnect()")
 
         # 이벤트 발생 대기 (OnEventConnect)
-        self.eventloop_로그인 = QEventLoop()
         self.eventloop_로그인.exec_()
 
-    # [ 리턴값 반환 모듈 (get) ]
+    # ***** [ 리턴값 반환 모듈 (get) ] *****
     def get_접속서버(self):
         """ 접속 서버 확인 후 결과 리턴 """
         # 서버 정보 요청 (리턴값: ['1']모의투자서버, [나머지]실서버)
@@ -189,7 +196,7 @@ class KiwoomAPI(QAxWidget):
 
         return s_투자유의종목
 
-    # [ 주문/체결 관련 모듈 ]
+    # ***** [ 주문/체결 관련 모듈 ] *****
     def send_주문(self, s_요청명, s_화면번호, s_계좌번호, n_주문유형, s_종목코드, n_주문수량, n_주문단가, s_거래구분, s_원주문번호):
         """ 주문 요청 \n
         SendOrder 후 3가지 이벤트 발생 (OnReceiveTRData, OnReceiveMsg, OnReceiveChejanData) """
@@ -214,10 +221,9 @@ class KiwoomAPI(QAxWidget):
         self.s_주문_전송결과 = '주문횟수초과(초당5회)' if n_리턴값 == -308 else s_주문전송
 
         # 이벤트 루프 생성
-        self.eventloop_주문 = QEventLoop()
-        self.eventloop_주문.exec_()
+        self.eventloop_주문조회.exec_()
 
-    # [ 조건검색 관련 모듈 ]
+    # ***** [ 조건검색 관련 모듈 ] *****
     def get_조건검색_전체(self):
         """ 서버에 등록되어 있는 전체 조건검색 조회하여 검색식명 별 종목코드 list 조회할 수 있는 dict 리턴 """
         # 조건검색 연결
@@ -225,7 +231,6 @@ class KiwoomAPI(QAxWidget):
         self.s_조건검색_요청결과 = '성공' if n_ret == 1 else '실패'
 
         # 조건검색 조회용 이벤트 대기 (OnReceiveConditionVer 발생)
-        self.eventloop_조건검색 = QEventLoop()
         self.eventloop_조건검색.exec_()
 
         # 조건검색 데이터 조회
@@ -243,7 +248,6 @@ class KiwoomAPI(QAxWidget):
             self.s_조건검색_종목조회성공여부 = '성공' if n_ret == 1 else '실패'
 
             # 조건검색 조회용 이벤트 대기 (OnReceiveTrCondition 발생)
-            self.eventloop_조건검색 = QEventLoop()
             self.eventloop_조건검색.exec_()
 
             # 결과 데이터 정리
@@ -262,7 +266,7 @@ class KiwoomAPI(QAxWidget):
 
         return dic_조건검색_검색식명2종목코드
 
-    # [ 실시간 데이터 요청 모듈 (real) ]
+    # ***** [ 실시간 데이터 요청 모듈 (real) ] *****
     def real_실시간종목등록(self, s_종목코드, s_등록형태):
         """ 실시간 데이터 감시 종목에 등록 요청 (장중일 때만 요청 전송) \n
         # 등록형태 : '신규', '추가' 중 선택 """
@@ -324,20 +328,27 @@ class KiwoomAPI(QAxWidget):
         dic_호가잔량 = self.dic_실시간_호가잔량[s_종목코드]
         return dic_호가잔량
 
-    # [ TR 요청 모듈 (tr_get) ]
-    def tr_get_일봉조회(self, s_종목코드, s_기준일=None):
-        """ 종목코드별 일봉 데이터 조회하여 df 리턴 """
+    # ***** [ TR 요청 모듈 (tr) ] *****
+    def get_tr_일봉조회(self, s_종목코드, s_기준일=None):
+        """ 종목코드별 일봉 데이터 조회하여 df 리턴 (OnReceiveTrData 이벤트 발생) """
         # 변수 정의
         s_기준일 = self.s_오늘 if s_기준일 is None else s_기준일
 
         # TR 요청
         self.set_input_value('종목코드', s_종목코드)
         self.set_input_value('기준일자', s_기준일)
-        self.comm_rq_data('opt10081_req', 'opt10081', 0, '2001')
+        self.comm_rq_data('주식일봉차트조회요청', 'opt10081', 0, '2001')
 
-        # TR 결과 (일봉)
-        ret = self.df_ohlcv_day
-        return ret
+        # 결과 가져오기
+        df_일봉 = self.df_일봉.copy()
+
+        # 데이터 정리
+        df_일봉['종목코드'] = s_종목코드
+        df_일봉['종목명'] = self.get_코드별종목명(s_종목코드)
+        df_일봉['종가'] = df_일봉['현재가']
+        df_일봉 = df_일봉.loc[:, ['종목코드', '종목명', '일자', '시가', '고가', '저가', '종가', '거래량', '거래대금(백만)']]
+
+        return df_일봉
 
 
 
@@ -510,26 +521,7 @@ class KiwoomAPI(QAxWidget):
     ### TR 데이터 처리
 
 
-    def comm_rq_data(self, s_rqname, s_trcode, n_next, s_screen_no):
-        ''' TR 데이터 요청 (OnReceiveTrData 이벤트 자동 호출) '''
-        ''' [rqname]사용자, [trcode]조회하려는 TR 이름, [next]연속조회여부 (0:조회, 2:연속), [screen_no]화면번호(4자리)
-            리턴값: [0]조회요청 정상, [-200]시세과부하, [-201]조회전문작성 에러 '''
-        ret = self.dynamicCall('CommRqData(QString, QString, int, QString', s_rqname, s_trcode, n_next, s_screen_no)
-        # print(f'TR 조회 요청 리턴값: {ret}')
 
-        self.eventloop_tr = QEventLoop()
-        self.eventloop_tr.exec_()
-
-        ''' self.df_ohlcv_day           : 주식일봉차트조회 (opt10081)
-            self.n_d2_deposit           : D+2일 예수금 (opw00001)
-            self.dic_balance            : 계좌 평가잔고 조회 (opw00018)
-            self.df_volume_jump         : 거래량 급등 조회 (opt10023)
-            self.df_ohlcv_min           : 주식분봉차트조회 (opt10080)
-            self.df_trade_history       : 계좌별 주문체결 현황 (opw00009)
-            self.df_profit              : 일자별 종목 실현손익 (opt10073)
-            self.df_ohlcv_day_allcodes  : 업종별주가요청-전체종목현재가 (opt20002)
-            self.df_basic_inform        : 주식기본정보요청-액면가 (opt10001)
-            self.df_contract            : 체결정보 요청 (opt10003)'''
 
 
 
@@ -541,6 +533,7 @@ class KiwoomAPI(QAxWidget):
 
     ###################################################################################################################
 
+    # ***** [ 이벤트 연계 실행 모듈 ] *****
     def on_event_connect(self, n_에러코드):
         """ 통신 연결 결과 출력 (OnEventConnect 이벤트 연결) """
         # 리턴값 정의
@@ -567,7 +560,7 @@ class KiwoomAPI(QAxWidget):
         print(f'메세지수신 | {s_메세지}')
 
         # 이벤트루프 종료
-        self.eventloop_주문.exit()
+        self.eventloop_주문조회.exit()
 
     def on_receive_chejan_data(self, s_구분, n_항목수, sFID목록):
         """ 주문전송 후 주문접수, 체결통보, 잔고통보 정보 처리 (OnReceiveChejanData 이벤트 연결, FID 항목별 값 확인) """
@@ -602,7 +595,7 @@ class KiwoomAPI(QAxWidget):
         self.df_체결잔고.to_csv(self.path_체결잔고, index=False, encoding='cp949')
 
     def _get_chejan_data(self, n_fid):
-        """ FID별 체결/잔고 데이터 요청 """
+        """ FID별 체결/잔고 데이터 요청 (OnReceiveChejanData 내부에서 사용) """
         s_리턴값 = self.dynamicCall('GetChejanData(int)', n_fid)
         return s_리턴값
 
@@ -622,6 +615,7 @@ class KiwoomAPI(QAxWidget):
         # 이벤트 루프 종료
         self.eventloop_조건검색.exit()
 
+    # ***** [ 실시간 연계 실행 모듈 ] *****
     def on_receive_tr_condition(self, s_화면번호, s_검색종목, s_검색식명, n_검색식번호, n_연속조회여부):
         """ 조건검색 결과 조회 후 체결/잔고 데이터 받아서 저장/출력 (OnReceiveTrCondition 이벤트 연결) """
         # tr 연속조회를 위한 딜레이 설정
@@ -698,14 +692,38 @@ class KiwoomAPI(QAxWidget):
         ret = self.dynamicCall('GetCommRealData(QString, int)', s_종목코드, n_fid)
         return ret.strip()
 
+    # ***** [ TR 연계 실행 모듈 ] *****
     def set_input_value(self, s_항목명, s_설정값):
         """ TR 요청을 위한 input 값 설정 """
-        self.dynamicCall('SetInputValue(QString, QString)', s_항목명, s_vs_설정값alue)
+        self.dynamicCall('SetInputValue(QString, QString)', s_항목명, s_설정값)
+
+    def comm_rq_data(self, s_요청명, s_tr코드, n_연속조회여부, s_화면번호):
+        """ TR 조회 요청 (OnReceiveTrData 이벤트 자동 호출) \n
+        # 연속조회여부 : [0]신규, [2]연속 """
+        n_리턴값 = self.dynamicCall('CommRqData(QString, QString, int, QString)',
+                                 s_요청명, s_tr코드, n_연속조회여부, s_화면번호)
+
+        # 리턴값 확인
+        dic_리턴값 = {0: '조회요청성공', -200: '시세과부하', -201: '조회전문작성에러'}
+        s_리턴값 = dic_리턴값[n_리턴값]
+
+        # 이벤트루프 실행
+        self.eventloop_tr조회.exec_()
 
     def on_receive_tr_data(self, s_화면번호, s_요청명, s_tr코드, s_레코드명, s_연속조회, unused1, unused2, unused3, unused4):
         """ TR 데이터 받아오기 (OnReceiveTrData 이벤트 발생 시 연결) """
-        # [ 참고사항 ]
-        # s_연속조회 : ['0']추가 데이터 없음, ['2']추가 데이터 있음
+        # 변수 정의 (s_연속조회 : ['0']추가 데이터 없음, ['2']추가 데이터 있음)
+        b_추가데이터존재 = True if s_연속조회 == '2' else False if s_연속조회 == '0' else None
+
+        # 요청 종류별 데이터 수신 모듈 연결
+        if s_요청명 == '주식일봉차트조회요청': self._opt10081(s_요청명, s_tr코드)     # self.df_일봉
+
+        try:
+            self.eventloop_tr조회.exit()
+        except AttributeError:
+            pass
+
+
 
         # TR 요청에 따른 모듈 연결
         # if s_요청명 == '주문': self._주문응답(s_요청명, s_tr코드, s_레코드명)
@@ -730,21 +748,35 @@ class KiwoomAPI(QAxWidget):
         # if s_rqname == 'opt10003_req': self._opt10003(s_rqname, s_trcode)  # 체결정보요청 (self.df_contract)
         #
         try:
-            self.eventloop_tr.exit()
+            self.eventloop_tr조회.exit()
         except AttributeError:
             pass
         # pass
+
+    def _opt10081(self, s_요청명, s_tr코드):
+        """ 데이터 수신 모듈 (주식일봉차트조회요청) """
+        li_데이터 = self._get_comm_data_ex(s_tr코드, s_요청명)
+        li_컬럼명 = ['종목코드', '현재가', '거래량', '거래대금(백만)', '일자', '시가', '고가', '저가',
+                  '수정주가구분', '수정비율', '대업종구분', '소업종구분', '종목정보', '수정주가이벤트', '전일종가']
+        # 수신 데이터 정리 (비어있는 항목 포함)
+        self.df_일봉 = pd.DataFrame(li_데이터, columns=li_컬럼명)
 
     def _데이터길이확인(self, s_tr코드, s_요청명):
         """ TR 결과 데이터 갯수 확인 """
         n_리턴값 = self.dynamicCall('GetRepeatCnt(QString, QString)', s_tr코드, s_요청명)
         return n_리턴값
 
-    def _데이터수신(self, s_tr코드, s_레코드명, n_인덱스, s_항목명):
-        """ 요청한 TR 데이터 받아오기 (OnReceiveTRData 내부에서 사용) """
-        s_리턴값 = self.dynamicCall('GetCommData(QString, QString, int, QString)', s_tr코드, s_레코드명, n_인덱스, s_항목명)
+    def _get_comm_data(self, s_tr코드, s_요청명, n_인덱스, s_항목명):
+        """ 요청한 TR 데이터 받아오기 (OnReceiveTrData 내부에서 사용) """
+        s_리턴값 = self.dynamicCall('GetCommData(QString, QString, int, QString)', s_tr코드, s_요청명, n_인덱스, s_항목명)
 
         return s_리턴값.strip()
+
+    def _get_comm_data_ex(self, s_tr코드, s_요청명):
+        """ 요청한 TR 데이터 일괄로 받아오기 (OnReceiveTrData 내부에서 사용) """
+        li_리턴값 = self.dynamicCall('GetCommDataEx(QString, QString)', s_tr코드, s_요청명)
+
+        return li_리턴값
 
     # def _주문응답(self, s_요청명, s_tr코드, s_레코드명):
     #     """ 주문 응답 읽어오기 """
@@ -756,7 +788,7 @@ class KiwoomAPI(QAxWidget):
     #     s_주문번호 = self._데이터수신(s_tr코드, s_레코드명, 0, '주문번호')
     #
     #     # 이벤트 루프 종료
-    #     self.eventloop_주문.exit()
+    #     self.eventloop_주문조회.exit()
 
         ################### 주문 들어갈 때 이 부분 확인 필요 #############################
 
@@ -815,4 +847,4 @@ if __name__ == "__main__":
     # api.get_조건검색('52주신고가')
     # api.get_조건검색_전체()
 
-    api.tr_get_일봉조회(s_종목코드='000020')
+    api.get_tr_일봉조회(s_종목코드='000020')
