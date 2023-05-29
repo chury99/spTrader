@@ -329,14 +329,15 @@ class KiwoomAPI(QAxWidget):
         return dic_호가잔량
 
     # ***** [ TR 요청 모듈 (tr) ] *****
-    def get_tr_일봉조회(self, s_종목코드, s_기준일=None):
-        """ 종목코드별 일봉 데이터 조회하여 df 리턴 (OnReceiveTrData 이벤트 발생) """
+    def get_tr_일봉조회(self, s_종목코드, s_기준일자_부터=None):
+        """ 종목코드별 일봉 데이터 조회하여 df 리턴 - 600개 (OnReceiveTrData 이벤트 발생) \n
+        # 기준일자 : 기준일자부터 이전 600개 데이터 조회 (default: 오늘일자) """
         # 변수 정의
-        s_기준일 = self.s_오늘 if s_기준일 is None else s_기준일
+        s_기준일자_부터 = self.s_오늘 if s_기준일자_부터 is None else s_기준일자_부터
 
         # TR 요청
         self.set_input_value('종목코드', s_종목코드)
-        self.set_input_value('기준일자', s_기준일)
+        self.set_input_value('기준일자', s_기준일자_부터)
         self.comm_rq_data('주식일봉차트조회요청', 'opt10081', 0, '2001')
 
         # 결과 가져오기
@@ -346,79 +347,111 @@ class KiwoomAPI(QAxWidget):
         df_일봉['종목코드'] = s_종목코드
         df_일봉['종목명'] = self.get_코드별종목명(s_종목코드)
         df_일봉['종가'] = df_일봉['현재가']
-        df_일봉 = df_일봉.loc[:, ['종목코드', '종목명', '일자', '시가', '고가', '저가', '종가', '거래량', '거래대금(백만)']]
+        df_일봉 = df_일봉.loc[:, ['일자', '종목코드', '종목명', '시가', '고가', '저가', '종가', '거래량', '거래대금(백만)']]
+
+        # 데이터 타입 지정
+        li_컬럼명_str = ['일자', '종목코드', '종목명']
+        li_컬럼명_int = [s_컬럼명 for s_컬럼명 in df_일봉.columns if s_컬럼명 not in li_컬럼명_str]
+        for s_컬럼명 in li_컬럼명_int:
+            df_일봉[s_컬럼명] = df_일봉[s_컬럼명].astype(int)
 
         return df_일봉
 
+    def get_tr_분봉조회(self, s_종목코드, n_틱범위, s_기준일자_까지=None):
+        """ 종목코드별 분봉 데이터 조회하여 df 리턴 - 900개 (OnReceiveTrData 이벤트 발생) \n
+        # 틱범위 : [1]1분, [3]3분, [5]5분, [10]10분, [15]15분, [30]30분, [45]45분, [60]60분 \n
+        # 기준일자 : 현재부터 기준일자까지 전체 데이터 조회 (default: 오늘일자) """
+        # 변수 정의
+        s_기준일자_까지 = self.s_오늘 if s_기준일자_까지 is None else s_기준일자_까지
+
+        # TR 요청
+        self.set_input_value('종목코드', s_종목코드)
+        self.set_input_value('틱범위', str(n_틱범위))
+        self.comm_rq_data('주식분봉차트조회요청', 'opt10080', 0, '2001')
+
+        # 결과 가져오기
+        df_분봉 = self.df_분봉.copy()
+
+        # 기준일자 확인
+        s_최소일자 = df_분봉['체결시간'].apply(lambda x: x[:8]).unique()[:-1].min()
+        while s_기준일자_까지 < s_최소일자:
+            # 예외처리 (데이터 900개 미만)
+            if len(df_분봉) < 900:
+                break
+
+            # TR 추가 요청
+            time.sleep(self.n_딜레이)
+            self.set_input_value('종목코드', s_종목코드)
+            self.set_input_value('틱범위', str(n_틱범위))
+            self.comm_rq_data('주식분봉차트조회요청', 'opt10080', 2, '2001')
+
+            # 결과 가져와서 합치기
+            df_분봉_추가 = self.df_분봉.copy()
+            df_분봉 = pd.concat([df_분봉, df_분봉_추가], axis=0)
+            df_분봉 = df_분봉.sort_values('체결시간', ascending=False).drop_duplicates().reset_index(drop=True)
+
+            # 기준일자 재확인
+            s_최소일자 = df_분봉['체결시간'].apply(lambda x: x[:8]).unique()[:-1].min()
+
+        # 데이터 정리
+        df_분봉['종목코드'] = s_종목코드
+        df_분봉['종목명'] = self.get_코드별종목명(s_종목코드)
+        df_분봉['종가'] = df_분봉['현재가']
+        df_분봉['일자'] = df_분봉['체결시간'].apply(lambda x: x[:8])
+        df_분봉['시간'] = df_분봉['체결시간'].apply(lambda x: f'{x[8:10]}:{x[10:12]}:{x[12:14]}')
+        df_분봉 = df_분봉.loc[:, ['일자', '종목코드', '종목명', '시간', '시가', '고가', '저가', '종가', '거래량']]
+
+        # 데이터 타입 지정
+        li_컬럼명_str = ['일자', '종목코드', '종목명', '시간']
+        li_컬럼명_int = [s_컬럼명 for s_컬럼명 in df_분봉.columns if s_컬럼명 not in li_컬럼명_str]
+        for s_컬럼명 in li_컬럼명_int:
+            df_분봉[s_컬럼명] = abs(df_분봉[s_컬럼명].astype(int))
+
+        return df_분봉
+
+    def get_tr_예수금(self, s_계좌번호):
+        """ 계좌의 D+2일 추정 예수금 조회하여 int 리턴 (OnReceiveTrData 이벤트 발생) """
+        # TR 요청
+        self.set_input_value('계좌번호', s_계좌번호)
+        self.set_input_value('비밀번호입력매체구분', '00')
+        self.set_input_value('조회구분', '3')  # ['3']추정조회, ['2']일반조회
+        self.comm_rq_data('예수금상세현황요청', 'opw00001', 0, '2001')
+
+        # 결과 가져오기
+        s_예수금 = self.s_예수금
+
+        # 데이터 타입 지정
+        n_예수금 = int(s_예수금)
+
+        return n_예수금
+
+    def get_tr_계좌잔고(self, s_계좌번호):
+        """ 계좌의 D+2일 추정 예수금 조회하여 df_계좌잔고, df_종목별잔고 리턴 (OnReceiveTrData 이벤트 발생) """
+        # TR 요청
+        self.set_input_value('계좌번호', s_계좌번호)
+        self.comm_rq_data('계좌평가잔고내역요청', 'opw00018', 0, '2001')
+
+        # 결과 가져오기
+        df_계좌잔고 = self.df_계좌잔고
+        df_종목별잔고 = self.df_종목별잔고
+
+        # 데이터 타입 지정
+        for s_컬럼명 in df_계좌잔고.columns:
+            df_계좌잔고[s_컬럼명] = df_계좌잔고[s_컬럼명].astype(int)
+        df_계좌잔고['수익률'] = df_계좌잔고['수익률'] / 100 if self.s_접속서버 == '실서버' else df_계좌잔고['수익률']
+
+        df_종목별잔고['종목코드'] = df_종목별잔고['종목코드'].apply(lambda x: x[-6:])
+        li_컬럼명_str = ['종목코드', '종목명']
+        li_컬럼명_int = [s_컬럼명 for s_컬럼명 in df_종목별잔고.columns if s_컬럼명 not in li_컬럼명_str]
+        for s_컬럼명 in li_컬럼명_int:
+            df_종목별잔고[s_컬럼명] = df_종목별잔고[s_컬럼명].astype(int)
+        df_종목별잔고['수익률'] = df_종목별잔고['수익률'] / 100 if self.s_접속서버 == '실서버' else df_종목별잔고['수익률']
+
+        return df_계좌잔고, df_종목별잔고
 
 
 
 
-
-
-    def tget_ohlcv_day_long(self, s_code, s_date=None):
-        ''' 종목코드별 일봉 데이터 조회하여 df 리턴 '''
-        # TR 요청 (일봉)
-        self.set_input_value('종목코드', s_code)
-        # self.set_input_value('기준일자', s_date)
-        self.comm_rq_data('opt10081_req', 'opt10081', 0, '2001')
-
-        # TR 결과 (일봉)
-        ret = self.df_ohlcv_day
-        return ret
-
-    def tget_ohlcv_min(self, s_code, n_bong):
-        ''' 종목코드별 분봉 데이터 조회하여 df 리턴 '''
-        # TR 요청 (분봉)
-        self.set_input_value('종목코드', s_code)
-        self.set_input_value('틱범위', str(n_bong))  # [1]1분, [3]3분, [5]5분, [10]10분, [15]15분, [30]30분, [45]45분, [60]60분
-        self.comm_rq_data('opt10080_req', 'opt10080', 0, '2002')
-
-        # TR 결과 (분봉)
-        ret = self.df_ohlcv_min
-        return ret
-
-    def tget_ohlcv_min_long(self, s_code, n_bong, s_date):
-        ''' 종목코드별 분봉 데이터 조회하여 df 리턴 (요청한 날짜까지 장기간 조회) '''
-        # TR 요청 (분봉)
-        self.set_input_value('종목코드', s_code)
-        self.set_input_value('틱범위', str(n_bong))  # [1]1분, [3]3분, [5]5분, [10]10분, [15]15분, [30]30분, [45]45분, [60]60분
-        self.comm_rq_data('opt10080_req', 'opt10080', 0, '2002')
-
-        # TR 결과 (분봉)
-        df_ret = self.df_ohlcv_min
-
-        # 기간 포함 확인용 데이터 생성
-        df_ret['n_date'] = df_ret['date'].apply(lambda x: int(x.replace('-', '')))
-        ary_date = df_ret['n_date'].unique()
-
-        # 데이터 없으면 비어있는 df 리턴
-        if len(df_ret) == 0:
-            return df_ret
-
-        # 데이터가 900개 미만이면 df 리턴
-        if len(df_ret) < 900:
-            return df_ret
-
-        # 조회 일자 미포함 시 추가 조회 진행
-        li_df_ret = [df_ret]
-        while ary_date.min() >= int(s_date):
-            time.sleep(0.2)
-            self.set_input_value('종목코드', s_code)
-            self.set_input_value('틱범위', str(n_bong))
-            self.comm_rq_data('opt10080_req', 'opt10080', 2, '2002')
-
-            df_ret = self.df_ohlcv_min
-            df_ret['n_date'] = df_ret['date'].apply(lambda x: int(x.replace('-', '')))
-            ary_date = df_ret['n_date'].unique()
-            li_df_ret.append(df_ret)
-
-        # df 정리
-        df_result = pd.concat(li_df_ret, axis=0).drop_duplicates()
-        df_result = df_result[df_result['n_date'] >= int(s_date)].sort_values(['date', 'time'], ascending=False)
-        del df_result['n_date']
-
-        return df_result
 
     def tget_ohlcv_day_allcodes(self, s_market):
         ''' 시장 내 전체 종목코드의 현재가 조회하여 df 리턴 '''
@@ -444,27 +477,9 @@ class KiwoomAPI(QAxWidget):
         ret = self.df_ohlcv_day_allcodes
         return ret
 
-    def tget_d2_deposit(self, s_account_number):
-        ''' 입력받은 계좌의 D+2일 추정 예수금 조회하여 int 리턴'''
-        # TR 요청
-        self.set_input_value('계좌번호', s_account_number)
-        self.set_input_value('비밀번호입력매체구분', '00')
-        self.set_input_value('조회구분', '3')  # 3:추정조회, 2:일반조회
-        self.comm_rq_data('opw00001_req', 'opw00001', 0, '2000')
 
-        # 예수금 데이터 표기
-        ret = self.n_d2_deposit
-        return ret
 
-    def tget_balance(self, s_account_number):
-        ''' 계좌 잔고 요청하여 dic 리턴 (전체는 total, 종목은 종목코드)'''
-        # TR 요청
-        self.set_input_value('계좌번호', s_account_number)
-        self.comm_rq_data('opw00018_req', 'opw00018', 0, '2000')
 
-        # 계좌 잔고 표기
-        ret = self.dic_balance
-        return ret
 
     def tget_trade_history(self, s_date, s_account_number):
         ''' 계좌별 주문체결 현황 요청하여 df 리턴 '''
@@ -717,6 +732,9 @@ class KiwoomAPI(QAxWidget):
 
         # 요청 종류별 데이터 수신 모듈 연결
         if s_요청명 == '주식일봉차트조회요청': self._opt10081(s_요청명, s_tr코드)     # self.df_일봉
+        if s_요청명 == '주식분봉차트조회요청': self._opt10080(s_요청명, s_tr코드)     # self.df_분봉
+        if s_요청명 == '예수금상세현황요청': self._opw00001(s_요청명, s_tr코드)       # self.df_예수금
+        if s_요청명 == '계좌평가잔고내역요청': self._opw00018(s_요청명, s_tr코드)     # self.dic_계좌잔고
 
         try:
             self.eventloop_tr조회.exit()
@@ -760,6 +778,54 @@ class KiwoomAPI(QAxWidget):
                   '수정주가구분', '수정비율', '대업종구분', '소업종구분', '종목정보', '수정주가이벤트', '전일종가']
         # 수신 데이터 정리 (비어있는 항목 포함)
         self.df_일봉 = pd.DataFrame(li_데이터, columns=li_컬럼명)
+
+    def _opt10080(self, s_요청명, s_tr코드):
+        """ 데이터 수신 모듈 (주식분봉차트조회요청) """
+        li_데이터 = self._get_comm_data_ex(s_tr코드, s_요청명)
+        li_컬럼명 = ['현재가', '거래량', '체결시간', '시가', '고가', '저가',
+                  '수정주가구분', '수정비율', '대업종구분', '소업종구분', '종목정보', '수정주가이벤트', '전일종가']
+        # 수신 데이터 정리 (비어있는 항목 포함)
+        self.df_분봉 = pd.DataFrame(li_데이터, columns=li_컬럼명)
+
+    def _opw00001(self, s_요청명, s_tr코드):
+        """ 데이터 수신 모듈 (예수금상세현황요청) """
+        self.s_예수금 = self._get_comm_data(s_tr코드, s_요청명, 0, 'd+2추정예수금')
+
+    def _opw00018(self, s_요청명, s_tr코드):
+        """ 데이터 수신 모듈 (계좌평가잔고내역요청) """
+        # 잔고 데이터 받아오기 (계좌잔고)
+        li_계좌잔고 = list()
+        li_계좌잔고.append(self._get_comm_data(s_tr코드, s_요청명, 0, '총매입금액'))
+        li_계좌잔고.append(self._get_comm_data(s_tr코드, s_요청명, 0, '총평가금액'))
+        li_계좌잔고.append(self._get_comm_data(s_tr코드, s_요청명, 0, '총평가손익금액'))
+        li_계좌잔고.append(self._get_comm_data(s_tr코드, s_요청명, 0, '총수익률(%)'))
+        li_계좌잔고.append(self._get_comm_data(s_tr코드, s_요청명, 0, '추정예탁자산'))
+
+        # df 생성 (계좌잔고)
+        li_컬럼명 = ['매입금액', '평가금액', '평가손익', '수익률', '추정자산']
+        df_계좌잔고 = pd.DataFrame([li_계좌잔고], columns=li_컬럼명)
+        self.df_계좌잔고 = df_계좌잔고
+
+        # 잔고 데이터 받아오기 (종목별잔고)
+        n_데이터길이 = self._데이터길이확인(s_tr코드, s_요청명)
+        li_종목별잔고 = []
+        for i in range(n_데이터길이):
+            # 잔고 데이터 받아오기 (종목별)
+            li_잔고 = list()
+            li_잔고.append(self._get_comm_data(s_tr코드, s_요청명, i, '종목번호'))
+            li_잔고.append(self._get_comm_data(s_tr코드, s_요청명, i, '종목명'))
+            li_잔고.append(self._get_comm_data(s_tr코드, s_요청명, i, '보유수량'))
+            li_잔고.append(self._get_comm_data(s_tr코드, s_요청명, i, '매입가'))
+            li_잔고.append(self._get_comm_data(s_tr코드, s_요청명, i, '현재가'))
+            li_잔고.append(self._get_comm_data(s_tr코드, s_요청명, i, '평가손익'))
+            li_잔고.append(self._get_comm_data(s_tr코드, s_요청명, i, '수익률(%)'))
+
+            li_종목별잔고.append(li_잔고)
+
+        # df 생성 (종목별잔고)
+        li_컬럼명 = ['종목코드', '종목명', '보유수량', '매입가', '현재가', '평가손익', '수익률']
+        df_종목별잔고 = pd.DataFrame(li_종목별잔고, columns=li_컬럼명)
+        self.df_종목별잔고 = df_종목별잔고
 
     def _데이터길이확인(self, s_tr코드, s_요청명):
         """ TR 결과 데이터 갯수 확인 """
@@ -847,4 +913,7 @@ if __name__ == "__main__":
     # api.get_조건검색('52주신고가')
     # api.get_조건검색_전체()
 
-    api.get_tr_일봉조회(s_종목코드='000020')
+    # api.get_tr_일봉조회(s_종목코드='000020', s_기준일자_부터='20220525')
+    # api.get_tr_분봉조회(s_종목코드='000020', n_틱범위=1, s_기준일자_까지='20230524')
+    # api.get_tr_예수금(s_계좌번호='5292685210')
+    api.get_tr_계좌잔고(s_계좌번호='5397778810')
