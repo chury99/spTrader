@@ -357,11 +357,12 @@ class KiwoomAPI(QAxWidget):
 
         return df_일봉
 
-    def get_tr_분봉조회(self, s_종목코드, n_틱범위, s_기준일자_까지=None):
+    def get_tr_분봉조회(self, s_종목코드, n_틱범위=None, s_기준일자_까지=None):
         """ 종목코드별 분봉 데이터 조회하여 df 리턴 - 900개 (OnReceiveTrData 이벤트 발생) \n
-        # 틱범위 : [1]1분, [3]3분, [5]5분, [10]10분, [15]15분, [30]30분, [45]45분, [60]60분 \n
+        # 틱범위 : [1]1분, [3]3분, [5]5분, [10]10분, [15]15분, [30]30분, [45]45분, [60]60분 (default: 1) \n
         # 기준일자 : 현재부터 기준일자까지 전체 데이터 조회 (default: 오늘일자) """
         # 변수 정의
+        n_틱범위 = 1 if n_틱범위 is None else n_틱범위
         s_기준일자_까지 = self.s_오늘 if s_기준일자_까지 is None else s_기준일자_까지
 
         # TR 요청
@@ -448,6 +449,67 @@ class KiwoomAPI(QAxWidget):
         df_종목별잔고['수익률'] = df_종목별잔고['수익률'] / 100 if self.s_접속서버 == '실서버' else df_종목별잔고['수익률']
 
         return df_계좌잔고, df_종목별잔고
+
+    def get_tr_거래량급증(self, s_시장구분=None, s_정렬구분=None, s_시간구분=None, s_거래량구분=None, s_시간=None,
+                     s_종목조건=None, s_가격구분=None):
+        """ 거래량 급증하는 종목 조회하여 df 리턴 (OnReceiveTrData 이벤트 발생) \n
+        # 시장구분 : '전체', '코스피', '코스닥' (None 값은 '전체') \n
+        # 정렬구분 : '급증량', '급증률' (None 값은 '급증률') \n
+        # 시간구분 : '분', '전일' (None 값은 '분') \n
+        # 거래량구분 : '5천주이상', '만주이상', '5만주이상', '10만주이상', '20만주이상', '30만주이상', '50만주이상', '백만주이상'
+                    (None 값은 '10만주이상') \n
+        # 시간 : 분단위 시간 입력 (None 값은 10분) \n
+        # 종목조건 : '전체조회', '관리종목제외', '증100제외', '증100만보기', '증40만보기', '증30만보기', '증20만보기'
+                    (None 값은 '관리종목제외') \n
+        # 가격구분 : '전체조회', '5만원이상', '1만원이상', '5천원이상', '1천원이상', '10만원이상' (None 값은 '전체조회') """
+        # 변수 정의
+        dic_시장구분 = {'전체': '000', '코스피': '001', '코스닥': '101'}
+        dic_정렬구분 = {'급증량': '1', '급증률': '2'}
+        dic_시간구분 = {'분': '1', '전일': '2'}
+        dic_거래량구분 = {'5천주이상': '5', '만주이상': '10', '5만주이상': '50',
+                     '10만주이상': '100', '20만주이상': '200', '30만주이상': '300', '50만주이상': '500', '백만주이상': '1000'}
+        dic_종목조건 = {'전체조회': '0', '관리종목제외': '1',
+                    '증100제외': '5', '증100만보기': '6', '증40만보기': '7', '증30만보기': '8', '증20만보기': '9'}
+        dic_가격구분 = {'전체조회': '0', '5만원이상': '2', '1만원이상': '5', '5천원이상': '6', '1천원이상': '8', '10만원이상': '9'}
+
+        s_시장구분 = dic_시장구분['전체'] if s_시장구분 is None else dic_시장구분[s_시장구분]
+        s_정렬구분 = dic_정렬구분['급증률'] if s_정렬구분 is None else dic_정렬구분[s_정렬구분]
+        s_시간구분 = dic_시간구분['분'] if s_시간구분 is None else dic_시간구분[s_시간구분]
+        s_거래량구분 = dic_거래량구분['10만주이상'] if s_거래량구분 is None else dic_거래량구분[s_거래량구분]
+        s_시간 = '10' if s_시간 is None else s_시간
+        s_종목조건 = dic_종목조건['관리종목제외'] if s_종목조건 is None else dic_종목조건[s_종목조건]
+        s_가격구분 = dic_가격구분['전체조회'] if s_가격구분 is None else dic_가격구분[s_가격구분]
+
+        # TR 요청
+        self.set_input_value('시장구분', s_시장구분)
+        self.set_input_value('정렬구분', s_정렬구분)
+        self.set_input_value('시간구분', s_시간구분)
+        self.set_input_value('거래량구분', s_거래량구분)
+        self.set_input_value('시간', s_시간)
+        self.set_input_value('종목조건', s_종목조건)
+        self.set_input_value('가격구분', s_가격구분)
+        self.comm_rq_data('거래량급증요청', 'opt10023', 0, '2001')
+
+        # 결과 가져오기
+        df_거래량급증 = self.df_거래량급증
+        # [ 참고사항 ] 현재거래량: 일누적 거래량, 급증량: 이번틱 거래량, 급증률: 누적 거래량 대비 이번틱 거래량
+
+        # 데이터 타입 지정
+        li_컬럼명_abs = ['현재가']
+        li_컬럼명_int = ['전일대비', '이전거래량', '현재거래량', '급증량']
+        li_컬럼명_float = ['등락률', '급증률']
+
+        for s_컬럼명 in li_컬럼명_abs:
+            df_거래량급증[s_컬럼명] = abs(df_거래량급증[s_컬럼명].astype(int))
+        for s_컬럼명 in li_컬럼명_int:
+            df_거래량급증[s_컬럼명] = df_거래량급증[s_컬럼명].astype(int)
+        for s_컬럼명 in li_컬럼명_float:
+            df_거래량급증[s_컬럼명] = df_거래량급증[s_컬럼명].astype(float)
+
+        df_거래량급증['전일대비기호'] = df_거래량급증['전일대비기호'].apply(lambda x:
+                                                      '상승' if x == '2' else '하락' if x == '5' else '보합')
+
+        return df_거래량급증
 
 
 
@@ -735,6 +797,12 @@ class KiwoomAPI(QAxWidget):
         if s_요청명 == '주식분봉차트조회요청': self._opt10080(s_요청명, s_tr코드)     # self.df_분봉
         if s_요청명 == '예수금상세현황요청': self._opw00001(s_요청명, s_tr코드)       # self.df_예수금
         if s_요청명 == '계좌평가잔고내역요청': self._opw00018(s_요청명, s_tr코드)     # self.dic_계좌잔고
+        if s_요청명 == '거래량급증요청': self._opt10023(s_요청명, s_tr코드)          # self.df_거래량급증
+
+        # if s_rqname == 'opt20002_req': self._opt20002(s_rqname, s_trcode)  # 업종별주가요청-전체종목현재가 (self.df_ohlcv_day_allcodes)
+        # if s_rqname == 'opt10001_req': self._opt10001(s_rqname, s_trcode)  # 주식기본정보요청 (액면가) (self.df_basic_inform)
+        # if s_rqname == 'opt10003_req': self._opt10003(s_rqname, s_trcode)  # 체결정보요청 (self.df_contract)
+
 
         try:
             self.eventloop_tr조회.exit()
@@ -827,6 +895,15 @@ class KiwoomAPI(QAxWidget):
         df_종목별잔고 = pd.DataFrame(li_종목별잔고, columns=li_컬럼명)
         self.df_종목별잔고 = df_종목별잔고
 
+    def _opt10023(self, s_요청명, s_tr코드):
+        """ 데이터 수신 모듈 (거래량급증요청) """
+        li_데이터 = self._get_comm_data_ex(s_tr코드, s_요청명)
+        li_컬럼명 = ['종목코드', '종목명', '현재가', '전일대비기호', '전일대비', '등락률', '이전거래량', '현재거래량',
+                  '급증량', '급증률']
+        # 수신 데이터 정리
+        # [ 참고사항 ] 현재거래량: 일누적 거래량, 급증량: 이번틱 거래량, 급증률: 누적 거래량 대비 이번틱 거래량
+        self.df_거래량급증 = pd.DataFrame(li_데이터, columns=li_컬럼명)
+
     def _데이터길이확인(self, s_tr코드, s_요청명):
         """ TR 결과 데이터 갯수 확인 """
         n_리턴값 = self.dynamicCall('GetRepeatCnt(QString, QString)', s_tr코드, s_요청명)
@@ -914,6 +991,7 @@ if __name__ == "__main__":
     # api.get_조건검색_전체()
 
     # api.get_tr_일봉조회(s_종목코드='000020', s_기준일자_부터='20220525')
-    # api.get_tr_분봉조회(s_종목코드='000020', n_틱범위=1, s_기준일자_까지='20230524')
+    # api.get_tr_분봉조회(s_종목코드='000020', s_기준일자_까지='20230524')
     # api.get_tr_예수금(s_계좌번호='5292685210')
-    api.get_tr_계좌잔고(s_계좌번호='5397778810')
+    # api.get_tr_계좌잔고(s_계좌번호='5397778810')
+    api.get_tr_거래량급증()
