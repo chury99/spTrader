@@ -27,14 +27,14 @@ class KiwoomAPI(QAxWidget):
         with open('config.json', mode='rt', encoding='utf-8') as file:
             dic_config = json.load(file)
 
+        # 기준정보 정의
+        self.s_오늘 = pd.Timestamp('now').strftime('%Y%m%d')
+        self.n_딜레이 = 0.2
+
         # 폴더 정의
         folder_work = dic_config['folder_work']
         self.folder_이력 = os.path.join(folder_work, '이력')
         os.makedirs(self.folder_이력, exist_ok=True)
-
-        # 기준정보 정의
-        self.s_오늘 = pd.Timestamp('now').strftime('%Y%m%d')
-        self.n_딜레이 = 0.2
 
         # 체결잔고 정보 불러오기
         folder_체결잔고 = os.path.join(self.folder_이력, '체결잔고')
