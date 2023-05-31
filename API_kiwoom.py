@@ -3,12 +3,9 @@ import sys
 from PyQt5.QtWidgets import *
 from PyQt5.QAxContainer import *
 from PyQt5.QtCore import *
-import numpy as np
 import pandas as pd
 import json
 import time
-import sqlite3
-import pickle
 
 # [ 키움 API 통신 순서 ] (TR 주고, event 받음)
 # 1) SetInputValue : 입력 데이터 설정 @spTrader.py
@@ -181,7 +178,10 @@ class KiwoomAPI(QAxWidget):
         dic_종목정보 = {key_old: dic_종목정보[key_new] for key_old, key_new
                     in [['대분류', '시장구분0'], ['중분류', '시장구분1'], ['업종구분', '업종구분']]}
 
-        return dic_종목정보
+        # df 형태로 변환
+        df_종목정보 = pd.DataFrame([dic_종목정보.values()], columns=list(dic_종목정보.keys()))
+
+        return df_종목정보
 
     def get_투자유의종목(self, s_종목코드):
         """ 입력한 종목코드 값에 따른 투자유의종목 여부 리턴 """
@@ -219,6 +219,7 @@ class KiwoomAPI(QAxWidget):
         # 전송결과 정보 생성
         s_주문전송 = '전송성공' if n_리턴값 == 0 else '전송실패'
         self.s_주문_전송결과 = '주문횟수초과(초당5회)' if n_리턴값 == -308 else s_주문전송
+        print(f'주문전송결과 | {self.s_주문_전송결과}')
 
         # 이벤트 루프 생성
         self.eventloop_주문조회.exec_()
@@ -262,12 +263,12 @@ class KiwoomAPI(QAxWidget):
         df_조건검색['검색종목'] = li_li_검색종목
 
         # 리턴값 생성
-        dic_조건검색_검색식명2종목코드 = df_조건검색.set_index('검색식명').to_dict()['검색종목']
+        dic_조건검색식별종목코드 = df_조건검색.set_index('검색식명').to_dict()['검색종목']
 
-        return dic_조건검색_검색식명2종목코드
+        return dic_조건검색식별종목코드
 
     # ***** [ 실시간 데이터 요청 모듈 (real) ] *****
-    def real_실시간종목등록(self, s_종목코드, s_등록형태):
+    def set_실시간_종목등록(self, s_종목코드, s_등록형태):
         """ 실시간 데이터 감시 종목에 등록 요청 (장중일 때만 요청 전송) \n
         # 등록형태 : '신규', '추가' 중 선택 """
         # 등록형태 정의
@@ -296,13 +297,13 @@ class KiwoomAPI(QAxWidget):
         s_요일 = dt_현재.strftime('%a')
 
         if ((s_요일 in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'])
-                and (dt_현재 >= pd.Timestamp('09:00:00')) and (dt_now <= pd.Timestamp('15:30:00'))):
+                and (dt_현재 >= pd.Timestamp('09:00:00')) and (dt_현재 <= pd.Timestamp('15:30:00'))):
             # 실시간 데이터 감시 요청 (장중일 시)
             s_fid = f"{dic_fid['종목코드']};{dic_fid['현재가']};{dic_fid['호가시간']};" \
                     f"{dic_fid['매도호가총잔량']};{dic_fid['매도호가총잔량']}"
             self.set_real_reg('1001', s_종목코드, s_fid, dic_등록형태[s_등록형태])
 
-    def real_실시간종목해제(self, s_종목코드):
+    def set_실시간_종목해제(self, s_종목코드):
         """ 실시간 데이터 감시 종료 """
         self.set_real_remove('1001', s_종목코드)
 
@@ -314,18 +315,24 @@ class KiwoomAPI(QAxWidget):
 
     def get_실시간_체결(self, s_종목코드):
         """ 실시간 체결정보(누적) 가져와서 df로 리턴 """
-        # 데이터 가져오기
-        li_체결 = self.dic_실시간_체결[s_종목코드]
+        if s_종목코드 not in self.dic_실시간_체결.keys():
+            df_체결 = None
+        else:
+            # 데이터 가져오기
+            li_체결 = self.dic_실시간_체결[s_종목코드]
+            # df 형식으로 정리
+            df_체결 = pd.DataFrame(li_체결, columns=['종목코드', '체결시간', '현재가', '거래량', '매수매도', '거래대금'])
+            df_체결['체결시간'] = df_체결['체결시간'].astype('datetime64')
 
-        # df 형식으로 정리
-        df_체결 = pd.DataFrame(li_체결, columns=['종목코드', '체결시간', '현재가', '거래량', '매수매도', '거래대금'])
-        df_체결['체결시간'] = df_체결['체결시간'].astype('datetime64')
         return df_체결
 
     def get_실시간_호가잔량(self, s_종목코드):
         """ 실시간 호가잔량(갱신)을 가져와서 dict 리턴 """
         # 데이터 가져오기
-        dic_호가잔량 = self.dic_실시간_호가잔량[s_종목코드]
+        if s_종목코드 in self.dic_실시간_호가잔량.keys():
+            dic_호가잔량 = self.dic_실시간_호가잔량[s_종목코드]
+        else:
+            dic_호가잔량 = None
         return dic_호가잔량
 
     # ***** [ TR 요청 모듈 (tr) ] *****
@@ -511,102 +518,28 @@ class KiwoomAPI(QAxWidget):
 
         return df_거래량급증
 
-
-
-
-
-    def tget_ohlcv_day_allcodes(self, s_market):
-        ''' 시장 내 전체 종목코드의 현재가 조회하여 df 리턴 '''
-        # dic 정의
-        dic_market = {'kospi': '0', 'kosdaq': '1'}
-        dic_section = {'kospi': '001', 'kosdaq': '101'}
-
-        # TR 요청 (업종별 전체종목 현재가)
-        self.flag_tr_rq_1st = 1
-        self.set_input_value('시장구분', dic_market[s_market])
-        self.set_input_value('업종코드', dic_section[s_market])
-        self.comm_rq_data('opt20002_req', 'opt20002', 0, '2001')
-
-        # 데이터가 남아 있으면 이어서 조회
-        while self.remained_data:
-            time.sleep(0.2)
-            self.flag_tr_rq_1st = 0
-            self.set_input_value('시장구분', dic_market[s_market])
-            self.set_input_value('업종코드', dic_section[s_market])
-            self.comm_rq_data('opt20002_req', 'opt20002', 2, '2001')
-
-        # TR 결과 (업종별 전체종목 현재가)
-        ret = self.df_ohlcv_day_allcodes
-        return ret
-
-
-
-
-
-    def tget_trade_history(self, s_date, s_account_number):
-        ''' 계좌별 주문체결 현황 요청하여 df 리턴 '''
+    def get_tr_종목별기본정보(self, s_종목코드):
+        """ 종목별 기본정보 조회하여 df 리턴 (OnReceiveTrData 이벤트 발생) """
         # TR 요청
-        self.flag_tr_rq_1st = 1
-        self.set_input_value('주문일자', s_date)  # YYYYMMDD
-        self.set_input_value('계좌번호', s_account_number)
-        self.set_input_value('비밀번호입력매체구분', '00')
-        self.set_input_value('주식채권구분', '0')  # [0]전체, [1]주식, [2]채권
-        self.set_input_value('시장구분', '0')  # [0]전체, [1]장내, [2]코스닥, [3]OTCBB, [4]ECN
-        self.set_input_value('매도수구분', '0')  # [0]전체, [1]매도, [2]매수
-        self.set_input_value('조회구분', '0')  # [0]전체, [1]체결
-        self.comm_rq_data('opw00009_req', 'opw00009', 0, '2001')
+        self.set_input_value('종목코드', s_종목코드)
+        self.comm_rq_data('주식기본정보요청', 'opt10001', 0, '2001')
 
-        # 데이터가 남아 있으면 이어서 조회
-        while self.remained_data == True:
-            time.sleep(0.2)
-            self.flag_tr_rq_1st = 0
-            self.set_input_value('주문일자', s_date)  # YYYYMMDD
-            self.set_input_value('계좌번호', s_account_number)
-            self.set_input_value('비밀번호입력매체구분', '00')
-            self.set_input_value('주식채권구분', '0')  # [0]전체, [1]주식, [2]채권
-            self.set_input_value('시장구분', '0')  # [0]전체, [1]장내, [2]코스닥, [3]OTCBB, [4]ECN
-            self.set_input_value('매도수구분', '0')  # [0]전체, [1]매도, [2]매수
-            self.set_input_value('조회구분', '0')  # [0]전체, [1]체결
-            self.comm_rq_data('opw00009_req', 'opw00009', 2, '2001')
+        # 결과 가져오기
+        df_기본정보 = self.df_기본정보
 
-        # 거래이력 표기
-        ret = self.df_trade_history
-        return ret
+        # 데이터 타입 지정
+        li_컬럼명_abs = ['연중최고', '연중최저', '250최고', '250최저', '시가', '고가', '저가', '현재가']
+        li_컬럼명_int = ['액면가', '상장주식', '시가총액', '거래량', '전일대비']
+        li_컬럼명_float = ['외인소진률', 'PER', '거래대비']
 
+        for s_컬럼명 in li_컬럼명_abs:
+            df_기본정보[s_컬럼명] = abs(df_기본정보[s_컬럼명].astype(int))
+        for s_컬럼명 in li_컬럼명_int:
+            df_기본정보[s_컬럼명] = df_기본정보[s_컬럼명].astype(int)
+        for s_컬럼명 in li_컬럼명_float:
+            df_기본정보[s_컬럼명] = df_기본정보[s_컬럼명].astype(float)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    ### 실시간 데이터 처리
-
-
-    ### TR 데이터 처리
-
-
-
-
-
-
-
-
-
-
-
+        return df_기본정보
 
     ###################################################################################################################
 
@@ -790,54 +723,20 @@ class KiwoomAPI(QAxWidget):
     def on_receive_tr_data(self, s_화면번호, s_요청명, s_tr코드, s_레코드명, s_연속조회, unused1, unused2, unused3, unused4):
         """ TR 데이터 받아오기 (OnReceiveTrData 이벤트 발생 시 연결) """
         # 변수 정의 (s_연속조회 : ['0']추가 데이터 없음, ['2']추가 데이터 있음)
-        b_추가데이터존재 = True if s_연속조회 == '2' else False if s_연속조회 == '0' else None
+        self.b_추가데이터존재 = True if s_연속조회 == '2' else False if s_연속조회 == '0' else None
 
         # 요청 종류별 데이터 수신 모듈 연결
         if s_요청명 == '주식일봉차트조회요청': self._opt10081(s_요청명, s_tr코드)     # self.df_일봉
         if s_요청명 == '주식분봉차트조회요청': self._opt10080(s_요청명, s_tr코드)     # self.df_분봉
         if s_요청명 == '예수금상세현황요청': self._opw00001(s_요청명, s_tr코드)       # self.df_예수금
-        if s_요청명 == '계좌평가잔고내역요청': self._opw00018(s_요청명, s_tr코드)     # self.dic_계좌잔고
+        if s_요청명 == '계좌평가잔고내역요청': self._opw00018(s_요청명, s_tr코드)     # self.df_계좌잔고, self.df_종목별잔고
         if s_요청명 == '거래량급증요청': self._opt10023(s_요청명, s_tr코드)          # self.df_거래량급증
-
-        # if s_rqname == 'opt20002_req': self._opt20002(s_rqname, s_trcode)  # 업종별주가요청-전체종목현재가 (self.df_ohlcv_day_allcodes)
-        # if s_rqname == 'opt10001_req': self._opt10001(s_rqname, s_trcode)  # 주식기본정보요청 (액면가) (self.df_basic_inform)
-        # if s_rqname == 'opt10003_req': self._opt10003(s_rqname, s_trcode)  # 체결정보요청 (self.df_contract)
-
+        if s_요청명 == '주식기본정보요청': self._opt10001(s_요청명, s_tr코드)         # self.df_기본정보
 
         try:
             self.eventloop_tr조회.exit()
         except AttributeError:
             pass
-
-
-
-        # TR 요청에 따른 모듈 연결
-        # if s_요청명 == '주문': self._주문응답(s_요청명, s_tr코드, s_레코드명)
-
-        # # 연속 데이터 플래그 설정
-        # if s_next == '2':
-        #     self.remained_data = True
-        # else:
-        #     self.remained_data = False
-        #
-        # # TR별 데이터 리딩 함수 연결
-        # if s_rqname == 'opt10081_req': self._opt10081(s_rqname, s_trcode)  # 주식일봉차트조회 (self.df_ohlcv_day)
-        # if s_rqname == 'opw00001_req': self._opw00001(s_rqname, s_trcode)  # 예수금 현황 조회 (self.n_d2_deposit)
-        # if s_rqname == 'opw00018_req': self._opw00018(s_rqname, s_trcode)  # 계좌 평가 잔고 조회 (self.dic_balance)
-        # if s_rqname == 'opt10023_req': self._opt10023(s_rqname, s_trcode)  # 거래량급등조회요청 (self.df_volume_jump)
-        # if s_rqname == 'opt10080_req': self._opt10080(s_rqname, s_trcode)  # 주식분봉차트조회요청 (self.df_ohlcv_min)
-        # if s_rqname == 'opw00009_req': self._opw00009(s_rqname, s_trcode)  # 계좌별주문체결현황요청 (self.df_trade_history)
-        # if s_rqname == 'opt10073_req': self._opt10073(s_rqname, s_trcode)  # 일자별종목별실현손익요청 (self.df_profit)
-        # if s_rqname == 'opt20002_req': self._opt20002(s_rqname,
-        #                                               s_trcode)  # 업종별주가요청-전체종목현재가 (self.df_ohlcv_day_allcodes)
-        # if s_rqname == 'opt10001_req': self._opt10001(s_rqname, s_trcode)  # 주식기본정보요청 (액면가) (self.df_basic_inform)
-        # if s_rqname == 'opt10003_req': self._opt10003(s_rqname, s_trcode)  # 체결정보요청 (self.df_contract)
-        #
-        try:
-            self.eventloop_tr조회.exit()
-        except AttributeError:
-            pass
-        # pass
 
     def _opt10081(self, s_요청명, s_tr코드):
         """ 데이터 수신 모듈 (주식일봉차트조회요청) """
@@ -904,6 +803,35 @@ class KiwoomAPI(QAxWidget):
         # [ 참고사항 ] 현재거래량: 일누적 거래량, 급증량: 이번틱 거래량, 급증률: 누적 거래량 대비 이번틱 거래량
         self.df_거래량급증 = pd.DataFrame(li_데이터, columns=li_컬럼명)
 
+    def _opt10001(self, s_요청명, s_tr코드):
+        """ 데이터 수신 모듈 (거래량급증요청) """
+        li_데이터 = list()
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '종목코드'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '종목명'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '액면가'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '상장주식'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '연중최고'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '연중최저'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '시가총액'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '외인소진률'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, 'PER'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '250최고'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '250최저'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '시가'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '고가'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '저가'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '현재가'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '거래량'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '전일대비'))
+        li_데이터.append(self._get_comm_data(s_tr코드, s_요청명, 0, '거래대비'))
+        li_데이터 = [li_데이터]
+
+        li_컬럼명 = ['종목코드', '종목명', '액면가', '상장주식', '연중최고', '연중최저', '시가총액', '외인소진률', 'PER',
+                  '250최고', '250최저', '시가', '고가', '저가', '현재가', '거래량', '전일대비', '거래대비']
+
+        # 수신 데이터 정리
+        self.df_기본정보 = pd.DataFrame(li_데이터, columns=li_컬럼명)
+
     def _데이터길이확인(self, s_tr코드, s_요청명):
         """ TR 결과 데이터 갯수 확인 """
         n_리턴값 = self.dynamicCall('GetRepeatCnt(QString, QString)', s_tr코드, s_요청명)
@@ -921,35 +849,6 @@ class KiwoomAPI(QAxWidget):
 
         return li_리턴값
 
-    # def _주문응답(self, s_요청명, s_tr코드, s_레코드명):
-    #     """ 주문 응답 읽어오기 """
-    #
-    #     # 데이터 갯수 확인
-    #     n_데이터길이 = self._데이터길이확인(s_tr코드, s_요청명)
-    #
-    #     # 데이터 받아오기
-    #     s_주문번호 = self._데이터수신(s_tr코드, s_레코드명, 0, '주문번호')
-    #
-    #     # 이벤트 루프 종료
-    #     self.eventloop_주문조회.exit()
-
-        ################### 주문 들어갈 때 이 부분 확인 필요 #############################
-
-
-        # # 데이터 구조 정의
-        # dic_ohlcv_day = {'date': [], 'open': [], 'high': [], 'low': [], 'close': [], 'volume': [], 'cash': []}
-        #
-        # # 데이터 받아오기
-        # for i in range(n_data_cnt):
-        #     date = self._get_comm_data(trcode, rqname, i, '일자')
-        #     open = self._get_comm_data(trcode, rqname, i, '시가')
-        #     high = self._get_comm_data(trcode, rqname, i, '고가')
-        #     low = self._get_comm_data(trcode, rqname, i, '저가')
-        #     close = self._get_comm_data(trcode, rqname, i, '현재가')
-        #     volume = self._get_comm_data(trcode, rqname, i, '거래량')
-        #     cash = self._get_comm_data(trcode, rqname, i, '거래대금')
-        # pass
-
 
 #######################################################################################################################
 if __name__ == "__main__":
@@ -958,40 +857,52 @@ if __name__ == "__main__":
     api.comm_connect()
 
     # 테스트용 실행 코드
-    # api.get_접속서버()
-    # api.get_접속상태()
-    # api.get_로그인정보('계좌수')
-    # api.get_로그인정보('계좌목록')
-    # api.get_로그인정보('아이디')
-    # api.get_로그인정보('사용자명')
-    # api.get_로그인정보('키보드보안해지여부')
-    # api.get_로그인정보('방화벽설정여부')
-    # api.get_전체종목코드('코스피')
-    # api.get_전체종목코드('코스닥')
-    # api.get_전체종목코드('ELW')
-    # api.get_전체종목코드('ETF')
-    # api.get_전체종목코드('KONEX')
-    # api.get_전체종목코드('뮤추얼펀드')
-    # api.get_전체종목코드('신주인수권')
-    # api.get_전체종목코드('리츠')
-    # api.get_전체종목코드('하이얼펀드')
-    # api.get_전체종목코드('K-OTC')
-    # api.get_코드별종목명('000020')
-    # api.get_코드별상장주식수('000020')
-    # api.get_코드별감리구분('000020')
-    # api.get_코드별상장일('000020')
-    # api.get_코드별기준가('000020')
-    # api.get_종목정보('000020')
-    # api.get_투자유의종목('000020')
+    s_접속서버 = api.get_접속서버()
+    s_접속상태 = api.get_접속상태()
+    s_로그인정보_코드 = api.get_로그인정보('계좌수')
+    s_로그인정보_계좌목록 = api.get_로그인정보('계좌목록')
+    s_로그인정보_아이디 = api.get_로그인정보('아이디')
+    s_로그인정보_사용자명 = api.get_로그인정보('사용자명')
+    s_로그인정보_키보드보안해지여부 = api.get_로그인정보('키보드보안해지여부')
+    s_로그인정보_방화벽설정여부 = api.get_로그인정보('방화벽설정여부')
+    li_전체종목코드_코스피 = api.get_전체종목코드('코스피')
+    li_전체종목코드_코스닥 = api.get_전체종목코드('코스닥')
+    li_전체종목코드_ELW = api.get_전체종목코드('ELW')
+    li_전체종목코드_ETF = api.get_전체종목코드('ETF')
+    li_전체종목코드_KONEX = api.get_전체종목코드('KONEX')
+    li_전체종목코드_뮤추얼펀드 = api.get_전체종목코드('뮤추얼펀드')
+    li_전체종목코드_신주인수권 = api.get_전체종목코드('신주인수권')
+    li_전체종목코드_리츠 = api.get_전체종목코드('리츠')
+    li_전체종목코드_하이얼펀드 = api.get_전체종목코드('하이얼펀드')
+    li_전체종목코드_KOTC = api.get_전체종목코드('K-OTC')
+    s_종목명 = api.get_코드별종목명('000020')
+    n_상장주식수 = api.get_코드별상장주식수('000020')
+    s_감리구분 = api.get_코드별감리구분('000020')
+    s_상장일 = api.get_코드별상장일('000020')
+    n_기준가 = api.get_코드별기준가('000020')
+    df_종목정보 = api.get_종목정보('000020')
+    s_투자유의종목 = api.get_투자유의종목('000020')
 
     # api.send_주문(s_요청명='주문', s_화면번호='0001', s_계좌번호='5292685210', n_주문유형=1, s_종목코드='000020',
     #             n_주문수량=1000, n_주문단가=1000, s_거래구분='00', s_원주문번호='')
 
-    # api.get_조건검색('52주신고가')
-    # api.get_조건검색_전체()
-
-    # api.get_tr_일봉조회(s_종목코드='000020', s_기준일자_부터='20220525')
-    # api.get_tr_분봉조회(s_종목코드='000020', s_기준일자_까지='20230524')
-    # api.get_tr_예수금(s_계좌번호='5292685210')
-    # api.get_tr_계좌잔고(s_계좌번호='5397778810')
-    api.get_tr_거래량급증()
+    # dic_조건검색식별종목코드 = api.get_조건검색_전체()
+    #
+    # api.set_실시간_종목등록(s_종목코드='000020', s_등록형태='신규')
+    # api.set_실시간_종목등록(s_종목코드='000020', s_등록형태='추가')
+    # n_실시간_현재가 = api.get_실시간_현재가(s_종목코드='000020')
+    # df_체결 = api.get_실시간_체결(s_종목코드='000020')
+    # dic_호가잔량 = api.get_실시간_호가잔량(s_종목코드='000020')
+    # api.set_실시간_종목해제(s_종목코드='000020')
+    #
+    df_일봉 = api.get_tr_일봉조회(s_종목코드='000020', s_기준일자_부터='20220525')
+    time.sleep(0.2)
+    df_분봉 = api.get_tr_분봉조회(s_종목코드='000020', s_기준일자_까지='20230524')
+    time.sleep(0.2)
+    n_예수금 = api.get_tr_예수금(s_계좌번호='5292685210')
+    time.sleep(0.2)
+    df_계좌잔고, df_종목별잔고 = api.get_tr_계좌잔고(s_계좌번호='5397778810')
+    time.sleep(0.2)
+    df_거래량급증 = api.get_tr_거래량급증()
+    time.sleep(0.2)
+    df_기본정보 = api.get_tr_종목별기본정보(s_종목코드='000020')
