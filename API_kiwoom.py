@@ -309,31 +309,44 @@ class KiwoomAPI(QAxWidget):
 
     def get_실시간_현재가(self, s_종목코드):
         """ 실시간 현재가(갱신) 가져와서 int 리턴 (데이터 없으면 None 리턴) """
-        n_실시간_현재가 = self.dic_실시간_현재가[s_종목코드] if s_종목코드 in self.dic_실시간_현재가.keys() else None
+        try:
+            n_실시간_현재가 = self.dic_실시간_현재가[s_종목코드] if s_종목코드 in self.dic_실시간_현재가.keys() else None
+        except AttributeError:
+            n_실시간_현재가 = '[error] 실시간 종목 등록 필요'
 
         return n_실시간_현재가
 
     def get_실시간_체결(self, s_종목코드):
         """ 실시간 체결정보(누적) 가져와서 df로 리턴 """
-        if s_종목코드 not in self.dic_실시간_체결.keys():
-            df_체결 = None
-        else:
-            # 데이터 가져오기
-            li_체결 = self.dic_실시간_체결[s_종목코드]
-            # df 형식으로 정리
-            df_체결 = pd.DataFrame(li_체결, columns=['종목코드', '체결시간', '현재가', '거래량', '매수매도', '거래대금'])
-            df_체결['체결시간'] = df_체결['체결시간'].astype('datetime64')
+        try:
+            if s_종목코드 not in self.dic_실시간_체결.keys():
+                df_체결 = None
+            else:
+                # 데이터 가져오기
+                li_체결 = self.dic_실시간_체결[s_종목코드]
+                # df 형식으로 정리
+                df_체결 = pd.DataFrame(li_체결, columns=['종목코드', '체결시간', '현재가', '거래량', '매수매도', '거래대금'])
+                df_체결['체결시간'] = df_체결['체결시간'].astype('datetime64')
+        except AttributeError:
+            df_체결 = '[error] 실시간 종목 등록 필요'
 
         return df_체결
 
     def get_실시간_호가잔량(self, s_종목코드):
         """ 실시간 호가잔량(갱신)을 가져와서 dict 리턴 """
-        # 데이터 가져오기
-        if s_종목코드 in self.dic_실시간_호가잔량.keys():
-            dic_호가잔량 = self.dic_실시간_호가잔량[s_종목코드]
-        else:
-            dic_호가잔량 = None
-        return dic_호가잔량
+        try:
+            # 데이터 가져오기
+            if s_종목코드 not in self.dic_실시간_호가잔량.keys():
+                df_호가잔량 = None
+            else:
+                # 데이터 가져오기
+                dic_호가잔량 = self.dic_실시간_호가잔량[s_종목코드]
+                # df 형식으로 정리
+                df_호가잔량 = pd.DataFrame([dic_호가잔량.values()], columns=dic_호가잔량.keys())
+        except AttributeError:
+            df_호가잔량 = '[error] 실시간 종목 등록 필요'
+
+        return df_호가잔량
 
     # ***** [ TR 요청 모듈 (tr) ] *****
     def get_tr_일봉조회(self, s_종목코드, s_기준일자_부터=None):
@@ -663,6 +676,10 @@ class KiwoomAPI(QAxWidget):
             # dict 저장
             self.dic_실시간_현재가[s_종목코드] = n_현재가
 
+            # 화면 출력
+            li_데이터 = [s_종목코드, n_현재가]
+            print(f'실시간 | {s_실시간타입} | {li_데이터}')
+
         # 주식체결 데이터 수집 (누적)
         if s_실시간타입 == "주식체결":
             s_체결시간 = self._get_comm_real_data(s_종목코드, 20)
@@ -676,11 +693,16 @@ class KiwoomAPI(QAxWidget):
             n_거래량 = abs(int(volume))
             n_거래대금 = n_현재가 * n_거래량
 
+            li_데이터 = [s_종목코드, s_체결시간, n_현재가, n_거래량, s_매수매도, n_거래대금]
+
             # dict 저장
             if s_code in self.dic_실시간_체결.keys():
-                self.dic_실시간_체결[s_종목코드].append([s_종목코드, s_체결시간, n_현재가, n_거래량, s_매수매도, n_거래대금])
+                self.dic_실시간_체결[s_종목코드].append(li_데이터)
             else:
-                self.dic_실시간_체결[s_종목코드] = [[s_종목코드, s_체결시간, n_현재가, n_거래량, s_매수매도, n_거래대금]]
+                self.dic_실시간_체결[s_종목코드] = [li_데이터]
+
+            # 화면 출력
+            print(f'실시간 | {s_실시간타입} | {li_데이터}')
 
         # 호가잔량 데이터 수집 (갱신)
         if s_실시간타입 == "주식호가잔량":
@@ -696,6 +718,10 @@ class KiwoomAPI(QAxWidget):
             # dict 저장
             self.dic_실시간_호가잔량[s_종목코드] = {'종목코드': s_종목코드, '호가시간': s_호가시간,
                                          '매도호가잔량': n_매도호가잔량, '매수호가잔량': n_매수호가잔량}
+
+            # 화면 출력
+            li_데이터 = [s_종목코드, s_호가시간, n_매도호가잔량, n_매수호가잔량]
+            print(f'실시간 | {s_실시간타입} | {li_데이터}')
 
     def _get_comm_real_data(self, s_종목코드, n_fid):
         """ 실시간 데이터 값 요청 (OnReceiveRealData 내부에서 사용) """
@@ -886,13 +912,13 @@ if __name__ == "__main__":
     # api.send_주문(s_요청명='주문', s_화면번호='0001', s_계좌번호='5292685210', n_주문유형=1, s_종목코드='000020',
     #             n_주문수량=1000, n_주문단가=1000, s_거래구분='00', s_원주문번호='')
 
-    # dic_조건검색식별종목코드 = api.get_조건검색_전체()
+    dic_조건검색식별종목코드 = api.get_조건검색_전체()
     #
     # api.set_실시간_종목등록(s_종목코드='000020', s_등록형태='신규')
     # api.set_실시간_종목등록(s_종목코드='000020', s_등록형태='추가')
-    # n_실시간_현재가 = api.get_실시간_현재가(s_종목코드='000020')
-    # df_체결 = api.get_실시간_체결(s_종목코드='000020')
-    # dic_호가잔량 = api.get_실시간_호가잔량(s_종목코드='000020')
+    n_실시간_현재가 = api.get_실시간_현재가(s_종목코드='000020')
+    df_체결 = api.get_실시간_체결(s_종목코드='000020')
+    df_호가잔량 = api.get_실시간_호가잔량(s_종목코드='000020')
     # api.set_실시간_종목해제(s_종목코드='000020')
     #
     df_일봉 = api.get_tr_일봉조회(s_종목코드='000020', s_기준일자_부터='20220525')
@@ -906,3 +932,4 @@ if __name__ == "__main__":
     df_거래량급증 = api.get_tr_거래량급증()
     time.sleep(0.2)
     df_기본정보 = api.get_tr_종목별기본정보(s_종목코드='000020')
+    time.sleep(0.2)
