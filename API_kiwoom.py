@@ -33,13 +33,17 @@ class KiwoomAPI(QAxWidget):
 
         # 폴더 정의
         folder_work = dic_config['folder_work']
-        self.folder_이력 = os.path.join(folder_work, '이력')
-        os.makedirs(self.folder_이력, exist_ok=True)
+        folder_체결잔고 = os.path.join(folder_work, '이력', '체결잔고')
+        folder_메세지 = os.path.join(folder_work, '이력', '메세지')
+        folder_실시간 = os.path.join(folder_work, '이력', '실시간')
+        os.makedirs(folder_체결잔고, exist_ok=True)
+        os.makedirs(folder_메세지, exist_ok=True)
+        os.makedirs(folder_실시간, exist_ok=True)
+        self.path_체결잔고 = os.path.join(folder_체결잔고, f'체결잔고_{self.s_오늘}.csv')
+        self.path_메세지 = os.path.join(folder_메세지, f'메세지_{self.s_오늘}.txt')
+        self.folder_실시간 = folder_실시간
 
         # 체결잔고 정보 불러오기
-        folder_체결잔고 = os.path.join(self.folder_이력, '체결잔고')
-        os.makedirs(folder_체결잔고, exist_ok=True)
-        self.path_체결잔고 = os.path.join(folder_체결잔고, f'체결잔고_{self.s_오늘}.csv')
         try:
             self.df_체결잔고 = pd.read_csv(self.path_체결잔고, encoding='cp949')
         except FileNotFoundError:
@@ -228,7 +232,11 @@ class KiwoomAPI(QAxWidget):
         # 전송결과 정보 생성
         s_주문전송 = '전송성공' if n_리턴값 == 0 else '전송실패'
         self.s_주문_전송결과 = '주문횟수초과(초당5회)' if n_리턴값 == -308 else s_주문전송
-        print(f'주문전송결과 | {self.s_주문_전송결과}')
+
+        s_텍스트 = f'주문전송결과 | {self.s_주문_전송결과}'
+        print(s_텍스트)
+        with open(self.path_메세지, 'at') as file:
+            file.write(f'{s_텍스트}\n')
 
         # 이벤트 루프 생성
         self.eventloop_주문조회.exec_()
@@ -579,9 +587,13 @@ class KiwoomAPI(QAxWidget):
 
         # 접속 결과 출력
         if n_에러코드 == 0:
-            print(f'*** Connected at Kiwoom API server [{self.s_접속서버}] ***')
+            s_텍스트 = f'*** Connected at Kiwoom API server [{self.s_접속서버}] ***'
         else:
-            print(f'*** Connection Fail - {self.s_접속결과} ***')
+            s_텍스트 = f'*** Connection Fail - {self.s_접속결과} ***'
+
+        print(s_텍스트)
+        with open(self.path_메세지, 'at') as file:
+            file.write(f'{s_텍스트}\n')
 
         self.eventloop_로그인.exit()
 
@@ -589,7 +601,11 @@ class KiwoomAPI(QAxWidget):
         """ 주문전송 서버 메시지 수신 (OnReceiveMsg 이벤트 연결, 이벤트루프 필요) """
         # 메세지 처리
         self.s_주문_메세지 = s_메세지
-        print(f'메세지수신 | {s_메세지}')
+        s_텍스트 = f'메세지수신 | {s_메세지}'
+
+        print(s_텍스트)
+        with open(self.path_메세지, 'at') as file:
+            file.write(f'{s_텍스트}\n')
 
         # 이벤트루프 종료
         self.eventloop_주문조회.exit()
@@ -609,22 +625,19 @@ class KiwoomAPI(QAxWidget):
                      '상한가': 305, '하한가': 306}
 
         # 주문/체결 정보 정리
-        df_체결잔고 = self.df_체결잔고.copy()
-        if len(df_체결잔고) == 0:
-            df_체결잔고['구분'] = [dic_구분[s_구분]]
-            for s_항목 in dic_FID목록.keys():
-                df_체결잔고[s_항목] = [self._get_chejan_data(dic_FID목록[s_항목])]
-        else:
-            df_체결잔고['구분'].append(dic_구분[s_구분])
-            for s_항목 in dic_FID목록.keys():
-                df_체결잔고[s_항목].append(self._get_chejan_data(dic_FID목록[s_항목]))
+        dic_체결잔고 = dict()
+        dic_체결잔고['구분'] = [dic_구분[s_구분]]
+        dic_체결잔고['시간'] = [pd.Timestamp('now').strftime('%H:%M:%S')]
+        for s_항목 in dic_FID목록.keys():
+            dic_체결잔고[s_항목] = [self._get_chejan_data(dic_FID목록[s_항목])]
+        df_체결잔고 = pd.DataFrame(dic_체결잔고)
 
         # df 정리
-        self.df_체결잔고 = pd.concat([self.df_체결잔고, df_체결잔고], axis=0)
-        self.df_체결잔고 = self.df_체결잔고.sort_values('주문체결시간', ascending=Fasle).reset_index(drop=True)
+        self.df_체결잔고_누적 = pd.concat([self.df_체결잔고, df_체결잔고], axis=0)
+        self.df_체결잔고_누적 = self.df_체결잔고_누적.sort_values('주문체결시간', ascending=False).reset_index(drop=True)
 
         # df 저장
-        self.df_체결잔고.to_csv(self.path_체결잔고, index=False, encoding='cp949')
+        self.df_체결잔고_누적.to_csv(self.path_체결잔고, index=False, encoding='cp949')
 
     def _get_chejan_data(self, n_fid):
         """ FID별 체결/잔고 데이터 요청 (OnReceiveChejanData 내부에서 사용) """
@@ -679,15 +692,21 @@ class KiwoomAPI(QAxWidget):
     def on_receive_real_data(self, s_종목코드, s_실시간타입, s_실시간데이터):
         """ 실시간 데이터 받아오기 (OnReceiveRealData 이벤트 연결) """
         # 현재가 관리 (갱신)
-        if s_실시간타입 == '주식시세':
-            s_현재가 = self._get_comm_real_data(s_종목코드, 10)
-            n_현재가 = abs(int(s_현재가))
-            # dict 저장
-            self.dic_실시간_현재가[s_종목코드] = n_현재가
-
-            # 화면 출력
-            li_데이터 = [s_종목코드, n_현재가]
-            print(f'실시간 | {s_실시간타입} | {li_데이터}')
+        # if s_실시간타입 == '주식시세':
+        #     s_현재가 = self._get_comm_real_data(s_종목코드, 10)
+        #     n_현재가 = abs(int(s_현재가))
+        #     # dict 저장
+        #     self.dic_실시간_현재가[s_종목코드] = n_현재가
+        #
+        #     # 화면 출력
+        #     li_데이터 = [s_종목코드, n_현재가]
+        #     s_텍스트 = f'실시간 | {s_실시간타입} | {li_데이터}'
+        #     print(s_텍스트)
+        #     try:
+        #         with open(os.path.join(self.folder_실시간, f'실시간_{s_실시간타입}_{self.s_오늘}.txt'), 'at') as file:
+        #             file.write(f'{s_텍스트}\n')
+        #     except PermissionError:
+        #         pass
 
         # 주식체결 데이터 수집 (누적)
         if s_실시간타입 == "주식체결":
@@ -699,19 +718,39 @@ class KiwoomAPI(QAxWidget):
             s_체결시간 = f'{s_체결시간[0:2]}:{s_체결시간[2:4]}:{s_체결시간[4:6]}'
             n_현재가 = abs(int(s_현재가))
             s_매수매도 = '매수' if int(s_거래량) > 0 else '매도'
-            n_거래량 = abs(int(volume))
+            n_거래량 = abs(int(s_거래량))
             n_거래대금 = n_현재가 * n_거래량
 
-            li_데이터 = [s_종목코드, s_체결시간, n_현재가, n_거래량, s_매수매도, n_거래대금]
+            # 현재가 등록 (갱신)
+            self.dic_실시간_현재가[s_종목코드] = n_현재가
+            # 화면 출력
+            li_데이터 = [s_종목코드, n_현재가]
+            s_텍스트 = f'실시간 | {s_실시간타입} | {li_데이터}'
+            print(s_텍스트)
+            try:
+                with open(os.path.join(self.folder_실시간, f'실시간_주식시세_{self.s_오늘}.txt'), 'at') as file:
+                    file.write(f'{s_텍스트}\n')
+            except PermissionError:
+                pass
 
-            # dict 저장
-            if s_code in self.dic_실시간_체결.keys():
-                self.dic_실시간_체결[s_종목코드].append(li_데이터)
-            else:
-                self.dic_실시간_체결[s_종목코드] = [li_데이터]
+            # 주식체결 데이터 저장 (누적)
+            li_데이터 = [s_종목코드, s_체결시간, n_현재가, n_거래량, s_매수매도, n_거래대금]
+            try:
+                if s_종목코드 in self.dic_실시간_체결.keys():
+                    self.dic_실시간_체결[s_종목코드].append(li_데이터)
+                else:
+                    self.dic_실시간_체결[s_종목코드] = [li_데이터]
+            except AttributeError:
+                return
 
             # 화면 출력
-            print(f'실시간 | {s_실시간타입} | {li_데이터}')
+            s_텍스트 = f'실시간 | {s_실시간타입} | {li_데이터}'
+            print(s_텍스트)
+            try:
+                with open(os.path.join(self.folder_실시간, f'실시간_{s_실시간타입}_{self.s_오늘}.txt'), 'at') as file:
+                    file.write(f'{s_텍스트}\n')
+            except PermissionError:
+                pass
 
         # 호가잔량 데이터 수집 (갱신)
         if s_실시간타입 == "주식호가잔량":
@@ -730,7 +769,13 @@ class KiwoomAPI(QAxWidget):
 
             # 화면 출력
             li_데이터 = [s_종목코드, s_호가시간, n_매도호가잔량, n_매수호가잔량]
-            print(f'실시간 | {s_실시간타입} | {li_데이터}')
+            s_텍스트 = f'실시간 | {s_실시간타입} | {li_데이터}'
+            print(s_텍스트)
+            try:
+                with open(os.path.join(self.folder_실시간, f'실시간_{s_실시간타입}_{self.s_오늘}.txt'), 'at') as file:
+                    file.write(f'{s_텍스트}\n')
+            except PermissionError:
+                pass
 
     def _get_comm_real_data(self, s_종목코드, n_fid):
         """ 실시간 데이터 값 요청 (OnReceiveRealData 내부에서 사용) """
@@ -919,16 +964,16 @@ if __name__ == "__main__":
     s_투자유의종목 = api.get_투자유의종목('000020')
 
     # api.send_주문(s_계좌번호='5292685210', s_주문유형='매수', s_종목코드='000020', n_주문수량=1000, n_주문단가=1000)
-    # api.send_주문(s_계좌번호='5292685210', s_주문유형='매수', s_종목코드='133750', n_주문수량=1, n_주문단가=2500)   # 메가엠디
-    # api.send_주문(s_계좌번호='5292685210', s_주문유형='매도', s_종목코드='133750', n_주문수량=1, n_주문단가=2520)  # 메가엠디
+    # api.send_주문(s_계좌번호='5292685210', s_주문유형='매수', s_종목코드='133750', n_주문수량=1, n_주문단가=2500)  # 메가엠디
+    # api.send_주문(s_계좌번호='5292685210', s_주문유형='매도', s_종목코드='133750', n_주문수량=1, n_주문단가=2480)  # 메가엠디
 
     dic_조건검색식별종목코드 = api.get_조건검색_전체()
     #
-    # api.set_실시간_종목등록(s_종목코드='000020', s_등록형태='신규')
-    # api.set_실시간_종목등록(s_종목코드='000020', s_등록형태='추가')
-    n_실시간_현재가 = api.get_실시간_현재가(s_종목코드='000020')
-    df_체결 = api.get_실시간_체결(s_종목코드='000020')
-    df_호가잔량 = api.get_실시간_호가잔량(s_종목코드='000020')
+    api.set_실시간_종목등록(s_종목코드='042670', s_등록형태='신규')
+    # api.set_실시간_종목등록(s_종목코드='042670', s_등록형태='추가')
+    n_실시간_현재가 = api.get_실시간_현재가(s_종목코드='042670')
+    df_체결 = api.get_실시간_체결(s_종목코드='042670')
+    df_호가잔량 = api.get_실시간_호가잔량(s_종목코드='042670')
     # api.set_실시간_종목해제(s_종목코드='000020')
     #
     df_일봉 = api.get_tr_일봉조회(s_종목코드='000020', s_기준일자_부터='20220525')
