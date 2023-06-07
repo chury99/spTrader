@@ -44,20 +44,73 @@ class Collector:
         self.make_log(f'### Collector 구동 시작 ({self.api.s_접속서버}) ###')
 
     def 진행확인(self):
-        """ 전체 진행할 항목 중 얼만큼 진행되었는지 확인 후 남은 항목 진행 """
-        # 전체 항목 확인 (전체종목 pkl 파일 확인)
+        """ 전체 진행할 항목 중 얼만큼 진행되었는지 확인 후 잔여 항목 선정 (전체종목 pkl, 일봉/분봉 ohlcv 임시저장 pkl 활용) """
+        # 전체 항목 확인 (df_전체종목.pkl 확인)
         df_전체종목 = pd.read_pickle(os.path.join(self.folder_정보수집, 'df_전체종목.pkl'))
         li_종목코드_전체 = list(df_전체종목['종목코드'].values)
-        pass
 
-        # 진행 완료한 항목 확인 (임시저장 pkl 확인)
+        # 완료 항목 확인 (df_ohlcv_일봉_임시.pkl, df_ohlcv_분봉_임시.pkl 확인)
+        try:
+            df_ohlcv_일봉 = pd.read_pickle(os.path.join(self.folder_정보수집, 'df_ohlcv_일봉_임시.pkl'))
+        except FileNotFoundError:
+            df_ohlcv_일봉 = None
 
-        # 진행할 항목 결정 (self 변수로 지정)
+        try:
+            df_ohlcv_분봉 = pd.read_pickle(os.path.join(self.folder_정보수집, 'df_ohlcv_분봉_임시.pkl'))
+        except FileNotFoundError:
+            df_ohlcv_분봉 = None
+
+        li_종목코드_완료_일봉 = list(df_ohlcv_일봉['종목코드'].unique()) if df_ohlcv_일봉 is not None else list()
+        li_종목코드_완료_분봉 = list(df_ohlcv_분봉['종목코드'].unique()) if df_ohlcv_분봉 is not None else list()
+
+        # 잔여 항목 확인
+        li_종목코드_잔여_일봉 = [s_종목코드 for s_종목코드 in li_종목코드_전체 if s_종목코드 not in li_종목코드_완료_일봉]
+        li_종목코드_잔여_분봉 = [s_종목코드 for s_종목코드 in li_종목코드_전체 if s_종목코드 not in li_종목코드_완료_분봉]
+
+        # self 변수 정의
+        self.dic_종목코드2종목명 = df_전체종목.set_index('종목코드').to_dict()['종목명']
+        self.n_전체항목 = len(li_종목코드_전체)
+        self.n_완료항목_일봉 = len(li_종목코드_완료_일봉)
+        self.n_완료항목_분봉 = len(li_종목코드_완료_분봉)
+        self.li_종목코드_잔여_일봉 = li_종목코드_잔여_일봉
+        self.li_종목코드_잔여_분봉 = li_종목코드_잔여_분봉
+
+        # log 기록
+        self.make_log(f'진행현황 확인 (일봉 {self.n_완료항목_일봉:,}/{self.n_전체항목:,} , '
+                      f'분봉 {self.n_완료항목_일봉:,}/{self.n_전체항목:,})')
+
+    def 일자확인(self):
+        """ db 파일 조회하여 수집해야 할 일봉/분봉 일자 선정 """
+        ###### 일봉이랑 분봉이랑 각각 어느 날짜부터 수집해야 하는지 산출 (db파일 조회해서 찾아야 할 듯)
 
         pass
 
     def 수집_일봉(self):
         """ 종목별 일봉 데이터 받아서 pkl 형식으로 임시 저장 """
+        # 임시 pkl 불러오기
+        try:
+            df_일봉 = pd.read_pickle(os.path.join(self.folder_정보수집, 'df_ohlcv_일봉_임시.pkl'))
+        except FileNotFoundError:
+            df_일봉 = pd.DataFrame()
+
+        for n_순번, s_종목코드 in enumerate(self.li_종목코드_잔여_일봉):
+            # 일봉 조회
+            df_일봉_추가 = self.api.get_tr_일봉조회(s_종목코드=s_종목코드, s_기준일자_부터=self.s_오늘)
+            time.sleep(self.n_딜레이)
+
+            ### df 합치기 전에 조회할 수집 대상 일자에 해당하는 데이터만 골라낼 것
+
+            # df 합쳐서 저장
+            df_일봉 = pd.concat([df_일봉, df_일봉_추가], axis=0)
+            df_일봉.to_pickle(os.path.join(self.folder_정보수집, 'df_ohlcv_일봉_임시.pkl'))
+
+            # log 기록
+            n_전체 = self.n_전체항목
+            n_완료 = self.n_완료항목_일봉 + n_순번 + 1
+            n_진행률 = n_완료 / n_전체 * 100
+            s_종목명 = self.dic_종목코드2종목명[s_종목코드]
+            self.make_log(f'{n_진행률:0.2f}% 수집 완료 ({n_완료}/{n_전체}) -- {s_종목명}')
+
         pass
 
     def 수집_분봉(self):
@@ -98,4 +151,5 @@ if __name__ == "__main__":
     c = Collector()
 
     c.진행확인()
+    c.수집_일봉()
     pass
