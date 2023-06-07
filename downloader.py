@@ -65,8 +65,9 @@ class Downloader:
         li_컬럼명 = ['종목코드', '종목명', '시장구분', '상장주식수', '상장일', '투자유의종목']
         df_전체종목 = pd.DataFrame(li_전체종목, columns=li_컬럼명)
 
-        # pkl 저장
+        # 파일 저장
         df_전체종목.to_pickle(os.path.join(self.folder_정보수집, 'df_전체종목.pkl'))
+        df_전체종목.to_csv(os.path.join(self.folder_정보수집, 'df_전체종목.csv'), index=False, encoding='cp949')
 
         # log 기록
         self.make_log(f'전체종목 저장 완료 - 총 {len(df_전체종목):,}종목 (코스피 {len(li_코스피):,}, 코스닥 {len(li_코스닥):,})')
