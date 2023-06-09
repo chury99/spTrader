@@ -6,6 +6,7 @@ from PyQt5.QtCore import *
 import pandas as pd
 import json
 import time
+import sqlite3
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
@@ -115,6 +116,29 @@ class Collector:
 
     def 수집_분봉(self):
         """ 종목별 분봉 데이터 받아서 pkl 형식으로 임시 저장 """
+        # 임시 pkl 불러오기
+        try:
+            df_분봉 = pd.read_pickle(os.path.join(self.folder_정보수집, 'df_ohlcv_분봉_임시.pkl'))
+        except FileNotFoundError:
+            df_분봉 = pd.DataFrame()
+
+        for n_순번, s_종목코드 in enumerate(self.li_종목코드_잔여_분봉):
+            # 분봉 조회
+            df_분봉_추가 = self.api.get_tr_분봉조회(s_종목코드=s_종목코드, n_틱범위=1, s_기준일자_까지=self.s_오늘)
+            time.sleep(self.n_딜레이)
+
+            ### df 합치기 전에 조회할 수집 대상 일자에 해당하는 데이터만 골라낼 것
+
+            # df 합쳐서 저장
+            df_분봉 = pd.concat([df_분봉, df_분봉_추가], axis=0)
+            df_분봉.to_pickle(os.path.join(self.folder_정보수집, 'df_ohlcv_분봉_임시.pkl'))
+
+            # log 기록
+            n_전체 = self.n_전체항목
+            n_완료 = self.n_완료항목_분봉 + n_순번 + 1
+            n_진행률 = n_완료 / n_전체 * 100
+            s_종목명 = self.dic_종목코드2종목명[s_종목코드]
+            self.make_log(f'{n_진행률:0.2f}% 수집 완료 ({n_완료}/{n_전체}) -- {s_종목명}')
         pass
 
     def 변환_일봉(self):
@@ -151,5 +175,6 @@ if __name__ == "__main__":
     c = Collector()
 
     c.진행확인()
-    c.수집_일봉()
+    # c.수집_일봉()
+    c.수집_분봉()
     pass
