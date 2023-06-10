@@ -368,17 +368,36 @@ class KiwoomAPI(QAxWidget):
     # ***** [ TR 요청 모듈 (tr) ] *****
     def get_tr_일봉조회(self, s_종목코드, s_기준일자_부터=None):
         """ 종목코드별 일봉 데이터 조회하여 df 리턴 - 600개 (OnReceiveTrData 이벤트 발생) \n
-        # 기준일자 : 기준일자부터 이전 600개 데이터 조회 (default: 오늘일자) """
+        # 기준일자 : 기준일자부터 현재까지 데이터를 600개 단위로 조회 (default: 오늘일자) """
         # 변수 정의
         s_기준일자_부터 = self.s_오늘 if s_기준일자_부터 is None else s_기준일자_부터
 
         # TR 요청
         self.set_input_value('종목코드', s_종목코드)
-        self.set_input_value('기준일자', s_기준일자_부터)
         self.comm_rq_data('주식일봉차트조회요청', 'opt10081', 0, '2001')
 
         # 결과 가져오기
         df_일봉 = self.df_일봉.copy()
+
+        # 기준일자 확인
+        s_최소일자 = df_일봉['일자'].min()
+        while s_기준일자_부터 < s_최소일자:
+            # 예외처리 (데이터 600개 미만)
+            if len(df_일봉) < 600:
+                break
+
+            # TR 추가 요청
+            time.sleep(self.n_딜레이)
+            self.set_input_value('종목코드', s_종목코드)
+            self.comm_rq_data('주식일봉차트조회요청', 'opt10081', 2, '2001')
+
+            # 결과 가져와서 합치기
+            df_일봉_추가 = self.df_일봉.copy()
+            df_일봉 = pd.concat([df_일봉, df_일봉_추가], axis=0)
+            df_일봉 = df_일봉.sort_values('일자', ascending=False).drop_duplicates().reset_index(drop=True)
+
+            # 기준일자 재확인
+            s_최소일자 = df_일봉['일자'].min()
 
         # 데이터 정리
         df_일봉['종목코드'] = s_종목코드
@@ -394,13 +413,13 @@ class KiwoomAPI(QAxWidget):
 
         return df_일봉
 
-    def get_tr_분봉조회(self, s_종목코드, n_틱범위=None, s_기준일자_까지=None):
+    def get_tr_분봉조회(self, s_종목코드, n_틱범위=None, s_기준일자_부터=None):
         """ 종목코드별 분봉 데이터 조회하여 df 리턴 - 900개 (OnReceiveTrData 이벤트 발생) \n
         # 틱범위 : [1]1분, [3]3분, [5]5분, [10]10분, [15]15분, [30]30분, [45]45분, [60]60분 (default: 1) \n
-        # 기준일자 : 현재부터 기준일자까지 전체 데이터 조회 (default: 오늘일자) """
+        # 기준일자 : 기준일자부터 현재까지 데이터를 900개 단위로 조회 (default: 오늘일자) """
         # 변수 정의
         n_틱범위 = 1 if n_틱범위 is None else n_틱범위
-        s_기준일자_까지 = self.s_오늘 if s_기준일자_까지 is None else s_기준일자_까지
+        s_기준일자_부터 = self.s_오늘 if s_기준일자_부터 is None else s_기준일자_부터
 
         # TR 요청
         self.set_input_value('종목코드', s_종목코드)
@@ -412,7 +431,7 @@ class KiwoomAPI(QAxWidget):
 
         # 기준일자 확인
         s_최소일자 = df_분봉['체결시간'].apply(lambda x: x[:8]).unique()[:-1].min()
-        while s_기준일자_까지 < s_최소일자:
+        while s_기준일자_부터 < s_최소일자:
             # 예외처리 (데이터 900개 미만)
             if len(df_분봉) < 900:
                 break
@@ -978,7 +997,7 @@ if __name__ == "__main__":
     #
     df_일봉 = api.get_tr_일봉조회(s_종목코드='000020', s_기준일자_부터='20220525')
     time.sleep(0.2)
-    df_분봉 = api.get_tr_분봉조회(s_종목코드='000020', s_기준일자_까지='20230524')
+    df_분봉 = api.get_tr_분봉조회(s_종목코드='000020', s_기준일자_부터='20230524')
     time.sleep(0.2)
     n_예수금 = api.get_tr_예수금(s_계좌번호='5292685210')
     time.sleep(0.2)
