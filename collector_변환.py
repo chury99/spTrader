@@ -4,6 +4,9 @@ import pandas as pd
 import json
 import sqlite3
 
+import pandas.errors
+from tqdm import tqdm
+
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
 # noinspection PyShadowingNames
@@ -75,18 +78,150 @@ class Collector:
 
     def 캐시저장_일봉(self):
         """ db 파일 불러와서 종목별 분류 후 pkl 파일 저장 (일봉) """
-        # 대상 구간 확인
+        # 전체 db 확인
+        li_파일명_일봉 = [파일명 for 파일명 in os.listdir(self.folder_ohlcv) if 'ohlcv_일봉_' in 파일명 and '.db' in 파일명]
+        li_df_테이블명 = list()
+        for 파일명 in li_파일명_일봉:
+            con = sqlite3.connect(os.path.join(self.folder_ohlcv, 파일명))
+            df_테이블명 = pd.read_sql(f'SELECT name FROM sqlite_master WHERE type="table"', con=con)
+            li_df_테이블명.append(df_테이블명)
+        df_테이블명 = pd.concat(li_df_테이블명, axis=0).sort_values('name')
+        li_테이블명_전체 = list(df_테이블명['name'].values)
 
-        # db 파일 불러오기
+        # 저장된 캐시파일 확인
+        li_파일명_캐시 = [파일명 for 파일명 in os.listdir(self.folder_캐시변환)
+                     if 'dic_코드별_일봉_' in 파일명 and '.pkl' in 파일명]
+        li_테이블명_캐시 = [파일명.replace('dic_코드별_', 'ohlcv_').replace('.pkl', '') for 파일명 in li_파일명_캐시]
 
-        # 종목별 분류
+        # 변환 대상 선정
+        li_테이블명_대상 = [테이블명 for 테이블명 in li_테이블명_전체 if 테이블명 not in li_테이블명_캐시]
+        li_테이블명_대상 = [max(li_테이블명_전체)] if len(li_테이블명_대상) == 0 else li_테이블명_대상
 
-        # pkl 저장
+        # 캐시파일 생성
+        for s_테이블명 in li_테이블명_대상:
+            # 불러올 db 테이블 대상 선정
+            s_년월 = s_테이블명.split('_')[2]
+            dt_대상일 = pd.Timestamp(f'{s_년월}01')
+            li_대상일 = [dt_대상일 - pd.DateOffset(months=n_개월) for n_개월 in range(12)]
+            li_테이블명_리딩 = [f'ohlcv_일봉_{dt.strftime("%Y%m")}' for dt in li_대상일]
 
-        pass
+            # db 파일 불러오기
+            li_df_전체 = list()
+            for s_테이블명_리딩 in li_테이블명_리딩:
+                con = sqlite3.connect(os.path.join(self.folder_ohlcv, f'{s_테이블명_리딩[:-2]}.db'))
+                try:
+                    df_리딩 = pd.read_sql(f'SELECT * FROM {s_테이블명_리딩}', con=con)
+                    li_df_전체.append(df_리딩)
+                except pandas.errors.DatabaseError:
+                    continue
+            df_전체 = pd.concat(li_df_전체, axis=0)
+
+            # 종목별 분류
+            dic_일봉 = dict()
+            gr_전체 = df_전체.groupby('종목코드')
+            for s_종목코드, df_종목별 in tqdm(gr_전체, desc=f'{s_테이블명}'):
+                # df 정리 (오름차순)
+                df_종목별 = df_종목별.drop_duplicates().sort_values('일자', ascending=True)
+                # 추가 데이터 생성
+                df_종목별['전일종가'] = df_종목별['종가'].shift(1)
+                df_종목별['전일대비(%)'] = (df_종목별['종가'] / df_종목별['전일종가'] - 1) * 100
+                df_종목별['종가ma5'] = df_종목별['종가'].rolling(5).mean()
+                df_종목별['종가ma10'] = df_종목별['종가'].rolling(10).mean()
+                df_종목별['종가ma20'] = df_종목별['종가'].rolling(20).mean()
+                df_종목별['종가ma60'] = df_종목별['종가'].rolling(60).mean()
+                df_종목별['종가ma120'] = df_종목별['종가'].rolling(120).mean()
+                df_종목별['거래량ma5'] = df_종목별['거래량'].rolling(5).mean()
+                df_종목별['거래량ma20'] = df_종목별['거래량'].rolling(20).mean()
+                df_종목별['거래량ma60'] = df_종목별['거래량'].rolling(60).mean()
+                df_종목별['거래량ma120'] = df_종목별['거래량'].rolling(120).mean()
+                # 해당 월만 골라내기
+                df_종목별['년월'] = df_종목별['일자'].apply(lambda x: x[:6])
+                df_종목별 = df_종목별[df_종목별['년월'] == s_년월]
+                df_종목별 = df_종목별.drop('년월', axis=1)
+                # dic 할당
+                dic_일봉[s_종목코드] = df_종목별
+
+            # pkl 저장
+            pd.to_pickle(dic_일봉, os.path.join(self.folder_캐시변환, f'dic_코드별_일봉_{s_년월}.pkl'))
+
+            # log 기록
+            self.make_log(f'{s_년월} 데이터 저장 완료')
 
     def 캐시저장_분봉(self):
         """ db 파일 불러와서 종목별 분류 후 pkl 파일 저장 (분봉) """
+        # 전체 db 확인
+        li_파일명_분봉 = [파일명 for 파일명 in os.listdir(self.folder_ohlcv) if 'ohlcv_분봉_' in 파일명 and '.db' in 파일명]
+        li_df_테이블명 = list()
+        for 파일명 in li_파일명_분봉:
+            con = sqlite3.connect(os.path.join(self.folder_ohlcv, 파일명))
+            df_테이블명 = pd.read_sql(f'SELECT name FROM sqlite_master WHERE type="table"', con=con)
+            li_df_테이블명.append(df_테이블명)
+        df_테이블명 = pd.concat(li_df_테이블명, axis=0).sort_values('name')
+        li_테이블명_전체 = list(df_테이블명['name'].values)
+
+        # 저장된 캐시파일 확인
+        li_파일명_캐시 = [파일명 for 파일명 in os.listdir(self.folder_캐시변환)
+                     if 'dic_코드별_분봉_' in 파일명 and '.pkl' in 파일명]
+        li_테이블명_캐시 = [파일명.replace('dic_코드별_', 'ohlcv_').replace('.pkl', '') for 파일명 in li_파일명_캐시]
+
+        # 변환 대상 선정
+        li_테이블명_대상 = [테이블명 for 테이블명 in li_테이블명_전체 if 테이블명 not in li_테이블명_캐시]
+
+        # 캐시파일 생성
+        for s_테이블명 in li_테이블명_대상:
+            # 불러올 db 테이블 대상 선정
+            s_년월일 = s_테이블명.split('_')[2]
+            s_년월 = s_년월일[:6]
+            dt_대상일 = pd.Timestamp(s_년월일)
+            li_대상일 = [dt_대상일 - pd.Timedelta(days=n_일) for n_일 in range(12)]
+            li_테이블명_리딩 = [f'ohlcv_분봉_{dt.strftime("%Y%m%d")}' for dt in li_대상일]
+
+            # db 파일 불러오기
+            li_df_전체 = list()
+            for s_테이블명_리딩 in li_테이블명_리딩:
+                s_파일명 = f'{s_테이블명_리딩[:-4]}_{s_테이블명_리딩[-4:-2]}.db'
+                con = sqlite3.connect(os.path.join(self.folder_ohlcv, s_파일명))
+                try:
+                    df_리딩 = pd.read_sql(f'SELECT * FROM {s_테이블명_리딩}', con=con)
+                    li_df_전체.append(df_리딩)
+                except pandas.errors.DatabaseError:
+                    continue
+            df_전체 = pd.concat(li_df_전체, axis=0)
+
+            # 종목별 분류
+            dic_분봉 = dict()
+            dic_코드별_일봉 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_일봉_{s_년월}.pkl'))
+            gr_전체 = df_전체.groupby('종목코드')
+            for s_종목코드, df_종목별 in tqdm(gr_전체, desc=f'{s_테이블명}'):
+                # df 정리 (오름차순)
+                df_종목별 = df_종목별.drop_duplicates().sort_values(['일자', '시간'], ascending=True)
+                # 추가 데이터 생성 (!!!주의!!! 해당 날짜 이외 데이터는 신뢰성 없음)
+                df_일봉 = dic_코드별_일봉[s_종목코드] if s_종목코드 in dic_코드별_일봉.keys() else None
+                dic_전일종가 = df_일봉.set_index('일자').to_dict()['전일종가'] if df_일봉 is not None else None
+                df_종목별['전일종가'] = dic_전일종가[s_년월일] if df_일봉 is not None else None
+                df_종목별['전일대비(%)'] = (df_종목별['종가'] / df_종목별['전일종가'] - 1) * 100 if df_일봉 is not None else None
+                df_종목별['종가ma5'] = df_종목별['종가'].rolling(5).mean()
+                df_종목별['종가ma10'] = df_종목별['종가'].rolling(10).mean()
+                df_종목별['종가ma20'] = df_종목별['종가'].rolling(20).mean()
+                df_종목별['종가ma60'] = df_종목별['종가'].rolling(60).mean()
+                df_종목별['종가ma120'] = df_종목별['종가'].rolling(120).mean()
+                df_종목별['거래량ma5'] = df_종목별['거래량'].rolling(5).mean()
+                df_종목별['거래량ma20'] = df_종목별['거래량'].rolling(20).mean()
+                df_종목별['거래량ma60'] = df_종목별['거래량'].rolling(60).mean()
+                df_종목별['거래량ma120'] = df_종목별['거래량'].rolling(120).mean()
+                # 해당 일만 골라내기
+                df_종목별 = df_종목별[df_종목별['일자'] == s_년월일]
+                # dic 할당
+                dic_분봉[s_종목코드] = df_종목별
+
+            # pkl 저장
+            pd.to_pickle(dic_분봉, os.path.join(self.folder_캐시변환, f'dic_코드별_분봉_{s_년월일}.pkl'))
+
+            # log 기록
+            self.make_log(f'{s_년월일} 데이터 저장 완료')
+
+    def 캐시저장_10분봉(self):
+        """ 분봉 db 파일 불러와서 종목별 분류 후 10분봉 pkl 파일 저장 """
         pass
 
     ###################################################################################################################
@@ -114,7 +249,8 @@ if __name__ == "__main__":
     c = Collector()
 
     # c.db저장_일봉()
-    c.db저장_분봉()
-    c.캐시저장_일봉()
+    # c.db저장_분봉()
+    # c.캐시저장_일봉()
     c.캐시저장_분봉()
+
     pass
