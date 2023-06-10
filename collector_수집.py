@@ -78,13 +78,35 @@ class Collector:
 
         # log 기록
         self.make_log(f'진행현황 확인 (일봉 {self.n_완료항목_일봉:,}/{self.n_전체항목:,} , '
-                      f'분봉 {self.n_완료항목_일봉:,}/{self.n_전체항목:,})')
+                      f'분봉 {self.n_완료항목_분봉:,}/{self.n_전체항목:,})')
 
     def 일자확인(self):
         """ db 파일 조회하여 수집해야 할 일봉/분봉 일자 선정 """
-        ###### 일봉이랑 분봉이랑 각각 어느 날짜부터 수집해야 하는지 산출 (db파일 조회해서 찾아야 할 듯)
+        # 파일명 확인
+        li_파일명_일봉 = [파일명 for 파일명 in os.listdir(self.folder_ohlcv) if 'ohlcv_일봉_' in 파일명 and '.db' in 파일명]
+        li_파일명_분봉 = [파일명 for 파일명 in os.listdir(self.folder_ohlcv) if 'ohlcv_분봉_' in 파일명 and '.db' in 파일명]
+        s_최종파일_일봉 = max(li_파일명_일봉)
+        s_최종파일_분봉 = max(li_파일명_분봉)
 
-        pass
+        # 일봉 일자 확인
+        con_일봉 = sqlite3.connect(os.path.join(self.folder_ohlcv, s_최종파일_일봉))
+        df_테이블명 = pd.read_sql(f'SELECT name FROM sqlite_master WHERE type="table"', con=con_일봉)
+        s_테이블명_최종 = df_테이블명['name'].values.max()
+        df_일봉 = pd.read_sql(f'SELECT * FROM {s_테이블명_최종}', con=con_일봉)
+        s_최종일자_일봉 = df_일봉['일자'].max()
+
+        # 분봉 일자 확인
+        con_분봉 = sqlite3.connect(os.path.join(self.folder_ohlcv, s_최종파일_분봉))
+        df_테이블명 = pd.read_sql(f'SELECT name FROM sqlite_master WHERE type="table"', con=con_분봉)
+        s_테이블명_최종 = df_테이블명['name'].values.max()
+        s_최종일자_분봉 = s_테이블명_최종.split('_')[2]
+
+        # self 변수 정의
+        self.s_최종일자_일봉 = s_최종일자_일봉
+        self.s_최종일자_분봉 = s_최종일자_분봉
+
+        # log 기록
+        self.make_log(f'DB에 저장된 마지막 데이터 확인 (일봉 {self.s_최종일자_일봉}, 분봉 {self.s_최종일자_분봉})')
 
     def 수집_일봉(self):
         """ 종목별 일봉 데이터 받아서 pkl 형식으로 임시 저장 """
@@ -96,10 +118,11 @@ class Collector:
 
         for n_순번, s_종목코드 in enumerate(self.li_종목코드_잔여_일봉):
             # 일봉 조회
-            df_일봉_추가 = self.api.get_tr_일봉조회(s_종목코드=s_종목코드, s_기준일자_부터=self.s_오늘)
+            df_일봉_추가 = self.api.get_tr_일봉조회(s_종목코드=s_종목코드, s_기준일자_부터=self.s_최종일자_일봉)
             time.sleep(self.n_딜레이)
 
-            ### df 합치기 전에 조회할 수집 대상 일자에 해당하는 데이터만 골라낼 것
+            # 해당 일자 골라내기
+            df_일봉_추가 = df_일봉_추가[df_일봉_추가['일자'] > self.s_최종일자_일봉]
 
             # df 합쳐서 저장
             df_일봉 = pd.concat([df_일봉, df_일봉_추가], axis=0)
@@ -112,8 +135,6 @@ class Collector:
             s_종목명 = self.dic_종목코드2종목명[s_종목코드]
             self.make_log(f'{n_진행률:0.2f}% 수집 완료 ({n_완료}/{n_전체}) -- {s_종목명}')
 
-        pass
-
     def 수집_분봉(self):
         """ 종목별 분봉 데이터 받아서 pkl 형식으로 임시 저장 """
         # 임시 pkl 불러오기
@@ -124,10 +145,11 @@ class Collector:
 
         for n_순번, s_종목코드 in enumerate(self.li_종목코드_잔여_분봉):
             # 분봉 조회
-            df_분봉_추가 = self.api.get_tr_분봉조회(s_종목코드=s_종목코드, n_틱범위=1, s_기준일자_까지=self.s_오늘)
+            df_분봉_추가 = self.api.get_tr_분봉조회(s_종목코드=s_종목코드, n_틱범위=1, s_기준일자_부터=self.s_최종일자_분봉)
             time.sleep(self.n_딜레이)
 
-            ### df 합치기 전에 조회할 수집 대상 일자에 해당하는 데이터만 골라낼 것
+            # 해당 일자 골라내기
+            df_분봉_추가 = df_분봉_추가[df_분봉_추가['일자'] > self.s_최종일자_분봉]
 
             # df 합쳐서 저장
             df_분봉 = pd.concat([df_분봉, df_분봉_추가], axis=0)
@@ -139,19 +161,10 @@ class Collector:
             n_진행률 = n_완료 / n_전체 * 100
             s_종목명 = self.dic_종목코드2종목명[s_종목코드]
             self.make_log(f'{n_진행률:0.2f}% 수집 완료 ({n_완료}/{n_전체}) -- {s_종목명}')
-        pass
-
-    def 변환_일봉(self):
-        """ pkl 형식으로 임시 저장된 일봉 파일 읽어와서 db, 캐시 파일 저장 """
-        pass
-
-    def 변환_분봉(self):
-        """ pkl 형식으로 임시 저장된 분봉 파일 읽어와서 db, 캐시 파일 저장 """
-        pass
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
-        """ 입력 받은 s_text 에 시간 붙여서 self.path_log 에 저장 """
+        """ 입력 받은 s_text에 시간 붙여서 self.path_log에 저장 """
         # 정보 설정
         s_시각 = pd.Timestamp('now').strftime('%H:%M:%S')
         s_파일 = os.path.basename(sys.argv[0]).replace('.py', '')
@@ -175,6 +188,6 @@ if __name__ == "__main__":
     c = Collector()
 
     c.진행확인()
+    c.일자확인()
     # c.수집_일봉()
     c.수집_분봉()
-    pass
