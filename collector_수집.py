@@ -1,8 +1,6 @@
 import os
 import sys
 from PyQt5.QtWidgets import *
-from PyQt5.QAxContainer import *
-from PyQt5.QtCore import *
 import pandas as pd
 import json
 import time
