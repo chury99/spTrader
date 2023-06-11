@@ -380,7 +380,7 @@ class KiwoomAPI(QAxWidget):
         df_일봉 = self.df_일봉.copy()
 
         # 기준일자 확인
-        s_최소일자 = df_일봉['일자'].min()
+        s_최소일자 = df_일봉['일자'].min() if len(df_일봉) > 0 else '0'
         while s_기준일자_부터 < s_최소일자:
             # 예외처리 (데이터 600개 미만)
             if len(df_일봉) < 600:
@@ -430,7 +430,7 @@ class KiwoomAPI(QAxWidget):
         df_분봉 = self.df_분봉.copy()
 
         # 기준일자 확인
-        s_최소일자 = df_분봉['체결시간'].apply(lambda x: x[:8]).unique()[:-1].min()
+        s_최소일자 = df_분봉['체결시간'].apply(lambda x: x[:8]).unique()[:-1].min() if len(df_분봉) > 0 else '0'
         while s_기준일자_부터 < s_최소일자:
             # 예외처리 (데이터 900개 미만)
             if len(df_분봉) < 900:
