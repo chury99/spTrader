@@ -29,11 +29,6 @@ class Collector:
         os.makedirs(self.folder_캐시변환, exist_ok=True)
         self.folder_정보수집 = os.path.join(folder_데이터, '정보수집')
 
-        # 모니터 파일 설정
-        folder_run = os.path.join(folder_work, 'run')
-        os.makedirs(folder_run, exist_ok=True)
-        self.path_모니터 = os.path.join(folder_run, '모니터_collector.txt')
-
         # 키움 api 연결
         import API_kiwoom
         self.api = API_kiwoom.KiwoomAPI()
@@ -47,6 +42,17 @@ class Collector:
         # 전체 항목 확인 (df_전체종목.pkl 확인)
         df_전체종목 = pd.read_pickle(os.path.join(self.folder_정보수집, 'df_전체종목.pkl'))
         li_종목코드_전체 = list(df_전체종목['종목코드'].values)
+
+        # 제외 항목 확인 (데이터 길이 0 인 종목코드)
+        try:
+            li_종목코드_제외_일봉 = pd.read_pickle(os.path.join(self.folder_정보수집, 'li_종목코드_제외_일봉.pkl'))
+        except FileNotFoundError:
+            li_종목코드_제외_일봉 = list()
+
+        try:
+            li_종목코드_제외_분봉 = pd.read_pickle(os.path.join(self.folder_정보수집, 'li_종목코드_제외_분봉.pkl'))
+        except FileNotFoundError:
+            li_종목코드_제외_분봉 = list()
 
         # 완료 항목 확인 (df_ohlcv_일봉_임시.pkl, df_ohlcv_분봉_임시.pkl 확인)
         try:
@@ -64,19 +70,25 @@ class Collector:
 
         # 잔여 항목 확인
         li_종목코드_잔여_일봉 = [s_종목코드 for s_종목코드 in li_종목코드_전체 if s_종목코드 not in li_종목코드_완료_일봉]
+        li_종목코드_잔여_일봉 = [s_종목코드 for s_종목코드 in li_종목코드_잔여_일봉 if s_종목코드 not in li_종목코드_제외_일봉]
+
         li_종목코드_잔여_분봉 = [s_종목코드 for s_종목코드 in li_종목코드_전체 if s_종목코드 not in li_종목코드_완료_분봉]
+        li_종목코드_잔여_분봉 = [s_종목코드 for s_종목코드 in li_종목코드_잔여_분봉 if s_종목코드 not in li_종목코드_제외_분봉]
 
         # self 변수 정의
         self.dic_종목코드2종목명 = df_전체종목.set_index('종목코드').to_dict()['종목명']
-        self.n_전체항목 = len(li_종목코드_전체)
+        self.n_전체항목_일봉 = len(li_종목코드_전체) - len(li_종목코드_제외_일봉)
+        self.n_전체항목_분봉 = len(li_종목코드_전체) - len(li_종목코드_제외_분봉)
         self.n_완료항목_일봉 = len(li_종목코드_완료_일봉)
         self.n_완료항목_분봉 = len(li_종목코드_완료_분봉)
+        self.li_종목코드_제외_일봉 = li_종목코드_제외_일봉
+        self.li_종목코드_제외_분봉 = li_종목코드_제외_분봉
         self.li_종목코드_잔여_일봉 = li_종목코드_잔여_일봉
         self.li_종목코드_잔여_분봉 = li_종목코드_잔여_분봉
 
         # log 기록
-        self.make_log(f'진행현황 확인 (일봉 {self.n_완료항목_일봉:,}/{self.n_전체항목:,} , '
-                      f'분봉 {self.n_완료항목_분봉:,}/{self.n_전체항목:,})')
+        self.make_log(f'진행현황 확인 (일봉 {self.n_완료항목_일봉:,}/{self.n_전체항목_일봉:,} , '
+                      f'분봉 {self.n_완료항목_분봉:,}/{self.n_전체항목_분봉:,})')
 
     def 일자확인(self):
         """ db 파일 조회하여 수집해야 할 일봉/분봉 일자 선정 """
@@ -123,12 +135,17 @@ class Collector:
             # 해당 일자 골라내기
             df_일봉_추가 = df_일봉_추가[df_일봉_추가['일자'] > self.s_최종일자_일봉]
 
+            # 데이터 없는 종목코드 별도 저장
+            if len(df_일봉_추가) == 0:
+                self.li_종목코드_제외_일봉.append(s_종목코드)
+                pd.to_pickle(self.li_종목코드_제외_일봉, os.path.join(self.folder_정보수집, 'li_종목코드_제외_일봉.pkl'))
+
             # df 합쳐서 저장
             df_일봉 = pd.concat([df_일봉, df_일봉_추가], axis=0)
             df_일봉.to_pickle(os.path.join(self.folder_정보수집, s_파일명_임시pkl))
 
             # log 기록
-            n_전체 = self.n_전체항목
+            n_전체 = self.n_전체항목_일봉
             n_완료 = self.n_완료항목_일봉 + n_순번 + 1
             n_진행률 = n_완료 / n_전체 * 100
             s_종목명 = self.dic_종목코드2종목명[s_종목코드]
@@ -151,12 +168,17 @@ class Collector:
             # 해당 일자 골라내기
             df_분봉_추가 = df_분봉_추가[df_분봉_추가['일자'] > self.s_최종일자_분봉]
 
+            # 데이터 없는 종목코드 별도 저장
+            if len(df_분봉_추가) == 0:
+                self.li_종목코드_제외_분봉.append(s_종목코드)
+                pd.to_pickle(self.li_종목코드_제외_분봉, os.path.join(self.folder_정보수집, 'li_종목코드_제외_분봉.pkl'))
+
             # df 합쳐서 저장
             df_분봉 = pd.concat([df_분봉, df_분봉_추가], axis=0)
             df_분봉.to_pickle(os.path.join(self.folder_정보수집, s_파일명_임시pkl))
 
             # log 기록
-            n_전체 = self.n_전체항목
+            n_전체 = self.n_전체항목_분봉
             n_완료 = self.n_완료항목_분봉 + n_순번 + 1
             n_진행률 = n_완료 / n_전체 * 100
             s_종목명 = self.dic_종목코드2종목명[s_종목코드]
