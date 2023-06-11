@@ -111,8 +111,9 @@ class Collector:
     def 수집_일봉(self):
         """ 종목별 일봉 데이터 받아서 pkl 형식으로 임시 저장 """
         # 임시 pkl 불러오기
+        s_파일명_임시pkl = 'df_ohlcv_일봉_임시.pkl'
         try:
-            df_일봉 = pd.read_pickle(os.path.join(self.folder_정보수집, 'df_ohlcv_일봉_임시.pkl'))
+            df_일봉 = pd.read_pickle(os.path.join(self.folder_정보수집, s_파일명_임시pkl))
         except FileNotFoundError:
             df_일봉 = pd.DataFrame()
 
@@ -126,7 +127,7 @@ class Collector:
 
             # df 합쳐서 저장
             df_일봉 = pd.concat([df_일봉, df_일봉_추가], axis=0)
-            df_일봉.to_pickle(os.path.join(self.folder_정보수집, 'df_ohlcv_일봉_임시.pkl'))
+            df_일봉.to_pickle(os.path.join(self.folder_정보수집, s_파일명_임시pkl))
 
             # log 기록
             n_전체 = self.n_전체항목
@@ -138,8 +139,9 @@ class Collector:
     def 수집_분봉(self):
         """ 종목별 분봉 데이터 받아서 pkl 형식으로 임시 저장 """
         # 임시 pkl 불러오기
+        s_파일명_임시pkl = 'df_ohlcv_분봉_임시.pkl'
         try:
-            df_분봉 = pd.read_pickle(os.path.join(self.folder_정보수집, 'df_ohlcv_분봉_임시.pkl'))
+            df_분봉 = pd.read_pickle(os.path.join(self.folder_정보수집, s_파일명_임시pkl))
         except FileNotFoundError:
             df_분봉 = pd.DataFrame()
 
@@ -153,7 +155,7 @@ class Collector:
 
             # df 합쳐서 저장
             df_분봉 = pd.concat([df_분봉, df_분봉_추가], axis=0)
-            df_분봉.to_pickle(os.path.join(self.folder_정보수집, 'df_ohlcv_분봉_임시.pkl'))
+            df_분봉.to_pickle(os.path.join(self.folder_정보수집, s_파일명_임시pkl))
 
             # log 기록
             n_전체 = self.n_전체항목
