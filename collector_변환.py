@@ -33,7 +33,13 @@ class Collector:
     def db저장_일봉(self):
         """ pkl 형식으로 임시 저장된 일봉 파일 읽어와서 db 파일 저장 """
         # pkl 읽어오기
-        df_일봉 = pd.read_pickle(os.path.join(self.folder_정보수집, 'df_ohlcv_일봉_임시.pkl'))
+        s_파일명 = 'df_ohlcv_일봉_임시.pkl'
+        path_pkl_임시 = os.path.join(self.folder_정보수집, s_파일명)
+        try:
+            df_일봉 = pd.read_pickle(path_pkl_임시)
+        except FileNotFoundError:
+            self.make_log(f'[error] {s_파일명} 파일 미존재')
+            return
 
         # 일별로 분리
         gr_일봉 = df_일봉.groupby('일자')
@@ -48,16 +54,26 @@ class Collector:
 
             # df 합쳐서 저장
             df_일봉 = pd.concat([df_일봉_기존, df_일봉_신규], axis=0)
-            df_일봉 = df_일봉.drop_duplicates().sort_values(['일자', '종목코드'], ascending=True)
+            df_일봉 = df_일봉.drop_duplicates(subset=['일자', '종목코드'], keep='last')
+            df_일봉 = df_일봉.sort_values(['일자', '종목코드'], ascending=True)
             df_일봉.to_sql(s_테이블명, con=con_일봉, index=False, if_exists='replace')
 
             # log 기록
             self.make_log(f'{s_일자} 데이터 저장 완료')
 
+        # 임시 pkl 삭제
+        os.system(f'del {path_pkl_임시}')
+
     def db저장_분봉(self):
         """ pkl 형식으로 임시 저장된 분봉 파일 읽어와서 db 파일 저장 """
         # pkl 읽어오기
-        df_분봉 = pd.read_pickle(os.path.join(self.folder_정보수집, 'df_ohlcv_분봉_임시.pkl'))
+        s_파일명 = 'df_ohlcv_분봉_임시.pkl'
+        path_pkl_임시 = os.path.join(self.folder_정보수집, s_파일명)
+        try:
+            df_분봉 = pd.read_pickle(path_pkl_임시)
+        except FileNotFoundError:
+            self.make_log(f'[error] {s_파일명} 파일 미존재')
+            return
 
         # 일별로 분리
         gr_분봉 = df_분봉.groupby('일자')
@@ -70,11 +86,15 @@ class Collector:
             con_분봉 = sqlite3.connect(os.path.join(self.folder_ohlcv, s_파일명))
 
             # df 저장
-            df_분봉 = df_분봉.drop_duplicates().sort_values(['종목코드', '시간'], ascending=[True, False])
+            df_분봉 = df_분봉.drop_duplicates(subset=['종목코드', '시간'], keep='last')
+            df_분봉 = df_분봉.sort_values(['종목코드', '시간'], ascending=[True, False])
             df_분봉.to_sql(s_테이블명, con=con_분봉, index=False, if_exists='replace')
 
             # log 기록
             self.make_log(f'{s_일자} 데이터 저장 완료')
+
+        # 임시 pkl 삭제
+        os.system(f'del {path_pkl_임시}')
 
     def 캐시저장_일봉(self):
         """ db 파일 불러와서 종목별 분류 후 pkl 파일 저장 (일봉) """
@@ -339,10 +359,8 @@ class Collector:
 if __name__ == "__main__":
     c = Collector()
 
-    # c.db저장_일봉()
-    # c.db저장_분봉()
-    # c.캐시저장_일봉()
+    c.db저장_일봉()
+    c.db저장_분봉()
+    c.캐시저장_일봉()
     c.캐시저장_분봉()
     c.캐시저장_10분봉()
-
-    pass
