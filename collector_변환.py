@@ -63,6 +63,7 @@ class Collector:
 
         # 임시 pkl 삭제
         os.system(f'del {path_pkl_임시}')
+        os.system(f'del {os.path.join(self.folder_정보수집, "li_종목코드_제외_일봉.pkl")}')
 
     def db저장_분봉(self):
         """ pkl 형식으로 임시 저장된 분봉 파일 읽어와서 db 파일 저장 """
@@ -95,6 +96,7 @@ class Collector:
 
         # 임시 pkl 삭제
         os.system(f'del {path_pkl_임시}')
+        os.system(f'del {os.path.join(self.folder_정보수집, "li_종목코드_제외_분봉.pkl")}')
 
     def 캐시저장_일봉(self):
         """ db 파일 불러와서 종목별 분류 후 pkl 파일 저장 (일봉) """
