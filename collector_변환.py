@@ -139,7 +139,7 @@ class Collector:
             # 종목별 분류
             dic_일봉 = dict()
             gr_전체 = df_전체.groupby('종목코드')
-            for s_종목코드, df_종목별 in tqdm(gr_전체, desc=f'{s_테이블명}'):
+            for s_종목코드, df_종목별 in tqdm(gr_전체, desc=f'캐시저장|{s_테이블명}'):
                 # df 정리 (오름차순)
                 df_종목별 = df_종목별.drop_duplicates().sort_values('일자', ascending=True)
                 # 추가 데이터 생성
@@ -212,7 +212,7 @@ class Collector:
             dic_분봉 = dict()
             dic_코드별_일봉 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_일봉_{s_년월}.pkl'))
             gr_전체 = df_전체.groupby('종목코드')
-            for s_종목코드, df_종목별 in tqdm(gr_전체, desc=f'{s_테이블명}'):
+            for s_종목코드, df_종목별 in tqdm(gr_전체, desc=f'캐시저장|{s_테이블명}'):
                 # df 정리 (오름차순)
                 df_종목별 = df_종목별.drop_duplicates().sort_values(['일자', '시간'], ascending=True)
                 # 추가 데이터 생성 (!!!주의!!! 해당 날짜 이외 데이터는 신뢰성 없음)
@@ -288,7 +288,7 @@ class Collector:
             dic_10분봉 = dict()
             dic_코드별_일봉 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_일봉_{s_년월}.pkl'))
             gr_전체 = df_전체.groupby('종목코드')
-            for s_종목코드, df_종목별 in tqdm(gr_전체, desc=f'{s_테이블명}(10분봉)'):
+            for s_종목코드, df_종목별 in tqdm(gr_전체, desc=f'캐시저장|{s_테이블명}(10분봉)'):
                 # df 정리 (오름차순)
                 df_종목별 = df_종목별.drop_duplicates().sort_values(['일자', '시간'], ascending=True)
                 # 인덱스 설정
