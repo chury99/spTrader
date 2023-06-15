@@ -17,7 +17,7 @@ class Collector:
 
         # 기준정보 정의
         self.s_오늘 = pd.Timestamp('now').strftime('%Y%m%d')
-        self.path_log = os.path.join(dic_config['folder_log'], f'sp_ohlcv_{self.s_오늘}.log')
+        self.path_log = os.path.join(dic_config['folder_log'], f'sp_collector_{self.s_오늘}.log')
         self.n_딜레이 = 0.2
 
         # 폴더 정의
@@ -69,18 +69,22 @@ class Collector:
         li_종목코드_완료_분봉 = list(df_ohlcv_분봉['종목코드'].unique()) if df_ohlcv_분봉 is not None else list()
 
         # 잔여 항목 확인
-        li_종목코드_잔여_일봉 = [s_종목코드 for s_종목코드 in li_종목코드_전체 if s_종목코드 not in li_종목코드_완료_일봉]
-        li_종목코드_잔여_일봉 = [s_종목코드 for s_종목코드 in li_종목코드_잔여_일봉 if s_종목코드 not in li_종목코드_제외_일봉]
+        li_종목코드_잔여_일봉 = [s_종목코드 for s_종목코드 in li_종목코드_전체 if s_종목코드 not in li_종목코드_제외_일봉]
+        li_종목코드_잔여_일봉 = [s_종목코드 for s_종목코드 in li_종목코드_잔여_일봉 if s_종목코드 not in li_종목코드_완료_일봉]
 
-        li_종목코드_잔여_분봉 = [s_종목코드 for s_종목코드 in li_종목코드_전체 if s_종목코드 not in li_종목코드_완료_분봉]
-        li_종목코드_잔여_분봉 = [s_종목코드 for s_종목코드 in li_종목코드_잔여_분봉 if s_종목코드 not in li_종목코드_제외_분봉]
+        li_종목코드_잔여_분봉 = [s_종목코드 for s_종목코드 in li_종목코드_전체 if s_종목코드 not in li_종목코드_제외_분봉]
+        li_종목코드_잔여_분봉 = [s_종목코드 for s_종목코드 in li_종목코드_잔여_분봉 if s_종목코드 not in li_종목코드_완료_분봉]
 
         # self 변수 정의
         self.dic_종목코드2종목명 = df_전체종목.set_index('종목코드').to_dict()['종목명']
-        self.n_전체항목_일봉 = len(li_종목코드_전체) - len(li_종목코드_제외_일봉)
-        self.n_전체항목_분봉 = len(li_종목코드_전체) - len(li_종목코드_제외_분봉)
-        self.n_완료항목_일봉 = len(li_종목코드_완료_일봉)
-        self.n_완료항목_분봉 = len(li_종목코드_완료_분봉)
+        # self.n_전체항목_일봉 = len(li_종목코드_전체) - len(li_종목코드_제외_일봉)
+        # self.n_전체항목_분봉 = len(li_종목코드_전체) - len(li_종목코드_제외_분봉)
+        # self.n_완료항목_일봉 = len(li_종목코드_완료_일봉)
+        # self.n_완료항목_분봉 = len(li_종목코드_완료_분봉)
+        self.n_전체항목_일봉 = len(li_종목코드_전체)
+        self.n_전체항목_분봉 = len(li_종목코드_전체)
+        self.n_완료항목_일봉 = len(li_종목코드_완료_일봉) + len(li_종목코드_제외_일봉)
+        self.n_완료항목_분봉 = len(li_종목코드_완료_분봉) + len(li_종목코드_제외_분봉)
         self.li_종목코드_제외_일봉 = li_종목코드_제외_일봉
         self.li_종목코드_제외_분봉 = li_종목코드_제외_분봉
         self.li_종목코드_잔여_일봉 = li_종목코드_잔여_일봉
