@@ -10,7 +10,7 @@ import time
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
 # noinspection PyShadowingNames
-class Downloader:
+class Collector:
     def __init__(self):
         # config 읽어 오기
         with open('config.json', mode='rt', encoding='utf-8') as file:
@@ -18,7 +18,7 @@ class Downloader:
 
         # 기준정보 정의
         self.s_오늘 = pd.Timestamp('now').strftime('%Y%m%d')
-        self.path_log = os.path.join(dic_config['folder_log'], f'sp_정보수집_{self.s_오늘}.log')
+        self.path_log = os.path.join(dic_config['folder_log'], f'sp_collector_{self.s_오늘}.log')
         self.n_딜레이 = 0.2
 
         # 폴더 정의
@@ -95,8 +95,8 @@ class Downloader:
 #######################################################################################################################
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    d = Downloader()
+    c = Collector()
 
-    d.get_전체종목()
+    c.get_전체종목()
 
     pass
