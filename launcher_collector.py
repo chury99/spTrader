@@ -16,7 +16,7 @@ class LauncherCollector:
 
         # 기준정보 정의
         self.s_오늘 = pd.Timestamp('now').strftime('%Y%m%d')
-        self.path_log = os.path.join(dic_config['folder_log'], f'sp_ohlcv_{self.s_오늘}.log')
+        self.path_log = os.path.join(dic_config['folder_log'], f'sp_collector_{self.s_오늘}.log')
         self.path_파이썬32 = dic_config['path_파이썬32']
         self.path_파이썬64 = dic_config['path_파이썬64']
 
@@ -27,6 +27,21 @@ class LauncherCollector:
 
         # log 기록
         self.make_log(f'### 구동 시작 ###')
+
+    def collector_다운(self):
+        """ 키움 서버에서 필요 정보 다운로드 후 저장 """
+        # 파일 지정
+        path_실행 = os.path.join(os.getcwd(), 'collector_다운.py')
+
+        # log 기록
+        self.make_log(f'서버 데이터 다운로드 실행')
+
+        # 프로세스 실행
+        ret = subprocess.run([self.path_파이썬32, path_실행], shell=True)
+        s_실행결과 = '성공' if ret.returncode == 0 else '실패'
+
+        # log 기록
+        self.make_log(f'데이터 다운로드 완료 - {s_실행결과}')
 
     def collector_수집(self):
         """ ohlcv 수집 시 임시 pkl 파일 감시하여 응답 없을 시 종료 후 재구동 """
