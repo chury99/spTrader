@@ -589,7 +589,10 @@ class KiwoomAPI(QAxWidget):
         for s_컬럼명 in li_컬럼명_int:
             df_기본정보[s_컬럼명] = df_기본정보[s_컬럼명].astype(int)
         for s_컬럼명 in li_컬럼명_float:
-            df_기본정보[s_컬럼명] = df_기본정보[s_컬럼명].astype(float)
+            try:
+                df_기본정보[s_컬럼명] = df_기본정보[s_컬럼명].astype(float)
+            except ValueError:
+                df_기본정보[s_컬럼명] = float(0)
 
         return df_기본정보
 
