@@ -1,11 +1,8 @@
 import os
 import sys
 from PyQt5.QtWidgets import *
-from PyQt5.QAxContainer import *
-from PyQt5.QtCore import *
 import pandas as pd
 import json
-import time
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
@@ -33,10 +30,10 @@ class Collector:
         self.api.comm_connect()
 
         # log 기록
-        self.make_log(f'### Downloader 구동 시작 ({self.api.s_접속서버}) ###')
+        self.make_log(f'### 데이터 다운로드 시작 ({self.api.s_접속서버}) ###')
 
     def get_전체종목(self):
-        """ 전체 종목코드 받아서 pkl 저장 """
+        """ 전체 종목코드 받아서 pkl, csv 저장 """
         # 전체종목코드 받아오기
         li_코스피 = self.api.get_전체종목코드(s_주식시장='코스피')
         li_코스닥 = self.api.get_전체종목코드(s_주식시장='코스닥')
@@ -67,10 +64,42 @@ class Collector:
 
         # 파일 저장
         df_전체종목.to_pickle(os.path.join(self.folder_정보수집, 'df_전체종목.pkl'))
-        df_전체종목.to_csv(os.path.join(self.folder_정보수집, 'df_전체종목.csv'), index=False, encoding='cp949')
+        df_전체종목.to_csv(os.path.join(self.folder_정보수집, '전체종목.csv'), index=False, encoding='cp949')
 
         # log 기록
         self.make_log(f'전체종목 저장 완료 - 총 {len(df_전체종목):,}종목 (코스피 {len(li_코스피):,}, 코스닥 {len(li_코스닥):,})')
+
+    def get_조건검색(self):
+        """ 조건검색 항목별 종목코드 받아서 pkl, csv 저장 """
+        # 전체 조건검색 받아오기
+        dic_조건검색 = self.api.get_조건검색_전체()
+
+        # 전체 종목 받아오기
+        df_전체종목 = pd.read_pickle(os.path.join(self.folder_정보수집, 'df_전체종목.pkl'))
+
+        # 항목별 데이터 처리
+        dic_조건검색_df = dict()
+        for s_항목명 in dic_조건검색.keys():
+            li_종목코드 = dic_조건검색[s_항목명]
+
+            # 정보 추가
+            li_df_정보 = [df_전체종목[df_전체종목['종목코드'] == s_종목코드] for s_종목코드 in li_종목코드]
+            df_정보 = pd.concat(li_df_정보, axis=0).drop_duplicates().reset_index(drop=True)
+
+            # dic에 저장
+            dic_조건검색_df[s_항목명] = df_정보
+
+            # csv 파일 저장
+            df_정보.to_csv(os.path.join(self.folder_정보수집, f'조건검색_{s_항목명}.csv'), index=False, encoding='cp949')
+
+            # log 기록
+            self.make_log(f'조건검색 저장 - [{s_항목명}] {len(df_정보):,}개 종목')
+
+        # pkl 파일 저장
+        pd.to_pickle(dic_조건검색_df, os.path.join(self.folder_정보수집, 'dic_조건검색.pkl'))
+
+        # log 기록
+        self.make_log(f'전체 조건검색 종목 저장 완료 - 총 {len(dic_조건검색_df)}개 항목')
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
@@ -98,5 +127,4 @@ if __name__ == "__main__":
     c = Collector()
 
     c.get_전체종목()
-
-    pass
+    c.get_조건검색()
