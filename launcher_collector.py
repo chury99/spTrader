@@ -143,5 +143,6 @@ class LauncherCollector:
 if __name__ == "__main__":
     l = LauncherCollector()
 
+    l.collector_다운()
     l.collector_수집()
     l.collector_변환()
