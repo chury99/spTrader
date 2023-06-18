@@ -16,7 +16,7 @@ class LauncherCollector:
 
         # 기준정보 정의
         self.s_오늘 = pd.Timestamp('now').strftime('%Y%m%d')
-        self.path_log = os.path.join(dic_config['folder_log'], f'sp_collector_{self.s_오늘}.log')
+        self.path_log = os.path.join(dic_config['folder_log'], f'{dic_config["로그이름_trader"]}_{self.s_오늘}.log')
         self.path_파이썬32 = dic_config['path_파이썬32']
         self.path_파이썬64 = dic_config['path_파이썬64']
 
