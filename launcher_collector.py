@@ -57,6 +57,9 @@ class LauncherCollector:
 
         # 모니터링 진행
         while True:
+            # 현재시각 확인
+            dt_현재시각 = pd.Timestamp('now')
+
             # 정상종료 되었으면 종료
             ret = 프로세스.poll()
             s_실행상태 = '정상종료' if ret == 0 else '실행중' if ret is None else '비정상종료'
@@ -67,22 +70,21 @@ class LauncherCollector:
 
             # 모니터링 파일 확인
             try:
-                n_수정시간_일봉 = os.path.getmtime(path_모니터링_일봉)
+                n_수정시각_일봉 = os.path.getmtime(path_모니터링_일봉)
             except FileNotFoundError:
-                n_수정시간_일봉 = 0
+                n_수정시각_일봉 = 0
 
             try:
-                n_수정시간_분봉 = os.path.getmtime(path_모니터링_분봉)
+                n_수정시각_분봉 = os.path.getmtime(path_모니터링_분봉)
             except FileNotFoundError:
-                n_수정시간_분봉 = 0
+                n_수정시각_분봉 = 0
 
-            n_수정시간 = max(n_수정시간_일봉, n_수정시간_분봉)
-            dt_수정시간 = pd.Timestamp(time.ctime(n_수정시간))
-            dt_현재시간 = pd.Timestamp('now')
+            n_수정시각 = max(n_수정시각_일봉, n_수정시각_분봉)
+            dt_수정시각 = pd.Timestamp(time.ctime(n_수정시각))
 
             # 시간 지연 시 재구동
             n_지연시간_초 = 3
-            if dt_현재시간 - dt_수정시간 > pd.Timedelta(seconds=n_지연시간_초):
+            if dt_현재시각 - dt_수정시각 > pd.Timedelta(seconds=n_지연시간_초):
                 # log 기록
                 self.make_log(f'서버응답 지연({n_지연시간_초}초) - 강제종료 요청')
 
