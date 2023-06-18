@@ -4,6 +4,8 @@
     "folder_kakao" : "C:\\Users\\chury\\PycharmProjects\\api-kakao",
     "path_파이썬32" : "C:\\Python311-32\\python32.exe",
     "path_파이썬64" : "C:\\Python311-64\\python64.exe",
+    "로그이름_trader" : "sp_trader",
+    "로그이름_collector" : "sp_collector",
     "시작시각" : "08:50:00",
     "종료시각" : "15:20:00",
     "자본금" : "1,000,000"
