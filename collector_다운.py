@@ -15,7 +15,7 @@ class Collector:
 
         # 기준정보 정의
         self.s_오늘 = pd.Timestamp('now').strftime('%Y%m%d')
-        self.path_log = os.path.join(dic_config['folder_log'], f'{dic_config["로그이름_trader"]}_{self.s_오늘}.log')
+        self.path_log = os.path.join(dic_config['folder_log'], f'{dic_config["로그이름_collector"]}_{self.s_오늘}.log')
         self.n_딜레이 = 0.2
 
         # 폴더 정의
@@ -84,7 +84,10 @@ class Collector:
 
             # 정보 추가
             li_df_정보 = [df_전체종목[df_전체종목['종목코드'] == s_종목코드] for s_종목코드 in li_종목코드]
-            df_정보 = pd.concat(li_df_정보, axis=0).drop_duplicates().reset_index(drop=True)
+            try:
+                df_정보 = pd.concat(li_df_정보, axis=0).drop_duplicates().reset_index(drop=True)
+            except ValueError:
+                df_정보 = pd.DataFrame([], columns=df_전체종목.columns)
 
             # dic에 저장
             dic_조건검색_df[s_항목명] = df_정보
@@ -126,5 +129,5 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     c = Collector()
 
-    c.get_전체종목()
+    # c.get_전체종목()
     c.get_조건검색()
