@@ -129,5 +129,5 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     c = Collector()
 
-    # c.get_전체종목()
+    c.get_전체종목()
     c.get_조건검색()
