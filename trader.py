@@ -45,41 +45,112 @@ class Trader(QMainWindow, form_class):
         self.api = API_kiwoom.KiwoomAPI()
         self.api.comm_connect()
 
+        # 정보 설정
+        self.s_접속서버 = self.api.s_접속서버
+        self.s_계좌번호 = self.api.get_로그인정보('계좌목록').split(';')[1]
+        self.s_시작시각 = dic_config['시작시각']
+        self.s_종료시각 = dic_config['종료시각']
+        self.s_자본금 = dic_config['자본금']
+
         # log 기록
-        self.make_log(f'### Short Punch Trader 시작 ({self.api.s_접속서버}) ###')
+        self.make_log(f'### Short Punch Trader 시작 ({self.s_접속서버}) ###')
 
         # 초기 설정
-        self.계좌번호 = self.set_ui설정()
-        self.flag_종목보유 = self.set_flag설정()
-        self.set_대상종목설정()
+        self.setui_초기설정()
+        self.setui_예수금()
+        # self.flag_종목보유 = self.set_flag설정()
+        # self.set_대상종목설정()
+        # 실시간 설정
 
         # 타이머 기반 동작 설정 (메인봇 연결)
         self.타이머 = QTimer(self)
         self.타이머.start(1 * 1000)    # 1/1000초 단위로 숫자 입력
-        self.타이머.timeout.connect(self.run_메인봇)
-
-
-
-
-
-
+        self.타이머.timeout.connect(self.run_mainbot)
 
     ###################################################################################################################
-    def set_ui설정(self):
-        """ ui 내 정보 표시 및 버튼 동작 설정 """
-        pass
-
-    def run_메인봇(self):
+    def run_mainbot(self):
         """ 설정된 주기에 따라 매수봇, 매도봇 구동 """
-        pass
+        # ui 동작상태 업데이트
+        self.lb_run_mainbot.setText('[ 메인봇 ] 동작중')
+
+        # 현재 시각 확인
+        dt_현재 = pd.Timestamp('now')
+        n_분 = int(dt_현재.strftime('%M'))
+        n_초 = int(dt_현재.strftime('%S'))
+
+        # 1초 단위 업데이트
+        self.setui_상태표시줄()
+        self.setui_시간설정()
+
+        # 모니터링 파일 생성 (2초 단위)
+        if n_초 % 2 == 0:
+            pd.to_pickle(self.s_접속서버, self.path_모니터링)
+
+        # 매수봇 호출
+        if n_분 % 10 == 0 and n_초 == 0:
+            self.run_매수봇()
+
+        # 매도봇 효출
+
+        # ui 동작상태 업데이트
+        # self.lb_run_mainbot.setText('[ 메인봇 ] 동작 대기')
 
     def run_매수봇(self):
         """ 매수 조건 확인하여 조건 만족 시 매수 주문 실행 """
-        pass
+        # ui 동작상태 업데이트
+        self.lb_run_buybot.setText('[ 매수봇 ] 동작중')
+
+        # ui 동작상태 업데이트
+        self.lb_run_buybot.setText('[ 매수봇 ] 동작 대기')
 
     def run_매도봇(self):
         """ 매도 조건 확인하여 조건 만족 시 매도 주문 실행 """
-        pass
+        # ui 동작상태 업데이트
+        self.lb_run_sellbot.setText('[ 매도봇 ] 동작중')
+
+        # ui 동작상태 업데이트
+        self.lb_run_sellbot.setText('[ 매도봇 ] 동작 대기')
+
+    def setui_초기설정(self):
+        """ ui 내 정보 표시 및 버튼 동작| 설정 """
+        # 서버 정보 표시
+        self.lb_info_server.setText(self.s_접속서버)
+        self.lb_info_account.setText(f'[ 계좌 ] {self.s_계좌번호}')
+
+        # 설정 정보 표시
+        self.lb_time_start.setText(f'[ 시작시각 ] {self.s_시작시각}')
+        self.lb_time_end.setText(f'[ 종료시각 ] {self.s_종료시각}')
+        self.lb_cash_max.setText(f'[ 자본금 ] {int(self.s_자본금.replace(",", "")):,}')
+
+    def setui_상태표시줄(self):
+        """ 상태표시줄 업데이트 """
+        # 시간 설정
+        dt_현재 = pd.Timestamp('now')
+        n_초 = int(dt_현재.strftime('%S'))
+
+        # 상태표시줄 표시
+        if n_초 % 2 == 0:
+            s_상태 = '    o 서버 접속 중 '
+        else:
+            s_상태 = '    x 서버 접속 중'
+        self.statusbar.showMessage(f'{s_상태}  |  {self.s_접속서버}')
+
+    def setui_시간설정(self):
+        """ 일자 및 시간 정보 업데이트 """
+        # 날짜, 시간 설정
+        dt_현재 = pd.Timestamp('now')
+        dic_요일 = {'Mon': '월', 'Tue': '화', 'Wed': '수', 'Thu': '목', 'Fri': '금', 'Sat': '토', 'Sun': '일'}
+        s_날짜_ui = f'{dt_현재.strftime("%y-%m-%d")} ({dic_요일[dt_현재.strftime("%a")]})'
+        s_시각_ui = dt_현재.strftime('%H:%M:%S')
+
+        # ui 상에 표시
+        self.lb_info_date.setText(s_날짜_ui)
+        self.lb_info_time.setText(s_시각_ui)
+
+    def setui_예수금(self):
+        """ D+2 예수금 조회 후 ui에 표시 및 변수 업데이트 """
+        self.n_예수금 = self.api.get_tr_예수금(s_계좌번호=self.s_계좌번호)
+        self.lb_info_cash.setText(f'[ 예수금 ] {self.n_예수금:,}')
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
