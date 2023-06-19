@@ -83,7 +83,7 @@ class LauncherTrader:
             dt_수정시각 = pd.Timestamp(time.ctime(n_수정시각))
 
             # 시간 지연 시 재구동
-            n_지연시간_초 = 3
+            n_지연시간_초 = 7
             if dt_현재시각 - dt_수정시각 > pd.Timedelta(seconds=n_지연시간_초):
                 # log 기록
                 self.make_log(f'서버응답 지연({n_지연시간_초}초) - 강제종료 요청')
