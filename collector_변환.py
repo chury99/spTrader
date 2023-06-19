@@ -18,7 +18,7 @@ class Collector:
 
         # 기준정보 정의
         self.s_오늘 = pd.Timestamp('now').strftime('%Y%m%d')
-        self.path_log = os.path.join(dic_config['folder_log'], f'{dic_config["로그이름_trader"]}_{self.s_오늘}.log')
+        self.path_log = os.path.join(dic_config['folder_log'], f'{dic_config["로그이름_collector"]}_{self.s_오늘}.log')
 
         # 폴더 정의
         folder_work = dic_config['folder_work']
