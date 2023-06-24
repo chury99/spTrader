@@ -3,6 +3,7 @@ import sys
 from PyQt5.QtWidgets import *
 from PyQt5.QAxContainer import *
 from PyQt5.QtCore import *
+from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5 import uic
 import pandas as pd
 import json
@@ -31,6 +32,8 @@ class Trader(QMainWindow, form_class):
         self.folder_run = os.path.join(folder_work, 'run')
         folder_데이터 = os.path.join(folder_work, '데이터')
         self.folder_정보수집 = os.path.join(folder_데이터, '정보수집')
+        folder_이력 = os.path.join(folder_work, '이력')
+        self.folder_체결잔고 = os.path.join(folder_이력, '체결잔고')
 
         # 기준정보 정의
         self.s_오늘 = pd.Timestamp('now').strftime('%Y%m%d')
@@ -47,7 +50,8 @@ class Trader(QMainWindow, form_class):
 
         # 정보 설정
         self.s_접속서버 = self.api.s_접속서버
-        self.s_계좌번호 = self.api.get_로그인정보('계좌목록').split(';')[1]
+        li_계좌번호 = self.api.get_로그인정보('계좌목록').split(';')
+        self.s_계좌번호 = li_계좌번호[1] if self.s_접속서버 == '실서버' else li_계좌번호[0]
         self.s_시작시각 = dic_config['시작시각']
         self.s_종료시각 = dic_config['종료시각']
         self.s_자본금 = dic_config['자본금']
@@ -58,6 +62,7 @@ class Trader(QMainWindow, form_class):
         # 초기 설정
         self.setui_초기설정()
         self.setui_예수금()
+        self.setui_거래이력()
         # self.flag_종목보유 = self.set_flag설정()
         # self.set_대상종목설정()
         # 실시간 설정
@@ -79,36 +84,37 @@ class Trader(QMainWindow, form_class):
         n_초 = int(dt_현재.strftime('%S'))
 
         # 1초 단위 업데이트
-        self.setui_상태표시줄()
-        self.setui_시간설정()
+        self.setui_실시간()
 
         # 모니터링 파일 생성 (2초 단위)
         if n_초 % 2 == 0:
             pd.to_pickle(self.s_접속서버, self.path_모니터링)
 
         # 매수봇 호출
-        if n_분 % 10 == 0 and n_초 == 0:
+        # if n_분 % 10 == 0 and n_초 == 0:
+        if n_초 % 5 == 0:      ##### 테스트용 임시 코드
             self.run_매수봇()
 
-        # 매도봇 효출
-
-        # ui 동작상태 업데이트
-        # self.lb_run_mainbot.setText('[ 메인봇 ] 동작 대기')
+        # 매도봇 호출
+        if n_초 % 1 == 0:        ### 테스트용 임시 코드
+            self.run_매도봇()
 
     def run_매수봇(self):
         """ 매수 조건 확인하여 조건 만족 시 매수 주문 실행 """
-        # ui 동작상태 업데이트
+        # ui 상태 업데이트 및 log 기록
         self.lb_run_buybot.setText('[ 매수봇 ] 동작중')
+        self.make_log_주문(f'### 매수조건 검색 시작 ###')
 
-        # ui 동작상태 업데이트
+        # ui 상태 업데이트
         self.lb_run_buybot.setText('[ 매수봇 ] 동작 대기')
 
     def run_매도봇(self):
         """ 매도 조건 확인하여 조건 만족 시 매도 주문 실행 """
-        # ui 동작상태 업데이트
+        # ui 상태 업데이트 및 log 기록
         self.lb_run_sellbot.setText('[ 매도봇 ] 동작중')
+        self.make_log_주문(f'### 매도조건 검색 시작 ###')
 
-        # ui 동작상태 업데이트
+        # ui 상태 업데이트
         self.lb_run_sellbot.setText('[ 매도봇 ] 동작 대기')
 
     def setui_초기설정(self):
@@ -122,28 +128,20 @@ class Trader(QMainWindow, form_class):
         self.lb_time_end.setText(f'[ 종료시각 ] {self.s_종료시각}')
         self.lb_cash_max.setText(f'[ 자본금 ] {int(self.s_자본금.replace(",", "")):,}')
 
-    def setui_상태표시줄(self):
+    def setui_실시간(self):
         """ 상태표시줄 업데이트 """
-        # 시간 설정
+        # 정보 생성
         dt_현재 = pd.Timestamp('now')
         n_초 = int(dt_현재.strftime('%S'))
-
-        # 상태표시줄 표시
-        if n_초 % 2 == 0:
-            s_상태 = '    o 서버 접속 중 '
-        else:
-            s_상태 = '    x 서버 접속 중'
-        self.statusbar.showMessage(f'{s_상태}  |  {self.s_접속서버}')
-
-    def setui_시간설정(self):
-        """ 일자 및 시간 정보 업데이트 """
-        # 날짜, 시간 설정
-        dt_현재 = pd.Timestamp('now')
         dic_요일 = {'Mon': '월', 'Tue': '화', 'Wed': '수', 'Thu': '목', 'Fri': '금', 'Sat': '토', 'Sun': '일'}
+
+        # 상태표시줄 업데이트
+        s_깜빡이 = '□' if n_초 % 2 == 0 else '■'
+        self.statusbar.showMessage(f'    {s_깜빡이} 서버 접속 중  |  {self.s_접속서버} | {self.s_계좌번호}')
+
+        # 일자 및 시각 정보 업데이트
         s_날짜_ui = f'{dt_현재.strftime("%y-%m-%d")} ({dic_요일[dt_현재.strftime("%a")]})'
         s_시각_ui = dt_현재.strftime('%H:%M:%S')
-
-        # ui 상에 표시
         self.lb_info_date.setText(s_날짜_ui)
         self.lb_info_time.setText(s_시각_ui)
 
@@ -151,6 +149,50 @@ class Trader(QMainWindow, form_class):
         """ D+2 예수금 조회 후 ui에 표시 및 변수 업데이트 """
         self.n_예수금 = self.api.get_tr_예수금(s_계좌번호=self.s_계좌번호)
         self.lb_info_cash.setText(f'[ 예수금 ] {self.n_예수금:,}')
+
+    def setui_거래이력(self):
+        """ 체결잔고 csv 파일 읽어와서 ui에 표시 """
+        # 체결잔고 읽어오기
+        # df_체결잔고 = pd.read_csv(os.path.join(self.folder_체결잔고, f'체결잔고_{self.s_오늘}.csv'), encoding='cp949')
+        df_체결잔고 = pd.read_csv(os.path.join(self.folder_체결잔고, f'체결잔고_{"20230605"}.csv'), encoding='cp949')   ##### 테스트용 임시코드
+
+        # df 정리 (전체 컬럼 str으로 변환 필요)
+        df_거래이력 = pd.DataFrame()
+        df_거래이력['구분'] = df_체결잔고['구분']
+        df_거래이력['시간'] = df_체결잔고['시간']
+        df_거래이력['계좌번호'] = df_체결잔고['계좌번호'].apply(lambda x: str(x))
+        df_거래이력['종목코드'] = df_체결잔고['종목코드']
+        df_거래이력['종목명'] = df_체결잔고['종목명'].apply(lambda x: x.strip())
+        df_거래이력['주문상태'] = df_체결잔고['주문상태']
+        df_거래이력['주문수량'] = df_체결잔고['주문수량'].apply(lambda x: f'{float(x):,.0f}')
+        df_거래이력['주문가격'] = df_체결잔고['주문가격'].apply(lambda x: f'{float(x):,.0f}')
+        df_거래이력['미체결수량'] = df_체결잔고['미체결수량'].apply(lambda x: f'{float(x):,.0f}')
+        df_거래이력['체결누계금액'] = df_체결잔고['체결누계금액'].apply(lambda x: f'{float(x):,.0f}')
+        df_거래이력['매도수구분'] = df_체결잔고['매도수구분']
+        df_거래이력['주문체결시간'] = df_체결잔고['주문체결시간']
+        df_거래이력['체결가'] = df_체결잔고['체결가'].apply(lambda x: f'{float(x):,.0f}')
+        df_거래이력['체결량'] = df_체결잔고['체결량'].apply(lambda x: f'{float(x):,.0f}')
+        df_거래이력['현재가'] = df_체결잔고['현재가'].apply(lambda x: f'{abs(float(x)):,.0f}')
+
+        # df_거래이력 = df_거래이력[df_거래이력['계좌번호'] == self.s_계좌번호]
+        df_거래이력 = df_거래이력[df_거래이력['계좌번호'] == '5292685210']      ####### 임시 테스트용 코드
+        ary_거래이력 = df_거래이력.values
+
+        # 테이블 모델 생성
+        model_거래이력 = QStandardItemModel(df_거래이력.shape[0], df_거래이력.shape[1])
+        model_거래이력.setHorizontalHeaderLabels(df_거래이력.columns)
+
+        for n_row, ary_row in enumerate(ary_거래이력):
+            for n_col, s_항목 in enumerate(ary_row):
+                obj_정렬 = Qt.AlignRight if n_col in [0] else Qt.AlignCenter
+                obj_항목 = QStandardItem(str(s_항목))
+                obj_항목.setTextAlignment(obj_정렬)
+                model_거래이력.setItem(n_row, n_col, obj_항목)
+
+        # 테이블 모델 연결
+        tv_거래이력 = self.tv_history_trade
+        tv_거래이력.setModel(model_거래이력)
+        tv_거래이력.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
@@ -171,10 +213,41 @@ class Trader(QMainWindow, form_class):
             with open(self.path_log, mode='at', encoding='cp949') as file:
                 file.write(f'{s_log}\n')
 
+    def make_log_주문(self, s_text):
+        """ 입력 받은 s_text에 시간 붙여서 self.path_log와 self.path_log_주문에 동시 저장 """
+        # 정보 설정
+        s_시각 = pd.Timestamp('now').strftime('%H:%M:%S')
+        s_파일 = os.path.basename(sys.argv[0]).replace('.py', '')
+        s_모듈 = sys._getframe(1).f_code.co_name
+
+        # log 생성
+        s_log = f'[{s_시각}] {s_파일} | {s_모듈} | {s_text}'
+
+        # log 출력 (콘솔)
+        print(s_log)
+
+        # log 출력 (log 파일)
+        with open(self.path_log, mode='at', encoding='cp949') as file:
+            file.write(f'{s_log}\n')
+
+        # log 출력 (log_주문 파일)
+        with open(self.path_log_주문, mode='at', encoding='cp949') as file:
+            file.write(f'{s_log}\n')
+
+        # log 출력 (ui)
+        s_대상 = '매수' if s_모듈 == 'run_매수봇' else '매도' if s_모듈 == 'run_매도봇' else None
+        if s_모듈 not in ['run_매수봇', 'run_매도봇']:
+            return
+        obj_로그창 = self.te_info_buybot if s_모듈 == 'run_매수봇' else self.te_info_sellbot
+        obj_로그창.appendPlainText(f'{s_log}\n')
+
 
 #######################################################################################################################
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    style_fusion = QStyleFactory.create('Fusion')
+    app.setStyle(style_fusion)
+
     t = Trader()
     t.show()
     app.exec_()
