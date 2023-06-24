@@ -63,7 +63,10 @@ class Trader(QMainWindow, form_class):
         self.setui_초기설정()
         self.setui_예수금()
         self.setui_거래이력()
-        # self.flag_종목보유 = self.set_flag설정()
+
+        self.df_계좌잔고_전체, self.df_계좌잔고_종목별 = self.api.get_tr_계좌잔고(s_계좌번호=self.s_계좌번호)
+        self.flag_종목보유 = len(self.df_계좌잔고_종목별) > 0
+
         # self.set_대상종목설정()
         # 실시간 설정
 
@@ -91,12 +94,19 @@ class Trader(QMainWindow, form_class):
             pd.to_pickle(self.s_접속서버, self.path_모니터링)
 
         # 매수봇 호출
-        # if n_분 % 10 == 0 and n_초 == 0:
-        if n_초 % 5 == 0:      ##### 테스트용 임시 코드
+        # if self.flag_종목보유 is False:
+        #     if n_분 % 10 == 0 and n_초 == 1:
+        #         self.run_매수봇()
+        ##### 테스트용 임시 코드
+        if n_초 % 5 == 0:
             self.run_매수봇()
 
         # 매도봇 호출
-        if n_초 % 1 == 0:        ### 테스트용 임시 코드
+        # if self.flag_종목보유 is True:
+        #     if n_초 % 1 == 0:
+        #         self.run_매도봇()
+        ### 테스트용 임시 코드
+        if n_초 % 1 == 0:
             self.run_매도봇()
 
     def run_매수봇(self):
