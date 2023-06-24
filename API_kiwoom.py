@@ -486,7 +486,7 @@ class KiwoomAPI(QAxWidget):
         return n_예수금
 
     def get_tr_계좌잔고(self, s_계좌번호):
-        """ 계좌의 D+2일 추정 예수금 조회하여 df_계좌잔고, df_종목별잔고 리턴 (OnReceiveTrData 이벤트 발생) """
+        """ 계좌 현황 조회하여 df_계좌잔고, df_종목별잔고 리턴 (OnReceiveTrData 이벤트 발생) """
         # TR 요청
         self.set_input_value('계좌번호', s_계좌번호)
         self.comm_rq_data('계좌평가잔고내역요청', 'opw00018', 0, '2001')
@@ -497,14 +497,14 @@ class KiwoomAPI(QAxWidget):
 
         # 데이터 타입 지정
         for s_컬럼명 in df_계좌잔고.columns:
-            df_계좌잔고[s_컬럼명] = df_계좌잔고[s_컬럼명].astype(int)
+            df_계좌잔고[s_컬럼명] = df_계좌잔고[s_컬럼명].astype(float)
         df_계좌잔고['수익률'] = df_계좌잔고['수익률'] / 100 if self.s_접속서버 == '실서버' else df_계좌잔고['수익률']
 
         df_종목별잔고['종목코드'] = df_종목별잔고['종목코드'].apply(lambda x: x[-6:])
         li_컬럼명_str = ['종목코드', '종목명']
         li_컬럼명_int = [s_컬럼명 for s_컬럼명 in df_종목별잔고.columns if s_컬럼명 not in li_컬럼명_str]
         for s_컬럼명 in li_컬럼명_int:
-            df_종목별잔고[s_컬럼명] = df_종목별잔고[s_컬럼명].astype(int)
+            df_종목별잔고[s_컬럼명] = df_종목별잔고[s_컬럼명].astype(float)
         df_종목별잔고['수익률'] = df_종목별잔고['수익률'] / 100 if self.s_접속서버 == '실서버' else df_종목별잔고['수익률']
 
         return df_계좌잔고, df_종목별잔고
