@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>627</width>
+    <width>668</width>
     <height>561</height>
    </rect>
   </property>
@@ -19,7 +19,6 @@
   </property>
   <property name="styleSheet">
    <string notr="true">background-color: rgb(52, 50, 48);
-selection-color: rgb(255, 255, 0);
 color: rgb(230, 230, 230);</string>
   </property>
   <widget class="QWidget" name="centralwidget">
@@ -137,7 +136,7 @@ color: rgb(230, 230, 230);</string>
      <rect>
       <x>190</x>
       <y>10</y>
-      <width>421</width>
+      <width>461</width>
       <height>251</height>
      </rect>
     </property>
@@ -157,7 +156,7 @@ color: rgb(230, 230, 230);</string>
       <rect>
        <x>10</x>
        <y>20</y>
-       <width>401</width>
+       <width>441</width>
        <height>221</height>
       </rect>
      </property>
@@ -168,6 +167,15 @@ color: rgb(230, 230, 230);</string>
        <weight>75</weight>
        <bold>true</bold>
       </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true"/>
+     </property>
+     <property name="sizeAdjustPolicy">
+      <enum>QAbstractScrollArea::AdjustToContents</enum>
+     </property>
+     <property name="sortingEnabled">
+      <bool>true</bool>
      </property>
     </widget>
    </widget>
@@ -384,7 +392,7 @@ color: rgb(230, 230, 230);</string>
      <rect>
       <x>190</x>
       <y>270</y>
-      <width>421</width>
+      <width>461</width>
       <height>251</height>
      </rect>
     </property>
@@ -401,7 +409,7 @@ color: rgb(230, 230, 230);</string>
     <widget class="Line" name="line">
      <property name="geometry">
       <rect>
-       <x>200</x>
+       <x>220</x>
        <y>20</y>
        <width>20</width>
        <height>221</height>
@@ -423,7 +431,7 @@ color: rgb(230, 230, 230);</string>
       <rect>
        <x>10</x>
        <y>20</y>
-       <width>191</width>
+       <width>211</width>
        <height>221</height>
       </rect>
      </property>
@@ -441,9 +449,9 @@ color: rgb(230, 230, 230);</string>
     <widget class="QPlainTextEdit" name="te_info_sellbot">
      <property name="geometry">
       <rect>
-       <x>220</x>
+       <x>240</x>
        <y>20</y>
-       <width>191</width>
+       <width>211</width>
        <height>221</height>
       </rect>
      </property>
@@ -545,7 +553,7 @@ color: rgb(230, 230, 230);</string>
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>627</width>
+     <width>668</width>
      <height>21</height>
     </rect>
    </property>
