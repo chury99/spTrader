@@ -2,11 +2,16 @@ import os
 import sys
 import pandas as pd
 
+import numpy as np
+# noinspection PyUnresolvedReferences
+from sklearn.model_selection import train_test_split
+
 from tqdm import tqdm
 
 
+# noinspection PyArgumentList
 def make_추가데이터_lstm(df):
-    """ ohlcv 데이터 (ma 포함, na 삭제) 받아서 분석을 위한 추가 데이터 처리 후 ary_x, ary_y 데이터 리턴 """
+    """ ohlcv 데이터 (ma 포함, na 삭제) 받아서 분석을 위한 추가 데이터 처리 후 ary 데이터를 dic에 담아서 리턴 """
     # df_추가 생성
     # 정리 (date, code, name, time, ohlcv 만 남기고 삭제)
     df_추가 = df.loc[:, ['일자', '종목코드', '종목명', '시간', '시가', '고가', '저가', '종가', '거래량']].copy()
@@ -45,98 +50,62 @@ def make_추가데이터_lstm(df):
         li_구간 = [-float('inf'), -5, -3, -2, -1, -0.5, 0.5, 1, 2, 3, 5, float('inf')]
         li_구간명 = ['-5', '-3', '-2', '-1', '-05', '0', '+05', '+1', '+2', '+3', '+5']
         for s_구간명, n_구간_시작, n_구간_종료 in zip(li_구간명, li_구간[:-1], li_구간[1:]):
-            df_추가[f'ohe_{s_인자}_{s_구간명}'] = (df_추가[s_인자] > n_구간_시작) & (df_추가[s_인자] <= n_구간_종료)
+            sri_컬럼 = pd.Series((df_추가[s_인자] > n_구간_시작) & (df_추가[s_인자] <= n_구간_종료), name=f'ohe_{s_인자}_{s_구간명}')
+            df_추가 = pd.concat([df_추가, sri_컬럼], axis=1)
 
     li_인자_ohe = [f'상승률(%)_거래량_{i + 1}봉' for i in range(3)]
     for s_인자 in li_인자_ohe:
         li_구간 = [-float('inf'), 30, 50, 100, 150, 200, 300, float('inf')]
         li_구간명 = ['0', '50', '100', '150', '200', '300', '500']
         for s_구간명, n_구간_시작, n_구간_종료 in zip(li_구간명, li_구간[:-1], li_구간[1:]):
-            df_추가[f'ohe_{s_인자}_{s_구간명}'] = (df_추가[s_인자] > n_구간_시작) & (df_추가[s_인자] <= n_구간_종료)
+            sri_컬럼 = pd.Series((df_추가[s_인자] > n_구간_시작) & (df_추가[s_인자] <= n_구간_종료), name=f'ohe_{s_인자}_{s_구간명}')
+            df_추가 = pd.concat([df_추가, sri_컬럼], axis=1)
 
     # 라벨 데이터 생성
     s_컬럼명_라벨 = '상승률(%)_고가'
     n_스펙_라벨 = 3
-    df_추가[f'라벨_{s_컬럼명_라벨}'] = df_추가[s_컬럼명_라벨] > n_스펙_라벨
+
+    sri_컬럼 = pd.Series(df_추가[s_컬럼명_라벨] > n_스펙_라벨, name=f'라벨_{s_컬럼명_라벨}')
+    df_추가 = pd.concat([df_추가, sri_컬럼], axis=1)
 
     # 데이터 잘라내기
     df_추가 = df_추가.dropna()[-1000:]
 
-    # 상승률만 골라내기 ???
-    li_컬럼명 = ['일자'] + [컬럼명 for 컬럼명 in df_추가.columns if '상승률(%)_' in 컬럼명 or '라벨_' in 컬럼명]
-    df_상승률 = df_추가.loc[:, li_컬럼명].copy()
-
     # x, y 데이터 생성
     n_윈도우 = 20
-    li_인자_ohe = [컬럼명 for 컬럼명 in df_상승률.columns if 'ohe_' in 컬럼명]
+    li_인자_ohe = [컬럼명 for 컬럼명 in df_추가.columns if 'ohe_' in 컬럼명]
     s_라벨컬럼 = f'라벨_{s_컬럼명_라벨}'
 
-    pass
+    # 데이터 길이가 윈도우 크기보다 작으면 종료
+    if len(df_추가) <= n_윈도우:
+        return None
 
-    df = df_상승률
-    n_window = n_윈도우
-    li_col_x = li_인자_ohe
-    col_y = s_라벨컬럼
+    else:
+        ary_데이터_x = df_추가.loc[:, li_인자_ohe].values
+        ary_데이터_y = df_추가[s_라벨컬럼].values
 
-    if len(df) <= n_window:
-        print('*** len(ary_data) should be larger than n_window ***')
-        dummy = np.nan
-        return dummy, dummy, dummy
+        li_x = list()
+        li_y = list()
+        for i in range(len(ary_데이터_x) - n_윈도우):
+            # 참고할 과거 데이터 생성
+            li_x.append(ary_데이터_x[i:i + n_윈도우])
+            # 라벨 데이터 생성
+            li_y.append(ary_데이터_y[i + n_윈도우])
 
-    ary_data_x = df.loc[:, li_col_x].values
-    ary_data_y = df[col_y].values
+        ary_x = np.array(li_x)
+        ary_x = ary_x.reshape(-1, n_윈도우, len(li_인자_ohe))
+        ary_y = np.array(li_y)
 
-    li_x = []
-    li_y = []
-    for i in range(len(df) - n_window):
-        # 참고할 과거 데이터 생성
-        li_x.append(ary_data_x[i:i + n_window])
-        # 라벨 데이터 생성
-        li_y.append(ary_data_y[i + n_window])
+        # train, test 데이터 분리
+        ary_x_학습, ary_x_검증, ary_y_학습, ary_y_검증 = train_test_split(ary_x, ary_y, test_size=0.2, random_state=42)
 
-    # x, y array 설정
-    ary_x = np.array(li_x)
-    ary_x = ary_x.reshape(-1, n_window, len(li_col_x))  # 전체 데이터수 x 참고할 과거 데이터 수 x feature 수
-    ary_y = np.array(li_y)
+        # dic에 저장
+        dic_데이터셋 = dict()
+        dic_데이터셋['ary_x'] = ary_x
+        dic_데이터셋['ary_y'] = ary_y
+        dic_데이터셋['ary_x_학습'] = ary_x_학습
+        dic_데이터셋['ary_y_학습'] = ary_y_학습
+        dic_데이터셋['ary_x_검증'] = ary_x_검증
+        dic_데이터셋['ary_y_검증'] = ary_y_검증
 
-    # x array 마지막값 설정
-    ary_x_last = np.array([ary_data_x[-1 * n_window:]])
-    ary_x_last.reshape(-1, n_window, len(li_col_x))
-
-    # print(ary_x.shape, ary_y.shape, ary_x_last.shape)
-    return ary_x, ary_y, ary_x_last
-
-
-
-
-    # x, y 데이터 생성
-    n_window = 20
-    li_features = [col for col in df_norm.columns if ('ohe_' in col)]
-    s_label_label = f'label_{s_label}'
-    ary_x, ary_y, ary_x_last = self.t.get_xy(df=df_norm,
-                                             li_col_x=li_features, col_y=s_label_label, n_window=n_window)
-    # ary_x값 이상 시 error 처리 (이상 시 3개 모두 np.nan으로 리턴)
-    if (type(ary_x) == float) and np.isnan(ary_x):
-        self.dic_args['LSTM_error'] = 1
-        pd.to_pickle(self.dic_args, self.path_args)
-        return
-
-    # train, test 데이터 분리
-    x_train, x_test, y_train, y_test = train_test_split(ary_x, ary_y, test_size=0.2, random_state=42)
-
-    # train 데이터에 전체 데이터 지정
-    # x_train, y_train = ary_x, ary_y
-
-    # 변수값 저장
-    self.dic_args['LSTM_n_window'] = n_window
-    self.dic_args['LSTM_s_name'] = df['name'][0]
-    self.dic_args['LSTM_li_features'] = li_features
-    self.dic_args['LSTM_df'], self.dic_args['LSTM_df_norm'] = df, df_norm
-    self.dic_args['LSTM_s_label'], self.dic_args['LSTM_n_spec_label'] = s_label, n_spec_label
-    self.dic_args['LSTM_ary_x'], self.dic_args['LSTM_ary_y'] = ary_x, ary_y
-    self.dic_args['LSTM_ary_x_last'] = ary_x_last
-    self.dic_args['LSTM_x_train'], self.dic_args['LSTM_x_test'] = x_train, x_test
-    self.dic_args['LSTM_y_train'], self.dic_args['LSTM_y_test'] = y_train, y_test
-    pd.to_pickle(self.dic_args, self.path_args)
-
-    pass
+        return dic_데이터셋
