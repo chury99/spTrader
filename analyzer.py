@@ -6,6 +6,8 @@ import json
 import pandas.errors
 from tqdm import tqdm
 
+import analyzer_알고리즘 as Logic
+
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
 # noinspection PyShadowingNames
@@ -26,12 +28,16 @@ class Analyzer:
         self.folder_캐시변환 = os.path.join(folder_데이터, '캐시변환')
         self.folder_정보수집 = os.path.join(folder_데이터, '정보수집')
         folder_분석 = os.path.join(folder_work, '분석')
-        self.folder_감시대상 = os.path.join(folder_분석, '감시대상')
+        self.folder_변동성종목 = os.path.join(folder_분석, '변동성종목')
+        self.folder_데이터셋 = os.path.join(folder_분석, '데이터셋')
         self.folder_모델_lstm = os.path.join(folder_분석, '모델_lstm')
         self.folder_모델_rf = os.path.join(folder_분석, '모델_rf')
-        os.makedirs(self.folder_감시대상, exist_ok=True)
+        self.folder_감시대상 = os.path.join(folder_분석, '감시대상')
+        os.makedirs(self.folder_변동성종목, exist_ok=True)
+        os.makedirs(self.folder_데이터셋, exist_ok=True)
         os.makedirs(self.folder_모델_lstm, exist_ok=True)
         os.makedirs(self.folder_모델_rf, exist_ok=True)
+        os.makedirs(self.folder_감시대상, exist_ok=True)
 
         # 변수 설정
         dic_조건검색 = pd.read_pickle(os.path.join(self.folder_정보수집, 'dic_조건검색.pkl'))
@@ -39,20 +45,20 @@ class Analyzer:
         self.li_종목_분석대상 = list(df_분석대상종목['종목코드'].sort_values())
         self.dic_코드2종목명 = df_분석대상종목.set_index('종목코드').to_dict()['종목명']
 
-        li_일자 = [파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_캐시변환)
-                  if 'dic_코드별_10분봉_' in 파일명 and '.pkl' in 파일명]
-        self.li_일자_전체 = sorted(li_일자)[-90:]
+        self.li_일자_전체 = sorted([파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_캐시변환)
+                                if 'dic_코드별_10분봉_' in 파일명 and '.pkl' in 파일명])
 
         # log 기록
         self.make_log(f'### 종목 분석 시작 ###')
 
-    def 분석_후보종목(self):
-        """ 전체 종목 분석해서 감시대상 종목 선정 후 pkl, csv 저장 \n
+    def 분석_변동성확인(self):
+        """ 전체 종목 분석해서 변동성이 큰 종목 선정 후 pkl, csv 저장 \n
             # 선정기준 : 10분봉 기준 3%이상 상승이 하루에 2회 이상 존재 """
         # 분석대상 일자 선정
-        li_일자_완료 = [파일명.split('_')[2].replace('.pkl', '') for 파일명 in os.listdir(self.folder_감시대상)
-                    if 'df_후보종목_' in 파일명 and '.pkl' in 파일명]
-        li_일자_대상 = [s_일자 for s_일자 in self.li_일자_전체 if s_일자 not in li_일자_완료]
+        li_일자_전체 = self.li_일자_전체[-180:]
+        li_일자_완료 = [파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_변동성종목)
+                    if 'df_변동성종목_당일_' in 파일명 and '.pkl' in 파일명]
+        li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
@@ -60,8 +66,8 @@ class Analyzer:
             dic_10분봉 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_10분봉_{s_일자}.pkl'))
 
             # 종목별 분석 진행
-            li_후보종목 = list()
-            for s_종목코드 in tqdm(dic_10분봉.keys(), desc=f'후보종목선정|{s_일자}'):
+            li_변동성종목 = list()
+            for s_종목코드 in tqdm(dic_10분봉.keys(), desc=f'변동성종목선정|{s_일자}'):
                 # 분석대상 종목에 포함 여부 확인
                 if s_종목코드 not in self.li_종목_분석대상:
                     continue
@@ -81,22 +87,71 @@ class Analyzer:
                 if sum(li_상승여부) >= 2:
                     s_종목명 = self.dic_코드2종목명[s_종목코드]
                     n_상승갯수 = sum(li_상승여부)
-                    li_후보종목.append([s_종목코드, s_종목명, n_상승갯수])
+                    li_변동성종목.append([s_종목코드, s_종목명, n_상승갯수])
 
             # df 저장
-            df_후보종목 = pd.DataFrame(li_후보종목, columns=['종목코드', '종목명', '상승갯수'])
-            df_후보종목.to_pickle(os.path.join(self.folder_감시대상, f'df_후보종목_{s_일자}.pkl'))
-            df_후보종목.to_csv(os.path.join(self.folder_감시대상, f'후보종목_{s_일자}.csv'), index=False, encoding='cp949')
+            df_변동성종목 = pd.DataFrame(li_변동성종목, columns=['종목코드', '종목명', '상승갯수'])
+            df_변동성종목 = df_변동성종목.sort_values('상승갯수', ascending=False).reset_index(drop=True)
+            df_변동성종목.to_pickle(os.path.join(self.folder_변동성종목, f'df_변동성종목_당일_{s_일자}.pkl'))
+            df_변동성종목.to_csv(os.path.join(self.folder_변동성종목, f'변동성종목_당일_{s_일자}.csv'),
+                           index=False, encoding='cp949')
 
             # log 기록
-            self.make_log(f'후보종목 선정 완료({s_일자}) - {len(df_후보종목):,}종목')
+            self.make_log(f'종목선정 완료({s_일자}) - {len(df_변동성종목):,}종목')
 
-    def 분석_lstm(self):
-        """ 감시대상 종목 기준으로 lstm 분석해서 종목별 모델 생성 """
+    def 분석_데이터셋(self, s_모델):
+        """ 변동성 종목 대상 기준으로 모델 생성을 위한 데이터 정리 후 ary set을 dic 형태로 저장 """
+        # 분석대상 일자 선정
+        li_일자_전체 = [파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_변동성종목)
+                    if 'df_변동성종목_당일_' in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [파일명 for 파일명 in os.listdir(self.folder_데이터셋)
+                    if 'dic_df_10분봉_분석용_' in 파일명 and '.pkl'  in 파일명]
+        li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 10분봉 데이터 불러오기 (from 캐시변환, 30개)
+            li_대상일자 = [일자 for 일자 in self.li_일자_전체 if 일자 <= s_일자][-30:]
+            df_대상종목 = pd.read_pickle(os.path.join(self.folder_변동성종목, f'df_변동성종목_당일_{s_일자}.pkl'))
+            li_대상종목 = list(df_대상종목['종목코드'])
+
+            dic_li_df_종목별 = dict()
+            for s_대상일자 in tqdm(li_대상일자, desc=f'10분봉 읽어오기({s_일자})'):
+                dic_10분봉 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_10분봉_{s_대상일자}.pkl'))
+                for s_종목코드 in li_대상종목:
+                    try:
+                        dic_li_df_종목별[s_종목코드].append(dic_10분봉[s_종목코드])
+                    except KeyError:
+                        dic_li_df_종목별[s_종목코드] = [dic_10분봉.get(s_종목코드, pd.DataFrame())]
+
+            dic_df_10분봉 = dict()
+            for s_종목코드 in dic_li_df_종목별.keys():
+                dic_df_10분봉[s_종목코드] = pd.concat(dic_li_df_종목별[s_종목코드], axis=0).sort_index()
+            # pd.to_pickle(dic_df_10분봉, os.path.join(self.folder_데이터셋, '임시_dic_df_10분봉.pkl'))   ### 테스트용 임시 코드
+            # dic_df_10분봉 = pd.read_pickle(os.path.join(self.folder_데이터셋, '임시_dic_df_10분봉.pkl'))   ### 테스트용 임시 코드
+
+            # 분석용 데이터셋 생성
+            dic_dic_데이터셋 = dict()
+            for s_종목코드 in tqdm(li_대상종목, desc=f'데이터셋 생성({s_일자})'):
+                df_10분봉 = dic_df_10분봉[s_종목코드].dropna()
+                if s_모델 == 'lstm':
+                    dic_데이터셋 = Logic.make_추가데이터_lstm(df=df_10분봉)
+                else:
+                    dic_데이터셋 = None
+                dic_dic_데이터셋[s_종목코드] = dic_데이터셋
+
+            # 데이터셋 저장
+            pd.to_pickle(dic_dic_데이터셋, os.path.join(self.folder_데이터셋, f'dic_dic_데이터셋_{s_모델}_{s_일자}.pkl'))
+
+            # log 기록
+            self.make_log(f'데이터셋 준비 완료({s_일자}) - {s_모델}')
+
+    def 분석_모델생성_lstm(self):
+        """ 변동성 종목 대상 기준으로 lstm 분석해서 종목별 모델 생성 후 저장 """
         pass
 
-    def 분석_rf(self):
-        """ 감시대상 종목 기준으로 random forest 분석해서 종목별 모델 생성 """
+    def 분석_모델생성_rf(self):
+        """ 변동성 종목 대상 기준으로 random forest 분석해서 종목별 모델 생성 후 저장 """
         pass
 
     ###################################################################################################################
@@ -123,4 +178,5 @@ class Analyzer:
 if __name__ == "__main__":
     a = Analyzer()
 
-    a.분석_후보종목()
+    a.분석_변동성확인()
+    a.분석_데이터셋(s_모델='lstm')
