@@ -55,6 +55,7 @@ class Trader(QMainWindow, form_class):
         self.s_시작시각 = dic_config['시작시각']
         self.s_종료시각 = dic_config['종료시각']
         self.s_자본금 = dic_config['자본금']
+        self.n_재구동대기시간_초 = int(dic_config['재구동_대기시간(초)'])
 
         # log 기록
         self.make_log(f'### Short Punch Trader 시작 ({self.s_접속서버}) ###')
@@ -90,7 +91,8 @@ class Trader(QMainWindow, form_class):
         self.setui_실시간()
 
         # 모니터링 파일 생성 (2초 단위)
-        if n_초 % 2 == 0:
+        n_파일생성주기 = int(self.n_재구동대기시간_초 / 2)
+        if n_초 % n_파일생성주기 == 0:
             pd.to_pickle(self.s_접속서버, self.path_모니터링)
 
         # 매수봇 호출
