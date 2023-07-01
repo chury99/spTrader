@@ -24,6 +24,9 @@ class LauncherTrader:
         folder_work = dic_config['folder_work']
         self.folder_run = os.path.join(folder_work, 'run')
 
+        # 재구동 대기시간 정의
+        self.n_재구동대기시간_초 = int(dic_config['재구동_대기시간(초)'])
+
         # 구동시간 확인
         self.dt_시작시각 = pd.Timestamp(dic_config['시작시각'])
         self.dt_종료시각 = pd.Timestamp(dic_config['종료시각'])
@@ -83,10 +86,9 @@ class LauncherTrader:
             dt_수정시각 = pd.Timestamp(time.ctime(n_수정시각))
 
             # 시간 지연 시 재구동
-            n_지연시간_초 = 5
-            if dt_현재시각 - dt_수정시각 > pd.Timedelta(seconds=n_지연시간_초):
+            if dt_현재시각 - dt_수정시각 > pd.Timedelta(seconds=self.n_재구동대기시간_초):
                 # log 기록
-                self.make_log(f'서버응답 지연({n_지연시간_초}초) - 강제종료 요청')
+                self.make_log(f'서버응답 지연({self.n_재구동대기시간_초}초) - 강제종료 요청')
 
                 # 시간 지연 시 종료 요청
                 ret = subprocess.run(f'taskkill /f /t /pid {s_pid}', shell=True)
