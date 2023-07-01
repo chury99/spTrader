@@ -7,6 +7,7 @@
     "로그이름_trader" : "sp_trader",
     "로그이름_collector" : "sp_collector",
     "로그이름_analyzer" : "sp_analyzer",
+    "재구동_대기시간(초)" : "5",
     "시작시각" : "08:50:00",
     "종료시각" : "15:20:00",
     "자본금" : "1,000,000"
