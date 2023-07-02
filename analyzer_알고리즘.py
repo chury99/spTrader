@@ -19,9 +19,8 @@ from tqdm import tqdm
 
 # noinspection PyArgumentList
 def make_추가데이터_lstm(df):
-    """ ohlcv 데이터 (ma 포함, na 삭제) 받아서 분석을 위한 추가 데이터 처리 후 ary 데이터를 dic에 담아서 리턴 """
+    """ ohlcv 데이터 (ma 포함, na 삭제) 받아서 분석을 위한 추가 데이터 처리 후 df 리턴 """
     # df_추가 생성
-    # 정리 (date, code, name, time, ohlcv 만 남기고 삭제)
     df_추가 = df.loc[:, ['일자', '종목코드', '종목명', '시간', '시가', '고가', '저가', '종가', '거래량']].copy()
 
     # 상승률 생성
@@ -58,7 +57,8 @@ def make_추가데이터_lstm(df):
         li_구간 = [-float('inf'), -5, -3, -2, -1, -0.5, 0.5, 1, 2, 3, 5, float('inf')]
         li_구간명 = ['-5', '-3', '-2', '-1', '-05', '0', '+05', '+1', '+2', '+3', '+5']
         for s_구간명, n_구간_시작, n_구간_종료 in zip(li_구간명, li_구간[:-1], li_구간[1:]):
-            sri_컬럼 = pd.Series((df_추가[s_인자] > n_구간_시작) & (df_추가[s_인자] <= n_구간_종료), name=f'ohe_{s_인자}_{s_구간명}')
+            sri_컬럼 = pd.Series((df_추가[s_인자] > n_구간_시작) & (df_추가[s_인자] <= n_구간_종료),
+                               name=f'ohe_{s_인자}_{s_구간명}')
             df_추가 = pd.concat([df_추가, sri_컬럼], axis=1)
 
     li_인자_ohe = [f'상승률(%)_거래량_{i + 1}봉' for i in range(3)]
@@ -66,7 +66,8 @@ def make_추가데이터_lstm(df):
         li_구간 = [-float('inf'), 30, 50, 100, 150, 200, 300, float('inf')]
         li_구간명 = ['0', '50', '100', '150', '200', '300', '500']
         for s_구간명, n_구간_시작, n_구간_종료 in zip(li_구간명, li_구간[:-1], li_구간[1:]):
-            sri_컬럼 = pd.Series((df_추가[s_인자] > n_구간_시작) & (df_추가[s_인자] <= n_구간_종료), name=f'ohe_{s_인자}_{s_구간명}')
+            sri_컬럼 = pd.Series((df_추가[s_인자] > n_구간_시작) & (df_추가[s_인자] <= n_구간_종료),
+                               name=f'ohe_{s_인자}_{s_구간명}')
             df_추가 = pd.concat([df_추가, sri_컬럼], axis=1)
 
     # 라벨 데이터 생성
@@ -84,18 +85,30 @@ def make_추가데이터_lstm(df):
     # 데이터 잘라내기
     df_추가 = df_추가.dropna()[-1000:]
 
+    # ohe 데이터 숫자로 변환 (기존은 bool 타입)
+    li_컬럼명 = [컬럼명 for 컬럼명 in df_추가.columns if 'ohe_' in 컬럼명 or '라벨_' in 컬럼명]
+    for s_컬럼명 in li_컬럼명:
+        df_추가[s_컬럼명] = df_추가[s_컬럼명] * 1
+        df_추가[s_컬럼명] = df_추가[s_컬럼명].astype(int)
+
+    return df_추가
+
+
+# noinspection PyArgumentList
+def make_입력용xy_lstm(df):
+    """ 추가 데이터 정리된 df 받아서 모델 입력을 위한 ary_x, ary_y 정리 후 dic 리턴 """
     # x, y 데이터 생성
     n_윈도우 = 20
-    li_인자_ohe = [컬럼명 for 컬럼명 in df_추가.columns if 'ohe_' in 컬럼명]
-    s_라벨컬럼 = f'라벨_{s_컬럼명_라벨}'
+    li_인자_ohe = [컬럼명 for 컬럼명 in df.columns if 'ohe_' in 컬럼명]
+    s_라벨컬럼 = [컬럼명 for 컬럼명 in df.columns if '라벨_' in 컬럼명][0]
 
     # 데이터 길이가 윈도우 크기보다 작으면 종료
-    if len(df_추가) <= n_윈도우:
+    if len(df) <= n_윈도우:
         return None
 
     else:
-        ary_데이터_x = df_추가.loc[:, li_인자_ohe].values
-        ary_데이터_y = df_추가[s_라벨컬럼].values
+        ary_데이터_x = df.loc[:, li_인자_ohe].values
+        ary_데이터_y = df[s_라벨컬럼].values
 
         li_x = list()
         li_y = list()
@@ -161,15 +174,3 @@ def make_모델_lstm(dic_데이터셋):
                          callbacks=[obj_조기종료], verbose=0)
 
     return 모델
-
-
-
-
-    pass
-
-
-
-
-
-
-    return
