@@ -5,6 +5,14 @@ import pandas as pd
 import numpy as np
 # noinspection PyUnresolvedReferences
 from sklearn.model_selection import train_test_split
+# noinspection PyUnresolvedReferences
+from tensorflow.keras.models import Sequential
+# noinspection PyUnresolvedReferences
+from tensorflow.keras.layers import LSTM, Dense
+# noinspection PyUnresolvedReferences
+from tensorflow.keras import optimizers
+# noinspection PyUnresolvedReferences
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 
 from tqdm import tqdm
 
@@ -68,6 +76,11 @@ def make_추가데이터_lstm(df):
     sri_컬럼 = pd.Series(df_추가[s_컬럼명_라벨] > n_스펙_라벨, name=f'라벨_{s_컬럼명_라벨}')
     df_추가 = pd.concat([df_추가, sri_컬럼], axis=1)
 
+    # ohe 데이터 1봉 shift (모델에 입력 시 1봉 이전값 적용)
+    li_컬럼명 = [컬럼명 for 컬럼명 in df_추가.columns if 'ohe_' in 컬럼명]
+    for s_컬럼명 in li_컬럼명:
+        df_추가[s_컬럼명] = df_추가[s_컬럼명].shift(1)
+
     # 데이터 잘라내기
     df_추가 = df_추가.dropna()[-1000:]
 
@@ -109,3 +122,54 @@ def make_추가데이터_lstm(df):
         dic_데이터셋['ary_y_검증'] = ary_y_검증
 
         return dic_데이터셋
+
+
+# noinspection PyPep8Naming
+def make_모델_lstm(dic_데이터셋):
+    """ dic 형태의 데이터셋을 받아서 lstm 모델 생성 후 리턴 """
+    # 데이터 ary 설정
+    ary_x = dic_데이터셋['ary_x']
+    ary_y = dic_데이터셋['ary_y']
+    ary_x_학습 = dic_데이터셋['ary_x_학습']
+    ary_y_학습 = dic_데이터셋['ary_y_학습']
+    ary_x_검증 = dic_데이터셋['ary_x_검증']
+    ary_y_검증 = dic_데이터셋['ary_y_검증']
+
+    # 모델 생성
+    obj_형태 = ary_x.shape[1:]
+
+    모델 = Sequential()
+    모델.add(LSTM(200, input_shape=obj_형태, bias_initializer='he_normal', return_sequences=True))
+    모델.add(LSTM(50, return_sequences=False, recurrent_dropout=0.5))
+    모델.add(Dense(1, activation='sigmoid'))
+
+    adam = optimizers.Adam(learning_rate=0.001)
+    모델.compile(loss='mse', optimizer=adam, metrics=['Accuracy', 'Precision', 'Recall'])
+    # Accuracy: (TP+TN) / (TP+TN+FP+FN) => 전체 중 True/False를 올바르게 예측한 수
+    # Precision: (TP) / (TP+FP) => 모델이 Tru\e로 예측한 값 중 실제 True인 값 수
+    # Recall: (TP) / (TP+FN) => 실제 True인 값을 모델이 True로 예측한 수
+    #                     실제값
+    #                  True    False
+    # 예측값  True      TP       FP
+    #        False      FN      TN
+
+    # 조기종료 설정
+    obj_조기종료 = EarlyStopping(monitor='val_loss', patience=20)
+
+    # 학습 실행
+    obj_hist = 모델.fit(ary_x_학습, ary_y_학습, epochs=1000, batch_size=20, validation_data=(ary_x_검증, ary_y_검증),
+                         callbacks=[obj_조기종료], verbose=0)
+
+    return 모델
+
+
+
+
+    pass
+
+
+
+
+
+
+    return
