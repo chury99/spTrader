@@ -25,6 +25,11 @@ class LauncherCollector:
         folder_데이터 = os.path.join(folder_work, '데이터')
         self.folder_정보수집 = os.path.join(folder_데이터, '정보수집')
 
+        # 카카오 API 연결
+        sys.path.append(dic_config['folder_kakao'])
+        import API_kakao
+        self.k = API_kakao.KakaoAPI()
+
         # log 기록
         self.make_log(f'### 구동 시작 ###')
 
@@ -39,6 +44,11 @@ class LauncherCollector:
         # 프로세스 실행
         ret = subprocess.run([self.path_파이썬32, path_실행], shell=True)
         s_실행결과 = '성공' if ret.returncode == 0 else '실패'
+
+        # 실패 시 카카오 메세지 송부
+        if s_실행결과 == '실패':
+            s_메세지 = f'!!! 모듈 실행 중 오류 발생 - {sys._getframe(0).f_code.co_name} !!!'
+            result = self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
 
         # log 기록
         self.make_log(f'데이터 다운로드 완료 - {s_실행결과}')
@@ -117,6 +127,11 @@ class LauncherCollector:
         # 프로세스 실행
         ret = subprocess.run([self.path_파이썬64, path_실행], shell=True)
         s_실행결과 = '성공' if ret.returncode == 0 else '실패'
+
+        # 실패 시 카카오 메세지 송부
+        if s_실행결과 == '실패':
+            s_메세지 = f'!!! 모듈 실행 중 오류 발생 - {sys._getframe(0).f_code.co_name} !!!'
+            result = self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
 
         # log 기록
         self.make_log(f'데이터 변환 완료 - {s_실행결과}')
