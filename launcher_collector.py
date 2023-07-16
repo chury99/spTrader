@@ -48,7 +48,7 @@ class LauncherCollector:
         # 실패 시 카카오 메세지 송부
         if s_실행결과 == '실패':
             s_메세지 = f'!!! 모듈 실행 중 오류 발생 - {sys._getframe(0).f_code.co_name} !!!'
-            result = self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
+            self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
 
         # log 기록
         self.make_log(f'데이터 다운로드 완료 - {s_실행결과}')
@@ -59,6 +59,12 @@ class LauncherCollector:
         path_실행 = os.path.join(os.getcwd(), 'collector_수집.py')
         path_모니터링_일봉 = os.path.join(self.folder_정보수집, 'df_ohlcv_일봉_임시.pkl')
         path_모니터링_분봉 = os.path.join(self.folder_정보수집, 'df_ohlcv_분봉_임시.pkl')
+
+        # ohlcv 임시 파일 삭제 (데이터 혼입 방지)
+        if os.path.exists(path_모니터링_일봉):
+            os.system(f'del {path_모니터링_일봉}')
+        if os.path.exists(path_모니터링_분봉):
+            os.system(f'del {path_모니터링_분봉}')
 
         # 프로세스 실행
         프로세스 = subprocess.Popen([self.path_파이썬32, path_실행], shell=True)
@@ -131,7 +137,7 @@ class LauncherCollector:
         # 실패 시 카카오 메세지 송부
         if s_실행결과 == '실패':
             s_메세지 = f'!!! 모듈 실행 중 오류 발생 - {sys._getframe(0).f_code.co_name} !!!'
-            result = self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
+            self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
 
         # log 기록
         self.make_log(f'데이터 변환 완료 - {s_실행결과}')
