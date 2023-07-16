@@ -50,7 +50,10 @@ class Collector:
             s_파일명 = f'ohlcv_일봉_{s_년도}.db'
             s_테이블명 = f'ohlcv_일봉_{s_년월}'
             con_일봉 = sqlite3.connect(os.path.join(self.folder_ohlcv, s_파일명))
-            df_일봉_기존 = pd.read_sql(f'SELECT * FROM {s_테이블명}', con=con_일봉)
+            try:
+                df_일봉_기존 = pd.read_sql(f'SELECT * FROM {s_테이블명}', con=con_일봉)
+            except pandas.errors.DatabaseError:
+                df_일봉_기존 = pd.DataFrame()
 
             # df 합쳐서 저장
             df_일봉 = pd.concat([df_일봉_기존, df_일봉_신규], axis=0)
