@@ -111,11 +111,11 @@ class Analyzer:
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
             # 대상일자, 대상종목 확인
-            li_대상일자 = [일자 for 일자 in self.li_일자_전체 if 일자 <= s_일자][-30:]
+            li_대상일자 = [일자 for 일자 in self.li_일자_전체 if 일자 <= s_일자][-60:]
             df_대상종목 = pd.read_pickle(os.path.join(self.folder_변동성종목, f'df_변동성종목_당일_{s_일자}.pkl'))
             li_대상종목 = list(df_대상종목['종목코드'])
 
-            # 종목별 10분봉 데이터 불러오기 (from 캐시변환, 30개)
+            # 종목별 10분봉 데이터 불러오기 (from 캐시변환, 과거 60일치)
             dic_li_df_종목별 = dict()
             for s_대상일자 in tqdm(li_대상일자, desc=f'10분봉 읽어오기({s_일자})'):
                 dic_10분봉 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_10분봉_{s_대상일자}.pkl'))
@@ -174,7 +174,12 @@ class Analyzer:
                 df_데이터셋 = dic_df_데이터셋[s_종목코드]
 
                 # 입력용 xy로 변경
-                dic_데이터셋 = Logic.make_입력용xy_lstm(df=df_데이터셋)
+                if s_모델 == 'lstm':
+                    dic_데이터셋 = Logic.make_입력용xy_lstm(df=df_데이터셋)
+                if s_모델 == 'rf':
+                    dic_데이터셋 = Logic.make_입력용xy_rf(df=df_데이터셋)
+                else:
+                    dic_데이터셋 = None
 
                 # 데이터셋 미존재 시 종료 (데이터량 부족)
                 if dic_데이터셋 is None:
@@ -183,8 +188,11 @@ class Analyzer:
                 # 모델 생성
                 if s_모델 == 'lstm':
                     obj_모델 = Logic.make_모델_lstm(dic_데이터셋=dic_데이터셋)
+                if s_모델 == 'rf':
+                    obj_모델 = Logic.make_모델_rf(dic_데이터셋=dic_데이터셋)
                 else:
                     obj_모델 = None
+
                 dic_모델[s_종목코드] = obj_모델
 
             # 모델 저장
