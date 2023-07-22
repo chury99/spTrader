@@ -136,10 +136,11 @@ class Analyzer:
             dic_df_데이터셋 = dict()
             for s_종목코드 in tqdm(li_대상종목, desc=f'데이터셋 생성({s_일자})'):
                 df_10분봉 = dic_df_10분봉[s_종목코드].dropna()
+                df_데이터셋 = None
                 if s_모델 == 'lstm':
                     df_데이터셋 = Logic.make_추가데이터_lstm(df=df_10분봉)
-                else:
-                    df_데이터셋 = None
+                if s_모델 == 'rf':
+                    df_데이터셋 = Logic.make_추가데이터_rf(df=df_10분봉)
                 dic_df_데이터셋[s_종목코드] = df_데이터셋
 
             # 데이터셋 저장
@@ -288,7 +289,13 @@ class Analyzer:
 if __name__ == "__main__":
     a = Analyzer()
 
-    a.분석_변동성확인()
-    a.분석_데이터셋(s_모델='lstm')
-    a.분석_모델생성(s_모델='lstm')
-    a.분석_성능평가(s_모델='lstm')
+    # a.분석_변동성확인()
+    # a.분석_데이터셋(s_모델='rf')
+    a.분석_모델생성(s_모델='rf')
+    a.분석_성능평가(s_모델='rf')
+
+
+
+    # a.분석_데이터셋(s_모델='lstm')
+    # a.분석_모델생성(s_모델='lstm')
+    # a.분석_성능평가(s_모델='lstm')
