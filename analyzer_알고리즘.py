@@ -1,8 +1,11 @@
 import os
 import sys
 import pandas as pd
-
 import numpy as np
+
+# noinspection PyUnresolvedReferences
+from sklearn.ensemble import RandomForestClassifier
+
 # noinspection PyUnresolvedReferences
 from sklearn.model_selection import train_test_split
 # noinspection PyUnresolvedReferences
@@ -118,13 +121,14 @@ def make_추가데이터_rf(df):
     df_추가['임시_상승률(%)_저가_min'] = (df_추가['임시_저가_min'] / df_추가['종가_1봉'] - 1) * 100
 
     # 라벨 데이터 생성 (고가는 3% 이상 오르고, 저가는 -3% 밑으로 안 떨어지는 조건)
-    df_추가['라벨'] = (df_추가['임시_상승률(%)_고가_max'] >= 3) & (df_추가['임시_상승률(%)_저가_min'] > -3)
-    df_추가['라벨'] = df_추가['라벨'].astype(int)
+    s_라벨 = '라벨_상승여부'
+    df_추가[s_라벨] = (df_추가['임시_상승률(%)_고가_max'] >= 3) & (df_추가['임시_상승률(%)_저가_min'] > -3)
+    df_추가[s_라벨] = df_추가[s_라벨].astype(int)
 
     df_추가 = df_추가.loc[:, [컬럼명 for 컬럼명 in df_추가.columns if '임시_' not in 컬럼명]]
 
     # 인자 값 shift (기준정보와 라벨은 시점 유지, 인자 값들은 1칸 shift)
-    li_인자 = [컬럼명 for 컬럼명 in df_추가.columns if 컬럼명 not in ['일자', '종목코드', '종목명', '시간', '라벨']]
+    li_인자 = [컬럼명 for 컬럼명 in df_추가.columns if 컬럼명 not in ['일자', '종목코드', '종목명', '시간', s_라벨]]
     for s_컬럼명 in li_인자:
         df_추가[s_컬럼명] = df_추가[s_컬럼명].shift(1)
 
@@ -210,6 +214,33 @@ def make_추가데이터_lstm(df):
     return df_추가
 
 
+def make_입력용xy_rf(df):
+    """ 추가 데이터 정리된 df 받아서 모델 입력을 위한 ary_x, ary_y 정리 후 dic 리턴 """
+    # 데이터 길이 확인 (학습할 일수보다 데이터 일수가 적으면 종료, 입력된 데이터는 max 60일치)
+    n_학습일수 = 30
+    li_일자 = sorted(df['일자'].unique())
+    if len(li_일자) < n_학습일수:
+        return None
+
+    # 데이터 잘라내기
+    s_시작일 = li_일자[-1 * n_학습일수]
+    df_데이터 = df[df['일자'] >= s_시작일]
+
+    # 입력용 ary 생성 (인자 값은 이미 shift 되어 있음 - df 생성 시 shift 함)
+    s_라벨 = '라벨_상승여부'
+    li_인자 = [컬럼명 for 컬럼명 in df_데이터.columns if 컬럼명 not in ['일자', '종목코드', '종목명', '시간', s_라벨]]
+
+    ary_x_학습 = df.loc[:, li_인자].values
+    ary_y_학습 = df[s_라벨].values
+
+    # dic에 저장
+    dic_데이터셋 = dict()
+    dic_데이터셋['ary_x_학습'] = ary_x_학습
+    dic_데이터셋['ary_y_학습'] = ary_y_학습
+
+    return dic_데이터셋
+
+
 # noinspection PyArgumentList
 def make_입력용xy_lstm(df):
     """ 추가 데이터 정리된 df 받아서 모델 입력을 위한 ary_x, ary_y 정리 후 dic 리턴 """
@@ -251,6 +282,24 @@ def make_입력용xy_lstm(df):
         dic_데이터셋['ary_y_검증'] = ary_y_검증
 
         return dic_데이터셋
+
+
+# noinspection PyPep8Naming
+def make_모델_rf(dic_데이터셋):
+    """ dic 형태의 데이터셋을 받아서 lstm 모델 생성 후 리턴 """
+    # 데이터 ary 설정
+    ary_x_학습 = dic_데이터셋['ary_x_학습']
+    ary_y_학습 = dic_데이터셋['ary_y_학습']
+
+    # random forest 모델 생성
+    n_rf_트리 = 100
+    n_rf_깊이 = 20
+    모델 = RandomForestClassifier(n_estimators=n_rf_트리, max_depth=n_rf_깊이, random_state=42)
+
+    # 모델 학습
+    모델.fit(ary_x_학습, ary_y_학습)
+
+    return 모델
 
 
 # noinspection PyPep8Naming
