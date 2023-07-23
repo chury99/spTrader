@@ -197,7 +197,7 @@ class Analyzer:
             # log 기록
             self.make_log(f'모델 생성 완료({s_일자}, {s_모델})')
 
-            # 전일 모델 생성 ############################################################################################
+            # [ 전일 모델 생성 ] ########################################################################################
 
             # 전일 일자 확인
             try:
@@ -251,42 +251,54 @@ class Analyzer:
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
             # 전일 일자 확인
-            li_일자 = sorted([일자 for 일자 in li_일자_전체 if 일자 < s_일자])
-            if len(li_일자) > 0:
-                s_일자_전일 = li_일자[-1]
-            else:
+            try:
+                s_일자_전일 = min([일자_전체 for 일자_전체 in li_일자_전체 if 일자_전체 < s_일자])
+            except ValueError:
                 continue
 
             # 데이터셋 및 전일 모델 불러오기
-            dic_dic_데이터셋 = pd.read_pickle(os.path.join(self.folder_데이터셋, f'dic_dic_데이터셋_{s_모델}_{s_일자}.pkl'))
-            dic_모델 = pd.read_pickle(os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자_전일}.pkl'))
+            dic_df_데이터셋 = pd.read_pickle(os.path.join(self.folder_데이터셋, f'dic_df_데이터셋_{s_모델}_{s_일자}.pkl'))
+            dic_모델_전일 = pd.read_pickle(os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자_전일}.pkl'))
+            li_대상종목 = list (dic_df_데이터셋.keys())
 
             # 종목별 성능 평가 진행
             dic_df_평가상세 = dict()
             li_li_결과 = list()
-            for s_종목코드 in tqdm(dic_dic_데이터셋.keys(), desc=f'{s_모델} 성능 평가({s_일자})'):
+            for s_종목코드 in tqdm(li_대상종목, desc=f'{s_모델} 성능 평가({s_일자})'):
                 # 모델 설정
                 try:
-                    obj_모델 = dic_모델[s_종목코드]
+                    obj_모델_전일 = dic_모델_전일[s_종목코드]
                 except KeyError:
                     continue
 
-                # 데이터셋 설정
-                dic_데이터셋 = dic_dic_데이터셋[s_종목코드]
-                ary_x_평가 = dic_데이터셋['ary_x'][-39:]
-                ary_y_정답 = dic_데이터셋['ary_y'][-39:]
+                # 데이터셋 설정 (평가용 데이터, 당일 데이터만)
+                df_데이터셋 = dic_df_데이터셋[s_종목코드]
+                df_데이터셋 = Logic.make_라벨데이터_rf(df=df_데이터셋)
+                df_데이터셋 = df_데이터셋[df_데이터셋['일자'] == s_일자]
+                if len(df_데이터셋) == 0:
+                    continue
+
+                # 입력용 ary 설정
+                dic_데이터셋 = Logic.make_입력용xy_rf(df=df_데이터셋, n_학습일수=1)
+                ary_x_평가 = dic_데이터셋['ary_x_학습']
+                ary_y_정답 = dic_데이터셋['ary_y_학습']
 
                 # 모델 평가
-                df_평가 = pd.DataFrame()
-                ary_상승확률 = obj_모델.predict(ary_x_평가).reshape(-1)
-                df_평가['상승확률(%)'] = ary_상승확률 * 100
-                df_평가['예측'] = df_평가['상승확률(%)'] > 80
-                df_평가['정답'] = ary_y_정답
+                df_평가상세 = df_데이터셋.loc[:, '일자': '거래량'].copy()
+                df_평가상세['상승확률(%)'] = obj_모델_전일.predict_proba(ary_x_평가)[:, 1] * 100
+                df_평가상세['예측'] = (df_평가상세['상승확률(%)'] > 60).astype(int)
+                df_평가상세['정답'] = ary_y_정답
 
-                dic_df_평가상세[s_종목코드] = df_평가
+                dic_df_평가상세[s_종목코드] = df_평가상세
+
+                # 상세 결과 저장
+                folder_평가상세 = os.path.join(self.folder_성능평가, f'평가상세_{s_일자}')
+                os.makedirs(folder_평가상세, exist_ok=True)
+                df_평가상세.to_csv(os.path.join(folder_평가상세, f'평가상세_{s_종목코드}_{s_모델}_{s_일자}.csv'),
+                               index=False, encoding='cp949')
 
                 # 결과 정리
-                df_결과 = df_평가[df_평가['예측'] == 1]
+                df_결과 = df_평가상세[df_평가상세['예측'] == 1]
                 n_상승예측 = len(df_결과)
                 n_예측성공 = df_결과['정답'].sum()
                 n_예측실패 = n_상승예측 - n_예측성공
@@ -304,7 +316,7 @@ class Analyzer:
                            index=False, encoding='cp949')
 
             # log 기록
-            self.make_log(f'성능평가 완료({s_일자}, {s_모델})')
+            self.make_log(f'성능평가 완료(전일 모델, 금일 데이터_{s_일자}, {s_모델})')
 
 
     def 선정_감시대상(self):
@@ -339,9 +351,3 @@ if __name__ == "__main__":
     # a.분석_데이터셋(s_모델='rf')
     a.분석_모델생성(s_모델='rf')
     a.분석_성능평가(s_모델='rf')
-
-
-
-    # a.분석_데이터셋(s_모델='lstm')
-    # a.분석_모델생성(s_모델='lstm')
-    # a.분석_성능평가(s_모델='lstm')
