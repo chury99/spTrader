@@ -111,11 +111,11 @@ class Analyzer:
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
             # 대상일자, 대상종목 확인
-            li_대상일자 = [일자 for 일자 in self.li_일자_전체 if 일자 <= s_일자][-60:]
+            li_대상일자 = [일자 for 일자 in self.li_일자_전체 if 일자 <= s_일자][-61:]
             df_대상종목 = pd.read_pickle(os.path.join(self.folder_변동성종목, f'df_변동성종목_당일_{s_일자}.pkl'))
             li_대상종목 = list(df_대상종목['종목코드'])
 
-            # 종목별 10분봉 데이터 불러오기 (from 캐시변환, 과거 60일치)
+            # 종목별 10분봉 데이터 불러오기 (from 캐시변환, 과거 61일치)
             dic_li_df_종목별 = dict()
             for s_대상일자 in tqdm(li_대상일자, desc=f'10분봉 읽어오기({s_일자})'):
                 dic_10분봉 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_10분봉_{s_대상일자}.pkl'))
@@ -136,11 +136,12 @@ class Analyzer:
             dic_df_데이터셋 = dict()
             for s_종목코드 in tqdm(li_대상종목, desc=f'데이터셋 생성({s_일자})'):
                 df_10분봉 = dic_df_10분봉[s_종목코드].dropna()
-                df_데이터셋 = None
-                if s_모델 == 'lstm':
-                    df_데이터셋 = Logic.make_추가데이터_lstm(df=df_10분봉)
-                if s_모델 == 'rf':
-                    df_데이터셋 = Logic.make_추가데이터_rf(df=df_10분봉)
+                # df_데이터셋 = None
+                # if s_모델 == 'rf':
+                #     df_데이터셋 = Logic.make_추가데이터_rf(df=df_10분봉)
+                df_데이터셋 = Logic.make_추가데이터_rf(df=df_10분봉) if s_모델 == 'rf'\
+                    else Logic.make_추가데이터_lstm(df=df_10분봉) if s_모델 == 'lstm'\
+                    else None
                 dic_df_데이터셋[s_종목코드] = df_데이터셋
 
             # 데이터셋 저장
@@ -167,32 +168,27 @@ class Analyzer:
             # 데이터셋 불러오기
             dic_df_데이터셋 = pd.read_pickle(os.path.join(self.folder_데이터셋, f'dic_df_데이터셋_{s_모델}_{s_일자}.pkl'))
 
-            # 종목별 모델 생성
+            # 종목별 모델 생성 (당일)
             dic_모델 = dict()
             for s_종목코드 in tqdm(li_대상종목, desc=f'{s_모델} 모델 생성({s_일자})'):
                 # 해당 데이터셋 설정
                 df_데이터셋 = dic_df_데이터셋[s_종목코드]
 
-                # 입력용 xy로 변경
-                if s_모델 == 'lstm':
-                    dic_데이터셋 = Logic.make_입력용xy_lstm(df=df_데이터셋)
-                if s_모델 == 'rf':
-                    dic_데이터셋 = Logic.make_입력용xy_rf(df=df_데이터셋)
-                else:
-                    dic_데이터셋 = None
-
-                # 데이터셋 미존재 시 종료 (데이터량 부족)
-                if dic_데이터셋 is None:
-                    continue
-
                 # 모델 생성
-                if s_모델 == 'lstm':
-                    obj_모델 = Logic.make_모델_lstm(dic_데이터셋=dic_데이터셋)
-                if s_모델 == 'rf':
-                    obj_모델 = Logic.make_모델_rf(dic_데이터셋=dic_데이터셋)
-                else:
-                    obj_모델 = None
+                obj_모델 = None
 
+                if s_모델 == 'rf':
+                    # 라벨 데이터 생성 (대기봉수 설정)
+                    df_데이터셋 = Logic.make_라벨데이터_rf(df=df_데이터셋)
+                    # 입력용 xy로 변경 (학습일수 설정)
+                    dic_데이터셋 = Logic.make_입력용xy_rf(df=df_데이터셋)
+                    # 데이터셋 미존재 시 종료 (데이터량 부족)
+                    if dic_데이터셋 is None:
+                        continue
+                    # 모델 생성 (rf 트리수, rf 깊이 설정)
+                    obj_모델 = Logic.make_모델_rf(dic_데이터셋=dic_데이터셋)
+
+                # 모델 등록
                 dic_모델[s_종목코드] = obj_모델
 
             # 모델 저장
@@ -200,6 +196,48 @@ class Analyzer:
 
             # log 기록
             self.make_log(f'모델 생성 완료({s_일자}, {s_모델})')
+
+            # 전일 모델 생성 ############################################################################################
+
+            # 전일 일자 확인
+            try:
+                s_일자_전일 = min([일자_전체 for 일자_전체 in li_일자_전체 if 일자_전체 < s_일자])
+            except ValueError:
+                continue
+
+            # 전일 모델 불러오기
+            dic_모델_전일 = pd.read_pickle(os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자_전일}.pkl'))
+
+            # 전일 모델에 미존재 하는 종목코드 찾기
+            li_대상종목_전일 = [종목코드 for 종목코드 in li_대상종목 if 종목코드 not in dic_모델_전일.keys()]
+
+            for s_종목코드 in tqdm(li_대상종목_전일, desc=f'{s_모델} 모델 생성(전일-{s_일자_전일})'):
+                # 해당 데이터셋 설정 (전일까지만)
+                df_데이터셋 = dic_df_데이터셋[s_종목코드]
+                df_데이터셋 = df_데이터셋[df_데이터셋['일자'] < s_일자]
+
+                # 모델 생성
+                obj_모델 = None
+
+                if s_모델 == 'rf':
+                    # 라벨 데이터 생성 (대기봉수 설정)
+                    df_데이터셋 = Logic.make_라벨데이터_rf(df=df_데이터셋)
+                    # 입력용 xy로 변경 (학습일수 설정)
+                    dic_데이터셋 = Logic.make_입력용xy_rf(df=df_데이터셋)
+                    # 데이터셋 미존재 시 종료 (데이터량 부족)
+                    if dic_데이터셋 is None:
+                        continue
+                    # 모델 생성 (rf 트리수, rf 깊이 설정)
+                    obj_모델 = Logic.make_모델_rf(dic_데이터셋=dic_데이터셋)
+
+                # 모델 등록 (전일)
+                dic_모델_전일[s_종목코드] = obj_모델
+
+            # 모델 저장 (전일)
+            pd.to_pickle(dic_모델_전일, os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자_전일}.pkl'))
+
+            # log 기록
+            self.make_log(f'모델 생성 완료(전일-{s_일자_전일}, {s_모델})')
 
     def 분석_성능평가(self, s_모델):
         """ 전일 생성된 모델 기반으로 금일 데이터로 예측 결과 확인하여 평가결과 저장 """
