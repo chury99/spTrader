@@ -119,28 +119,31 @@ def make_추가데이터_rf(df):
 # noinspection PyPep8Naming
 def make_라벨데이터_rf(df, n_대기봉수=2):
     """ 데이터셋을 입력 받아서 라벨 데이터 생성 후 df 리턴 """
-    # 상승률 생성 (봉수 이내에서 최고가, 최저가 상승률 확인)
-    df['임시_고가_max'] = df['고가'].rolling(n_대기봉수).max().shift(-1 * (n_대기봉수 - 1))
-    df['임시_저가_min'] = df['저가'].rolling(n_대기봉수).min().shift(-1 * (n_대기봉수 - 1))
+    # df_라벨 생성
+    df_라벨 = df.copy()
 
-    df['임시_상승률(%)_고가_max'] = (df['임시_고가_max'] / df['종가_1봉'] - 1) * 100
-    df['임시_상승률(%)_저가_min'] = (df['임시_저가_min'] / df['종가_1봉'] - 1) * 100
+    # 상승률 생성 (봉수 이내에서 최고가, 최저가 상승률 확인)
+    df_라벨['임시_고가_max'] = df_라벨['고가'].rolling(n_대기봉수).max().shift(-1 * (n_대기봉수 - 1))
+    df_라벨['임시_저가_min'] = df_라벨['저가'].rolling(n_대기봉수).min().shift(-1 * (n_대기봉수 - 1))
+
+    df_라벨['임시_상승률(%)_고가_max'] = (df_라벨['임시_고가_max'] / df_라벨['종가_1봉'] - 1) * 100
+    df_라벨['임시_상승률(%)_저가_min'] = (df_라벨['임시_저가_min'] / df_라벨['종가_1봉'] - 1) * 100
 
     # 라벨 데이터 생성 (고가는 3% 이상 오르고, 저가는 -3% 밑으로 안 떨어지는 조건)
     s_라벨 = '라벨_상승여부'
-    df[s_라벨] = (df['임시_상승률(%)_고가_max'] >= 3) & (df['임시_상승률(%)_저가_min'] > -3)
-    df[s_라벨] = df[s_라벨].astype(int)
+    df_라벨[s_라벨] = (df_라벨['임시_상승률(%)_고가_max'] >= 3) & (df_라벨['임시_상승률(%)_저가_min'] > -3)
+    df_라벨[s_라벨] = df_라벨[s_라벨].astype(int)
 
-    df = df.loc[:, [컬럼명 for 컬럼명 in df.columns if '임시_' not in 컬럼명]]
+    df_라벨 = df_라벨.loc[:, [컬럼명 for 컬럼명 in df_라벨.columns if '임시_' not in 컬럼명]]
 
     # 인자 값 shift (기준정보와 라벨은 시점 유지, 인자 값들은 1칸 shift)
-    li_인자 = [컬럼명 for 컬럼명 in df.columns if 컬럼명 not in ['일자', '종목코드', '종목명', '시간', s_라벨]]
+    li_인자 = [컬럼명 for 컬럼명 in df_라벨.columns if 컬럼명 not in ['일자', '종목코드', '종목명', '시간', s_라벨]]
     for s_컬럼명 in li_인자:
-        df[s_컬럼명] = df[s_컬럼명].shift(1)
+        df_라벨[s_컬럼명] = df_라벨[s_컬럼명].shift(1)
 
-    df = df.dropna()
+    df_라벨 = df_라벨.dropna()
 
-    return df
+    return df_라벨
 
 
 # noinspection PyPep8Naming
