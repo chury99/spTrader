@@ -195,13 +195,13 @@ class Analyzer:
             pd.to_pickle(dic_모델, os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자}.pkl'))
 
             # log 기록
-            self.make_log(f'모델 생성 완료({s_일자}, {s_모델})')
+            self.make_log(f'모델 생성 완료({s_일자}, {len(li_대상종목):,}개 종목, {s_모델})')
 
             # [ 전일 모델 생성 ] ########################################################################################
 
             # 전일 일자 확인
             try:
-                s_일자_전일 = min([일자_전체 for 일자_전체 in li_일자_전체 if 일자_전체 < s_일자])
+                s_일자_전일 = max([일자 for 일자 in li_일자_전체 if 일자 < s_일자])
             except ValueError:
                 continue
 
@@ -237,7 +237,7 @@ class Analyzer:
             pd.to_pickle(dic_모델_전일, os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자_전일}.pkl'))
 
             # log 기록
-            self.make_log(f'모델 생성 완료(전일-{s_일자_전일}, {s_모델})')
+            self.make_log(f'모델 생성 완료(전일-{s_일자_전일}, {len(li_대상종목_전일):,}개 종목, {s_모델})')
 
     def 분석_성능평가(self, s_모델):
         """ 전일 생성된 모델 기반으로 금일 데이터로 예측 결과 확인하여 평가결과 저장 """
@@ -259,7 +259,7 @@ class Analyzer:
             # 데이터셋 및 전일 모델 불러오기
             dic_df_데이터셋 = pd.read_pickle(os.path.join(self.folder_데이터셋, f'dic_df_데이터셋_{s_모델}_{s_일자}.pkl'))
             dic_모델_전일 = pd.read_pickle(os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자_전일}.pkl'))
-            li_대상종목 = list (dic_df_데이터셋.keys())
+            li_대상종목 = list(dic_df_데이터셋.keys())
 
             # 종목별 성능 평가 진행
             dic_df_평가상세 = dict()
@@ -285,7 +285,10 @@ class Analyzer:
 
                 # 모델 평가
                 df_평가상세 = df_데이터셋.loc[:, '일자': '거래량'].copy()
-                df_평가상세['상승확률(%)'] = obj_모델_전일.predict_proba(ary_x_평가)[:, 1] * 100
+                try:
+                    df_평가상세['상승확률(%)'] = obj_모델_전일.predict_proba(ary_x_평가)[:, 1] * 100
+                except IndexError:
+                    df_평가상세['상승확률(%)'] = 0
                 df_평가상세['예측'] = (df_평가상세['상승확률(%)'] > 60).astype(int)
                 df_평가상세['정답'] = ary_y_정답
 
@@ -318,7 +321,6 @@ class Analyzer:
             # log 기록
             self.make_log(f'성능평가 완료(전일 모델, 금일 데이터_{s_일자}, {s_모델})')
 
-
     def 선정_감시대상(self):
         """ 모델평가 결과를 바탕으로 trader에서 실시간 감시할 종목 선정 후 저장 """
         pass
@@ -347,7 +349,7 @@ class Analyzer:
 if __name__ == "__main__":
     a = Analyzer()
 
-    # a.분석_변동성확인()
-    # a.분석_데이터셋(s_모델='rf')
+    a.분석_변동성확인()
+    a.분석_데이터셋(s_모델='rf')
     a.분석_모델생성(s_모델='rf')
     a.분석_성능평가(s_모델='rf')
