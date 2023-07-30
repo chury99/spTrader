@@ -117,7 +117,7 @@ def make_추가데이터_rf(df):
 
 
 # noinspection PyPep8Naming
-def make_라벨데이터_rf(df, n_대기봉수=2):
+def make_라벨데이터_rf(df, n_대기봉수):
     """ 데이터셋을 입력 받아서 라벨 데이터 생성 후 df 리턴 """
     # df_라벨 생성
     df_라벨 = df.copy()
@@ -147,7 +147,7 @@ def make_라벨데이터_rf(df, n_대기봉수=2):
 
 
 # noinspection PyPep8Naming
-def make_입력용xy_rf(df, n_학습일수=30):
+def make_입력용xy_rf(df, n_학습일수):
     """ 추가 데이터 정리된 df 받아서 모델 입력을 위한 ary_x, ary_y 정리 후 dic 리턴 """
     # 데이터 길이 확인 (학습할 일수보다 데이터 일수가 적으면 종료, 입력된 데이터는 max 60일치)
     li_일자 = sorted(df['일자'].unique())
@@ -174,7 +174,7 @@ def make_입력용xy_rf(df, n_학습일수=30):
 
 
 # noinspection PyPep8Naming
-def make_모델_rf(dic_데이터셋, n_rf_트리=100, n_rf_깊이=20):
+def make_모델_rf(dic_데이터셋, n_rf_트리, n_rf_깊이):
     """ dic 형태의 데이터셋을 받아서 lstm 모델 생성 후 리턴 """
     # 데이터 ary 설정
     ary_x_학습 = dic_데이터셋['ary_x_학습']
