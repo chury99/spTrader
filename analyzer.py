@@ -250,12 +250,12 @@ class Analyzer:
                     # 모델 등록 (전일)
                     dic_모델_전일[s_종목코드] = dic_모델_케이스_전일
 
-            # 모델 저장
+            # 모델 저장 (전일 모델)
             pd.to_pickle(dic_모델_전일, os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자_전일}.pkl'))
-            pd.to_pickle(dic_모델, os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자}.pkl'))
-
-            # log 기록
             self.make_log(f'모델 생성 완료(전일-{s_일자_전일}, {len(li_대상종목_전일):,}개 종목, {s_모델})')
+
+            # 모델 저장 (당일 모델)
+            pd.to_pickle(dic_모델, os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자}.pkl'))
             self.make_log(f'모델 생성 완료({s_일자}, {len(li_대상종목):,}개 종목, {s_모델})')
 
     def 분석_성능평가(self, s_모델):
@@ -282,7 +282,7 @@ class Analyzer:
 
             # 종목별 성능 평가 진행
             dic_df_평가_케이스 = dict()
-            li_li_결과 = list()
+            dic_df_평가_성공여부 = dict()
             for s_종목코드 in tqdm(li_대상종목, desc=f'{s_모델} 성능 평가({s_일자})'):
                 # 모델 설정
                 try:
@@ -296,6 +296,7 @@ class Analyzer:
                 # 케이스별 모델 평가
                 df_평가_케이스 = df_데이터셋.loc[:, '일자': '거래량'].copy()
                 df_평가_케이스 = df_평가_케이스[df_평가_케이스['일자'] == s_일자]
+                li_li_평가_성공여부 = list()
                 for s_케이스 in dic_모델_케이스_전일.keys():
                     # 케이스 설정
                     li_케이스 = [int(조건) for 조건 in s_케이스.split('_')]
@@ -315,42 +316,81 @@ class Analyzer:
                     ary_x_평가 = dic_데이터셋['ary_x_학습']
                     ary_y_정답 = dic_데이터셋['ary_y_학습']
 
-                    # 모델 평가
-                    df_평가_케이스['정답'] = ary_y_정답
+                    # 상승확률, 정답 산출
+                    s_col_확률 = f'상승확률(%)_{s_케이스}'
+                    s_col_정답 = f'정답_{s_케이스}'
                     try:
-                        df_평가_케이스[f'상승확률(%)_{s_케이스}'] = obj_모델_전일.predict_proba(ary_x_평가)[:, 1] * 100
+                        df_평가_케이스[s_col_확률] = obj_모델_전일.predict_proba(ary_x_평가)[:, 1] * 100
                     except IndexError:
-                        df_평가_케이스[f'상승확률(%)_{s_케이스}'] = 0
+                        df_평가_케이스[s_col_확률] = 0
+                    df_평가_케이스[s_col_정답] = ary_y_정답
 
-                    dic_df_평가_케이스[s_종목코드] = df_평가_케이스
+                    # 케이스별 성능 평가
+                    df_평가_성능 = df_평가_케이스.loc[:, [s_col_확률, s_col_정답]].copy()
+                    df_평가_성능 = df_평가_성능.sort_values(s_col_확률, ascending=False).reset_index(drop=True)
+                    df_평가_성능['누적_정답'] = df_평가_성능[s_col_정답].cumsum()
+                    df_성공 = df_평가_성능[df_평가_성능['누적_정답'] == df_평가_성능.index + 1]
 
-                # 상세 결과 저장
-                pd.to_pickle(dic_df_평가_케이스, os.path.join(self.folder_성능평가, f'평가_케이스_{s_일자}.pkl'))
+                    n_예측성공 = len(df_성공) if len(df_성공) > 0 else 0
+                    n_확률스펙 = df_성공[s_col_확률].min() if len(df_성공) > 0 else None
+                    s_종목명 = df_평가_케이스['종목명'].values[0] if len(df_평가_케이스) > 0 else None
 
-                # 결과 정리
-                df_결과 = df_평가상세[df_평가상세['예측'] == 1]
-                n_상승예측 = len(df_결과)
-                n_예측성공 = df_결과['정답'].sum()
-                n_예측실패 = n_상승예측 - n_예측성공
+                    li_평가_성공여부 = [s_종목코드, s_종목명, s_일자, n_대기봉수, n_학습일수, n_rf_트리, n_rf_깊이,
+                                  n_예측성공, n_확률스펙]
+                    li_li_평가_성공여부.append(li_평가_성공여부)
 
-                li_결과 = [s_종목코드, n_상승예측, n_예측성공, n_예측실패]
-                li_li_결과.append(li_결과)
+                # 케이스별 평가 결과 입력
+                dic_df_평가_케이스[s_종목코드] = df_평가_케이스
 
-            # 결과 df로 정리
-            df_성능평가 = pd.DataFrame(li_li_결과, columns=['종목코드', '상승예측', '예측성공', '예측실패'])
+                # 성능 평가 결과 입력
+                li_컬럼명 = ['종목코드', '종목명', '일자', '대기봉수', '학습일수', 'rf_트리', 'rf_깊이', '예측성공', '확률스펙']
+                df_평가_성공여부 = pd.DataFrame(li_li_평가_성공여부, columns=li_컬럼명)
+                dic_df_평가_성공여부[s_종목코드] = df_평가_성공여부
 
-            # 결과 저장
-            pd.to_pickle(dic_df_평가상세, os.path.join(self.folder_성능평가, f'dic_df_평가상세_{s_모델}_{s_일자}.pkl'))
-            df_성능평가.to_pickle(os.path.join(self.folder_성능평가, f'df_성능평가_{s_모델}_{s_일자}.pkl'))
-            df_성능평가.to_csv(os.path.join(self.folder_성능평가, f'성능평가_{s_모델}_{s_일자}.csv'),
+            # 평가 결과 저장
+            pd.to_pickle(dic_df_평가_케이스, os.path.join(self.folder_성능평가, f'dic_df_평가_케이스_{s_모델}_{s_일자}.pkl'))
+            pd.to_pickle(dic_df_평가_성공여부, os.path.join(self.folder_성능평가, f'dic_df_평가_성공여부_{s_모델}_{s_일자}.pkl'))
+
+            # log 기록
+            self.make_log(f'성능평가 완료({s_일자}, {len(dic_df_평가_성공여부):,}개 종목, {s_모델})')
+
+    def 선정_감시대상(self, s_모델):
+        """ 모델평가 결과를 바탕으로 trader에서 실시간 감시할 종목 선정 후 저장 """
+        # 분석대상 일자 선정
+        li_일자_전체 = [파일명.split('_')[5].replace('.pkl', '') for 파일명 in os.listdir(self.folder_성능평가)
+                    if f'dic_df_평가_성공여부_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_감시대상)
+                    if f'df_감시대상_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+        li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 평가 결과 불러오기
+            dic_df_평가_성공여부 = pd.read_pickle(os.path.join(self.folder_성능평가,
+                                                         f'dic_df_평가_성공여부_{s_모델}_{s_일자}.pkl'))
+
+            # 적합한 종목 및 스펙 선정
+            df_감시대상 = pd.DataFrame()
+            for s_종목코드 in tqdm(dic_df_평가_성공여부.keys(), desc=f'{s_모델} 감시대상 선정({s_일자})'):
+                df_평가 = dic_df_평가_성공여부[s_종목코드]
+                df_추가 = df_평가[df_평가['확률스펙'] > 50]
+                if len(df_추가) == 0:
+                    continue
+                df_추가 = df_추가.sort_values(['예측성공', '대기봉수', '확률스펙'], ascending=[False, True, False])
+                df_추가 = df_추가.reset_index(drop=True).loc[:0, :]
+
+                df_감시대상 = pd.concat([df_감시대상, df_추가], axis=0)
+
+            df_감시대상 = df_감시대상.sort_values(['예측성공', '대기봉수', '확률스펙'], ascending=[False, True, False])
+            df_감시대상 = df_감시대상.reset_index(drop=True)
+
+            # 평가 결과 저장
+            df_감시대상.to_pickle(os.path.join(self.folder_감시대상, f'df_감시대상_{s_모델}_{s_일자}.pkl'))
+            df_감시대상.to_csv(os.path.join(self.folder_감시대상, f'감시대상_{s_모델}_{s_일자}.csv'),
                            index=False, encoding='cp949')
 
             # log 기록
-            self.make_log(f'성능평가 완료(전일 모델, 금일 데이터_{s_일자}, {s_모델})')
-
-    def 선정_감시대상(self):
-        """ 모델평가 결과를 바탕으로 trader에서 실시간 감시할 종목 선정 후 저장 """
-        pass
+            self.make_log(f'감시대상 선정 완료({s_일자}, {len(df_감시대상):,}개 종목, {s_모델})')
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
@@ -379,4 +419,5 @@ if __name__ == "__main__":
     a.분석_변동성확인()
     a.분석_데이터셋(s_모델='rf')
     a.분석_모델생성(s_모델='rf')
-    a.분석_성능평가(s_모델='rf')   ### 성능평가 수정 필요 (케이스에 따라서 ...)
+    a.분석_성능평가(s_모델='rf')
+    a.선정_감시대상(s_모델='rf')
