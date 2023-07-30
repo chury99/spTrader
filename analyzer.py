@@ -271,7 +271,7 @@ class Analyzer:
         for s_일자 in li_일자_대상:
             # 전일 일자 확인
             try:
-                s_일자_전일 = min([일자_전체 for 일자_전체 in li_일자_전체 if 일자_전체 < s_일자])
+                s_일자_전일 = max([일자 for 일자 in li_일자_전체 if 일자 < s_일자])
             except ValueError:
                 continue
 
@@ -281,43 +281,51 @@ class Analyzer:
             li_대상종목 = list(dic_df_데이터셋.keys())
 
             # 종목별 성능 평가 진행
-            dic_df_평가상세 = dict()
+            dic_df_평가_케이스 = dict()
             li_li_결과 = list()
             for s_종목코드 in tqdm(li_대상종목, desc=f'{s_모델} 성능 평가({s_일자})'):
                 # 모델 설정
                 try:
-                    obj_모델_전일 = dic_모델_전일[s_종목코드]
+                    dic_모델_케이스_전일 = dic_모델_전일[s_종목코드]
                 except KeyError:
                     continue
 
-                # 데이터셋 설정 (평가용 데이터, 당일 데이터만)
+                # 데이터셋 설정
                 df_데이터셋 = dic_df_데이터셋[s_종목코드]
-                df_데이터셋 = Logic.make_라벨데이터_rf(df=df_데이터셋)
-                df_데이터셋 = df_데이터셋[df_데이터셋['일자'] == s_일자]
-                if len(df_데이터셋) == 0:
-                    continue
 
-                # 입력용 ary 설정
-                dic_데이터셋 = Logic.make_입력용xy_rf(df=df_데이터셋, n_학습일수=1)
-                ary_x_평가 = dic_데이터셋['ary_x_학습']
-                ary_y_정답 = dic_데이터셋['ary_y_학습']
+                # 케이스별 모델 평가
+                df_평가_케이스 = df_데이터셋.loc[:, '일자': '거래량'].copy()
+                df_평가_케이스 = df_평가_케이스[df_평가_케이스['일자'] == s_일자]
+                for s_케이스 in dic_모델_케이스_전일.keys():
+                    # 케이스 설정
+                    li_케이스 = [int(조건) for 조건 in s_케이스.split('_')]
+                    n_대기봉수, n_학습일수, n_rf_트리, n_rf_깊이 = li_케이스
 
-                # 모델 평가
-                df_평가상세 = df_데이터셋.loc[:, '일자': '거래량'].copy()
-                try:
-                    df_평가상세['상승확률(%)'] = obj_모델_전일.predict_proba(ary_x_평가)[:, 1] * 100
-                except IndexError:
-                    df_평가상세['상승확률(%)'] = 0
-                df_평가상세['예측'] = (df_평가상세['상승확률(%)'] > 60).astype(int)
-                df_평가상세['정답'] = ary_y_정답
+                    # 모델 설정
+                    obj_모델_전일 = dic_모델_케이스_전일[s_케이스]
 
-                dic_df_평가상세[s_종목코드] = df_평가상세
+                    # 데이터셋 설정 (평가용 데이터, 당일 데이터만)
+                    df_데이터셋_케이스 = Logic.make_라벨데이터_rf(df=df_데이터셋, n_대기봉수=n_대기봉수)
+                    df_데이터셋_케이스 = df_데이터셋_케이스[df_데이터셋_케이스['일자'] == s_일자]
+                    if len(df_데이터셋_케이스) == 0:
+                        continue
+
+                    # 입력용 ary 설정 (1일치 데이터)
+                    dic_데이터셋 = Logic.make_입력용xy_rf(df=df_데이터셋_케이스, n_학습일수=1)
+                    ary_x_평가 = dic_데이터셋['ary_x_학습']
+                    ary_y_정답 = dic_데이터셋['ary_y_학습']
+
+                    # 모델 평가
+                    df_평가_케이스['정답'] = ary_y_정답
+                    try:
+                        df_평가_케이스[f'상승확률(%)_{s_케이스}'] = obj_모델_전일.predict_proba(ary_x_평가)[:, 1] * 100
+                    except IndexError:
+                        df_평가_케이스[f'상승확률(%)_{s_케이스}'] = 0
+
+                    dic_df_평가_케이스[s_종목코드] = df_평가_케이스
 
                 # 상세 결과 저장
-                folder_평가상세 = os.path.join(self.folder_성능평가, f'평가상세_{s_일자}')
-                os.makedirs(folder_평가상세, exist_ok=True)
-                df_평가상세.to_csv(os.path.join(folder_평가상세, f'평가상세_{s_종목코드}_{s_모델}_{s_일자}.csv'),
-                               index=False, encoding='cp949')
+                pd.to_pickle(dic_df_평가_케이스, os.path.join(self.folder_성능평가, f'평가_케이스_{s_일자}.pkl'))
 
                 # 결과 정리
                 df_결과 = df_평가상세[df_평가상세['예측'] == 1]
