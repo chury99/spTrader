@@ -124,7 +124,7 @@ class Analyzer:
             df_대상종목 = pd.read_pickle(os.path.join(self.folder_변동성종목, f'df_변동성종목_당일_{s_일자}.pkl'))
             li_대상종목 = list(df_대상종목['종목코드'])
 
-            # 종목별 10분봉 데이터 불러오기 (from 캐시변환, 과거 61일치)
+            # 종목별 10분봉 데이터 불러오기 (from 캐시변환, 과거 70일치)
             dic_li_df_종목별 = dict()
             for s_대상일자 in tqdm(li_대상일자, desc=f'10분봉 읽어오기({s_일자})'):
                 dic_10분봉 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_10분봉_{s_대상일자}.pkl'))
@@ -138,16 +138,11 @@ class Analyzer:
             dic_df_10분봉 = dict()
             for s_종목코드 in dic_li_df_종목별.keys():
                 dic_df_10분봉[s_종목코드] = pd.concat(dic_li_df_종목별[s_종목코드], axis=0).sort_index()
-            # pd.to_pickle(dic_df_10분봉, os.path.join(self.folder_데이터셋, '임시_dic_df_10분봉.pkl'))   ### 테스트용 임시 코드
-            # dic_df_10분봉 = pd.read_pickle(os.path.join(self.folder_데이터셋, '임시_dic_df_10분봉.pkl'))   ### 테스트용 임시 코드
 
             # 분석용 데이터셋 생성
             dic_df_데이터셋 = dict()
             for s_종목코드 in tqdm(li_대상종목, desc=f'데이터셋 생성({s_일자})'):
                 df_10분봉 = dic_df_10분봉[s_종목코드].dropna()
-                # df_데이터셋 = None
-                # if s_모델 == 'rf':
-                #     df_데이터셋 = Logic.make_추가데이터_rf(df=df_10분봉)
                 df_데이터셋 = Logic.make_추가데이터_rf(df=df_10분봉) if s_모델 == 'rf'\
                     else Logic.make_추가데이터_lstm(df=df_10분봉) if s_모델 == 'lstm'\
                     else None
@@ -349,7 +344,8 @@ class Analyzer:
 
             # 평가 결과 저장
             pd.to_pickle(dic_df_평가_케이스, os.path.join(self.folder_성능평가, f'dic_df_평가_케이스_{s_모델}_{s_일자}.pkl'))
-            pd.to_pickle(dic_df_평가_성공여부, os.path.join(self.folder_성능평가, f'dic_df_평가_성공여부_{s_모델}_{s_일자}.pkl'))
+            pd.to_pickle(dic_df_평가_성공여부, os.path.join(self.folder_성능평가,
+                                                      f'dic_df_평가_성공여부_{s_모델}_{s_일자}.pkl'))
 
             # log 기록
             self.make_log(f'성능평가 완료({s_일자}, {len(dic_df_평가_성공여부):,}개 종목, {s_모델})')
