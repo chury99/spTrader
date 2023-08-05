@@ -4,8 +4,6 @@ import pandas as pd
 import json
 import re
 
-from tqdm import tqdm
-
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
 # noinspection PyShadowingNames
@@ -60,20 +58,101 @@ class Rotator:
         # 기준 일자 정의
         dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(months=self.n_보관기간_log)
         s_기준일자 = dt_기준일자.strftime('%Y%m%d')
-        s_기준일자 = '20210505'
 
         # 삭제대상 파일 찾기
         s_폴더 = self.dic_folder['log']
         li_파일_전체 = os.listdir(s_폴더)
         li_파일_일자존재 = [파일 for 파일 in li_파일_전체 if re.findall(r'\d{8}', 파일)]
         li_파일_삭제대상 = [파일 for 파일 in li_파일_일자존재 if re.findall(r'\d{8}', 파일)[0] < s_기준일자]
+        li_패스_삭제대상 = [os.path.join(s_폴더, 파일) for 파일 in li_파일_삭제대상]
 
         # 대상 파일 삭제
-        for s_파일 in li_파일_삭제대상:
-            os.system(f'del {os.path.join(s_폴더, s_파일)}')
+        for s_패스 in li_패스_삭제대상:
+            os.system(f'del {s_패스}')
 
         # log 기록
-        self.make_log(f' 파일 삭제 완료({self.n_보관기간_log}개월 경과, {s_기준일자} 기준, {len(li_파일_삭제대상)}개 파일)')
+        self.make_log(f' 파일 삭제 완료({self.n_보관기간_log}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상)}개 파일)')
+
+    def 파일관리_analyzer(self):
+        """ analyzer에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
+        # 기준 일자 정의
+        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(months=self.n_보관기간_analyzer)
+        s_기준일자 = dt_기준일자.strftime('%Y%m%d')
+
+        # 삭제대상 파일 찾기
+        dic_폴더 = self.dic_folder['analyzer']
+        li_패스_삭제대상 = list()
+        for s_폴더명 in dic_폴더.keys():
+            # 예외 폴더 정의
+            if s_폴더명 in []:
+                continue
+            # 대상 폴더 처리
+            s_폴더 = dic_폴더[s_폴더명]
+            li_파일_전체 = os.listdir(s_폴더)
+            li_파일_일자존재 = [파일 for 파일 in li_파일_전체 if re.findall(r'\d{8}', 파일)]
+            li_파일_삭제대상 = [파일 for 파일 in li_파일_일자존재 if re.findall(r'\d{8}', 파일)[0] < s_기준일자]
+            [li_패스_삭제대상.append(os.path.join(s_폴더, 파일)) for 파일 in li_파일_삭제대상]
+
+        # 대상 파일 삭제
+        for s_패스 in li_패스_삭제대상:
+            os.system(f'del {s_패스}')
+
+        # log 기록
+        self.make_log(f' 파일 삭제 완료({self.n_보관기간_analyzer}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상)}개 파일)')
+
+    def 파일관리_collector(self):
+        """ collector에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
+        # 기준 일자 정의
+        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(months=self.n_보관기간_collector)
+        s_기준일자 = dt_기준일자.strftime('%Y%m%d')
+
+        # 삭제대상 파일 찾기
+        dic_폴더 = self.dic_folder['collector']
+        li_패스_삭제대상 = list()
+        for s_폴더명 in dic_폴더.keys():
+            # 예외 폴더 정의
+            if s_폴더명 in ['ohlcv', '캐시변환']:
+                continue
+            # 대상 폴더 처리
+            s_폴더 = dic_폴더[s_폴더명]
+            li_파일_전체 = os.listdir(s_폴더)
+            li_파일_일자존재 = [파일 for 파일 in li_파일_전체 if re.findall(r'\d{8}', 파일)]
+            li_파일_삭제대상 = [파일 for 파일 in li_파일_일자존재 if re.findall(r'\d{8}', 파일)[0] < s_기준일자]
+            [li_패스_삭제대상.append(os.path.join(s_폴더, 파일)) for 파일 in li_파일_삭제대상]
+
+        # 대상 파일 삭제
+        for s_패스 in li_패스_삭제대상:
+            os.system(f'del {s_패스}')
+
+        # log 기록
+        self.make_log(f' 파일 삭제 완료({self.n_보관기간_collector}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상)}개 파일)')
+
+    def 파일관리_trader(self):
+        """ trader에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
+        # 기준 일자 정의
+        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(months=self.n_보관기간_trader)
+        s_기준일자 = dt_기준일자.strftime('%Y%m%d')
+
+        # 삭제대상 파일 찾기
+        dic_폴더 = self.dic_folder['trader']
+        li_패스_삭제대상 = list()
+        for s_폴더명 in dic_폴더.keys():
+            # 예외 폴더 정의
+            if s_폴더명 in ['run']:
+                continue
+            # 대상 폴더 처리
+            s_폴더 = dic_폴더[s_폴더명]
+            li_파일_전체 = os.listdir(s_폴더)
+            li_파일_일자존재 = [파일 for 파일 in li_파일_전체 if re.findall(r'\d{8}', 파일)]
+            li_파일_삭제대상 = [파일 for 파일 in li_파일_일자존재 if re.findall(r'\d{8}', 파일)[0] < s_기준일자]
+            [li_패스_삭제대상.append(os.path.join(s_폴더, 파일)) for 파일 in li_파일_삭제대상]
+
+        # 대상 파일 삭제
+        for s_패스 in li_패스_삭제대상:
+            os.system(f'del {s_패스}')
+
+        # log 기록
+        self.make_log(f' 파일 삭제 완료({self.n_보관기간_trader}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상)}개 파일)')
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
