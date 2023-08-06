@@ -2,6 +2,7 @@ import os
 import sys
 import pandas as pd
 import json
+import re
 
 import pandas.errors
 from tqdm import tqdm
@@ -41,7 +42,7 @@ class Analyzer:
         self.li_종목_분석대상 = list(df_분석대상종목['종목코드'].sort_values())
         self.dic_코드2종목명 = df_분석대상종목.set_index('종목코드').to_dict()['종목명']
 
-        self.li_일자_전체 = sorted([파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_캐시변환)
+        self.li_일자_전체 = sorted([re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
                                 if 'dic_코드별_10분봉_' in 파일명 and '.pkl' in 파일명])
 
         # log 기록
@@ -50,9 +51,9 @@ class Analyzer:
     def 백테스팅_상승예측(self, s_모델):
         """ 감시대상 종목 불러와서 10분봉 기준 상승여부 예측 """
         # 분석대상 일자 선정
-        li_일자_전체 = [파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_감시대상)
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_감시대상)
                     if f'df_감시대상_{s_모델}_' in 파일명 and '.pkl' in 파일명]
-        li_일자_완료 = [파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_상승예측)
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_상승예측)
                     if f'df_상승예측_{s_모델}_' in 파일명 and f'.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
@@ -67,8 +68,12 @@ class Analyzer:
             # 감시대상 불러오기 (전일 기준 - 전일 생성한 데이터 불러와서 당일 감시)
             df_감시대상 = pd.read_pickle(os.path.join(self.folder_감시대상, f'df_감시대상_{s_모델}_{s_일자_전일}.pkl'))
             df_감시대상['li_조건'] = [list(ary) for ary in df_감시대상.loc[:, '대기봉수': '확률스펙'].values]
-            dic_조건 = df_감시대상.set_index('종목코드').to_dict()['li_조건']
-            li_감시대상 = list(df_감시대상['종목코드'].values)
+            try:
+                dic_조건 = df_감시대상.set_index('종목코드').to_dict()['li_조건']
+                li_감시대상 = list(df_감시대상['종목코드'].values)
+            except KeyError:
+                dic_조건 = dict()
+                li_감시대상 = list()
 
             # 모델 불러오기 (전일 기준 - 전일 생성한 모델 불러와서 당일 적용)
             dic_모델 = pd.read_pickle(os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자_전일}.pkl'))
@@ -115,7 +120,7 @@ class Analyzer:
                 dic_df_상승예측[s_종목코드] = df_10분봉
 
             # 상승예측 결과 하나의 df로 합치기
-            li_df = [dic_df_상승예측[종목코드] for 종목코드 in dic_df_상승예측.keys()]
+            li_df = [pd.DataFrame()] + [dic_df_상승예측[종목코드] for 종목코드 in dic_df_상승예측.keys()]
             df_상승예측 = pd.concat(li_df, axis=0)
 
             # 결과 저장
@@ -129,9 +134,9 @@ class Analyzer:
     def 백테스팅_수익검증(self, s_모델, n_최소성공이력, n_최소확률스펙):
         """ 상승여부 예측한 결과를 바탕으로 종목선정 조건에 따른 결과 확인 """
         # 분석대상 일자 선정
-        li_일자_전체 = [파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_상승예측)
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_상승예측)
                     if f'df_상승예측_{s_모델}_' in 파일명 and '.pkl' in 파일명]
-        li_일자_완료 = [파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_수익검증)
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_수익검증)
                     if f'df_수익검증_{s_모델}_' in 파일명 and f'.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
@@ -173,4 +178,4 @@ if __name__ == "__main__":
     a = Analyzer()
 
     a.백테스팅_상승예측(s_모델='rf')
-    a.백테스팅_수익검증(s_모델='rf', n_최소성공이력=1, n_최소확률스펙=50)
+    # a.백테스팅_수익검증(s_모델='rf', n_최소성공이력=1, n_최소확률스펙=50)
