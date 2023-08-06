@@ -2,6 +2,7 @@ import os
 import sys
 import pandas as pd
 import json
+import re
 
 import pandas.errors
 from tqdm import tqdm
@@ -47,6 +48,8 @@ class Analyzer:
 
         self.li_일자_전체 = sorted([파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_캐시변환)
                                 if 'dic_코드별_10분봉_' in 파일명 and '.pkl' in 파일명])
+        self.li_일자_전체 = sorted([re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
+                               if 'dic_코드별_10분봉_' in 파일명 and '.pkl' in 파일명])
 
         # 모델 생성 케이스 생성
         li_대기봉수 = [1, 2, 3]
@@ -65,7 +68,7 @@ class Analyzer:
             # 선정기준 : 10분봉 기준 3%이상 상승이 하루에 2회 이상 존재 """
         # 분석대상 일자 선정
         li_일자_전체 = self.li_일자_전체[-180:]
-        li_일자_완료 = [파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_변동성종목)
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_변동성종목)
                     if 'df_변동성종목_당일_' in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
@@ -111,9 +114,9 @@ class Analyzer:
     def 분석_데이터셋(self, s_모델):
         """ 변동성 종목 대상 기준으로 모델 생성을 위한 데이터 정리 후 ary set을 dic 형태로 저장 """
         # 분석대상 일자 선정
-        li_일자_전체 = [파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_변동성종목)
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_변동성종목)
                     if 'df_변동성종목_당일_' in 파일명 and '.pkl' in 파일명]
-        li_일자_완료 = [파일명.split('_')[4].replace('.pkl', '') for 파일명 in os.listdir(self.folder_데이터셋)
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_데이터셋)
                     if f'dic_df_데이터셋_{s_모델}_' in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
@@ -157,9 +160,9 @@ class Analyzer:
     def 분석_모델생성(self, s_모델):
         """ 변동성 종목 대상 기준으로 종목별 모델 생성 후 저장 """
         # 분석대상 일자 선정
-        li_일자_전체 = [파일명.split('_')[4].replace('.pkl', '') for 파일명 in os.listdir(self.folder_데이터셋)
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_데이터셋)
                     if f'dic_df_데이터셋_{s_모델}_' in 파일명 and '.pkl' in 파일명]
-        li_일자_완료 = [파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_모델)
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_모델)
                     if f'dic_모델_{s_모델}_' in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
@@ -207,7 +210,7 @@ class Analyzer:
 
             # 전일 일자 확인
             try:
-                s_일자_전일 = max([일자 for 일자 in li_일자_전체 if 일자 < s_일자])
+                s_일자_전일 = max([일자 for 일자 in self.li_일자_전체 if 일자 < s_일자])
             except ValueError:
                 continue
 
@@ -256,10 +259,10 @@ class Analyzer:
     def 분석_성능평가(self, s_모델):
         """ 전일 생성된 모델 기반으로 금일 데이터로 예측 결과 확인하여 평가결과 저장 """
         # 분석대상 일자 선정
-        li_일자_전체 = [파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_모델)
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_모델)
                     if f'dic_모델_{s_모델}_' in 파일명 and '.pkl' in 파일명]
-        li_일자_완료 = [파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_성능평가)
-                    if f'df_성능평가_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_성능평가)
+                    if f'dic_df_평가_성공여부_{s_모델}_' in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
         # 일자별 분석 진행
@@ -353,9 +356,9 @@ class Analyzer:
     def 선정_감시대상(self, s_모델):
         """ 모델평가 결과를 바탕으로 trader에서 실시간 감시할 종목 선정 후 저장 """
         # 분석대상 일자 선정
-        li_일자_전체 = [파일명.split('_')[5].replace('.pkl', '') for 파일명 in os.listdir(self.folder_성능평가)
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_성능평가)
                     if f'dic_df_평가_성공여부_{s_모델}_' in 파일명 and '.pkl' in 파일명]
-        li_일자_완료 = [파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_감시대상)
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_감시대상)
                     if f'df_감시대상_{s_모델}_' in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
@@ -377,7 +380,8 @@ class Analyzer:
 
                 df_감시대상 = pd.concat([df_감시대상, df_추가], axis=0)
 
-            df_감시대상 = df_감시대상.sort_values(['예측성공', '대기봉수', '확률스펙'], ascending=[False, True, False])
+            if len(df_감시대상) > 0:
+                df_감시대상 = df_감시대상.sort_values(['예측성공', '대기봉수', '확률스펙'], ascending=[False, True, False])
             df_감시대상 = df_감시대상.reset_index(drop=True)
 
             # 평가 결과 저장
