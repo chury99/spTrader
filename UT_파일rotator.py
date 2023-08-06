@@ -71,7 +71,7 @@ class Rotator:
             os.system(f'del {s_패스}')
 
         # log 기록
-        self.make_log(f' 파일 삭제 완료({self.n_보관기간_log}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상)}개 파일)')
+        self.make_log(f'파일 삭제 완료({self.n_보관기간_log}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
 
     def 파일관리_analyzer(self):
         """ analyzer에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
@@ -98,7 +98,7 @@ class Rotator:
             os.system(f'del {s_패스}')
 
         # log 기록
-        self.make_log(f' 파일 삭제 완료({self.n_보관기간_analyzer}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상)}개 파일)')
+        self.make_log(f'파일 삭제 완료({self.n_보관기간_analyzer}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
 
     def 파일관리_collector(self):
         """ collector에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
@@ -125,7 +125,7 @@ class Rotator:
             os.system(f'del {s_패스}')
 
         # log 기록
-        self.make_log(f' 파일 삭제 완료({self.n_보관기간_collector}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상)}개 파일)')
+        self.make_log(f'파일 삭제 완료({self.n_보관기간_collector}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
 
     def 파일관리_trader(self):
         """ trader에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
@@ -152,7 +152,7 @@ class Rotator:
             os.system(f'del {s_패스}')
 
         # log 기록
-        self.make_log(f' 파일 삭제 완료({self.n_보관기간_trader}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상)}개 파일)')
+        self.make_log(f'파일 삭제 완료({self.n_보관기간_trader}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
