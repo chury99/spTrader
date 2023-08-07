@@ -29,6 +29,7 @@ class Rotator:
                                        '모델': os.path.join(folder_분석, '30_모델'),
                                        '성능평가': os.path.join(folder_분석, '40_성능평가'),
                                        '감시대상': os.path.join(folder_분석, '감시대상'),
+                                       '감시대상모델': os.path.join(folder_분석, '모델_감시대상'),
                                        '상승예측': os.path.join(folder_백테스팅, '10_상승예측'),
                                        '수익검증': os.path.join(folder_백테스팅, '20_수익검증')}
 
@@ -178,7 +179,8 @@ class Rotator:
 if __name__ == "__main__":
     r = Rotator()
 
-    r.파일관리_log()
+    # ### log 파일은 안 지우는 게 좋을 듯 (icloud와 충돌 발생) ###
+    # r.파일관리_log()
     r.파일관리_analyzer()
     r.파일관리_collector()
     r.파일관리_trader()
