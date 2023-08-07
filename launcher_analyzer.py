@@ -20,11 +20,6 @@ class LauncherAnalyzer:
         self.path_파이썬32 = dic_config['path_파이썬32']
         self.path_파이썬64 = dic_config['path_파이썬64']
 
-        # 폴더 정의
-        folder_work = dic_config['folder_work']
-        folder_데이터 = os.path.join(folder_work, '데이터')
-        self.folder_정보수집 = os.path.join(folder_데이터, '정보수집')
-
         # 카카오 API 연결
         sys.path.append(dic_config['folder_kakao'])
         import API_kakao
@@ -73,6 +68,26 @@ class LauncherAnalyzer:
         # log 기록
         self.make_log(f'분석 모델 백테스팅 완료 - {s_실행결과}')
 
+    def UT_파일rotator(self):
+        """ 생성된 파일들의 시점 확인하여 보관기간 지난 파일 삭제 """
+        # 파일 지정
+        path_실행 = os.path.join(os.getcwd(), 'UT_파일rotator.py')
+
+        # log 기록
+        self.make_log(f'파일 Rotation 실행')
+
+        # 프로세스 실행
+        ret = subprocess.run([self.path_파이썬64, path_실행], shell=True)
+        s_실행결과 = '성공' if ret.returncode == 0 else '실패'
+
+        # 실패 시 카카오 메세지 송부
+        if s_실행결과 == '실패':
+            s_메세지 = f'!!! 모듈 실행 중 오류 발생 - {sys._getframe(0).f_code.co_name} !!!'
+            self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
+
+        # log 기록
+        self.make_log(f'파일 Rotation 완료 - {s_실행결과}')
+
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
         """ 입력 받은 s_text에 시간 붙여서 self.path_log에 저장 """
@@ -99,3 +114,4 @@ if __name__ == "__main__":
 
     l.analyzer_분석()
     l.analyzer_백테스팅()
+    l.UT_파일rotator()
