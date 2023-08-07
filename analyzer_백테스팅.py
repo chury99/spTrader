@@ -4,10 +4,16 @@ import pandas as pd
 import json
 import re
 
-import pandas.errors
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 import analyzer_알고리즘 as Logic
+
+# 그래프 한글 설정
+from matplotlib import font_manager, rc, rcParams
+font_name = font_manager.FontProperties(fname="c:/Windows/Fonts/malgun.ttf").get_name()
+rc('font', family=font_name)
+rcParams['axes.unicode_minus'] = False
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
@@ -28,13 +34,15 @@ class Analyzer:
         self.folder_캐시변환 = os.path.join(folder_데이터, '캐시변환')
         self.folder_정보수집 = os.path.join(folder_데이터, '정보수집')
         folder_분석 = os.path.join(folder_work, '분석')
-        self.folder_모델 = os.path.join(folder_분석, '30_모델')
         self.folder_감시대상 = os.path.join(folder_분석, '감시대상')
+        self.folder_감시대상모델 = os.path.join(folder_분석, '모델_감시대상')
         folder_백테스팅 = os.path.join(folder_work, '백테스팅')
         self.folder_상승예측 = os.path.join(folder_백테스팅, '10_상승예측')
         self.folder_수익검증 = os.path.join(folder_백테스팅, '20_수익검증')
+        self.folder_수익조건 = os.path.join(folder_백테스팅, '30_수익조건')
         os.makedirs(self.folder_상승예측, exist_ok=True)
         os.makedirs(self.folder_수익검증, exist_ok=True)
+        os.makedirs(self.folder_수익조건, exist_ok=True)
 
         # 변수 설정
         dic_조건검색 = pd.read_pickle(os.path.join(self.folder_정보수집, 'dic_조건검색.pkl'))
@@ -76,7 +84,7 @@ class Analyzer:
                 li_감시대상 = list()
 
             # 모델 불러오기 (전일 기준 - 전일 생성한 모델 불러와서 당일 적용)
-            dic_모델 = pd.read_pickle(os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자_전일}.pkl'))
+            dic_모델 = pd.read_pickle(os.path.join(self.folder_감시대상모델, f'dic_모델_감시대상_{s_모델}_{s_일자_전일}.pkl'))
 
             # 10분봉 불러오기 (당일 기준)
             dic_df_10분봉_당일 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_10분봉_{s_일자}.pkl'))
@@ -101,7 +109,7 @@ class Analyzer:
                 df_데이터셋 = Logic.make_추가데이터_rf(df=df_10분봉)
                 df_데이터셋 = Logic.make_라벨데이터_rf(df=df_데이터셋, n_대기봉수=n_대기봉수)
                 df_데이터셋 = df_데이터셋[df_데이터셋['일자'] == s_일자]
-                if len(df_데이터셋) == 0:
+                if len(df_데이터셋) == 0 or len(df_데이터셋) != len(df_10분봉[df_10분봉['일자'] == s_일자]):
                     continue
                 dic_데이터셋 = Logic.make_입력용xy_rf(df=df_데이터셋, n_학습일수=1)
                 ary_x_평가 = dic_데이터셋['ary_x_학습']
@@ -115,6 +123,13 @@ class Analyzer:
                     df_10분봉['상승확률(%)'] = 0
                 df_10분봉['상승예측'] = (df_10분봉['상승확률(%)'] > n_확률스펙) * 1
                 df_10분봉['정답'] = ary_y_정답
+
+                # 케이스 정보 추가
+                df_10분봉['케이스'] = s_케이스
+
+                # 평가 정보 추가
+                df_10분봉['예측성공'] = int(n_예측성공)
+                df_10분봉['확률스펙'] = n_확률스펙
 
                 # dic_df에 입력
                 dic_df_상승예측[s_종목코드] = df_10분봉
@@ -131,27 +146,131 @@ class Analyzer:
             # log 기록
             self.make_log(f'종목별 상승예측 완료({s_일자}, {len(dic_df_상승예측):,}개 종목, {s_모델})')
 
-    def 백테스팅_수익검증(self, s_모델, n_최소성공이력, n_최소확률스펙):
-        """ 상승여부 예측한 결과를 바탕으로 종목선정 조건에 따른 결과 확인 """
-        # 분석대상 일자 선정
-        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_상승예측)
-                    if f'df_상승예측_{s_모델}_' in 파일명 and '.pkl' in 파일명]
-        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_수익검증)
-                    if f'df_수익검증_{s_모델}_' in 파일명 and f'.pkl' in 파일명]
-        li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+    def 백테스팅_수익검증(self, s_모델):
+        """ 상승여부 예측한 결과를 바탕으로 종목선정 조건에 따른 결과 확인 (예측 엑셀, 리포트 저장) """
+        # 상승예측 데이터 불러오기
+        li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_상승예측)
+                  if f'df_상승예측_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+        li_df = [pd.read_pickle(os.path.join(self.folder_상승예측, 파일명)) for 파일명 in li_파일명]
+        df_상승예측 = pd.concat(li_df, axis=0)
 
-        # 일자별 분석 진행
-        for s_일자 in li_일자_대상:
+        # 예측한 값만 잘라내기
+        df_수익검증 = df_상승예측[df_상승예측['상승예측'] == 1].drop_duplicates()
 
-            pass
+        # 감시대상 종목 불러오기
+        li_감시대상_파일명 = [파일명 for 파일명 in os.listdir(self.folder_감시대상)
+                       if f'df_감시대상_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+        df_감시대상 = pd.DataFrame()
+        df_감시대상['일자'] = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in li_감시대상_파일명]
+        df_감시대상['종목수'] = [len(pd.read_pickle(os.path.join(self.folder_감시대상, 파일명))) for 파일명 in li_감시대상_파일명]
 
-            # 결과 저장
-            df_상승예측.to_pickle(os.path.join(self.folder_상승예측, f'df_수익검증_{s_모델}_{s_일자}.pkl'))
-            df_상승예측.to_csv(os.path.join(self.folder_상승예측, f'수익검증_{s_모델}_{s_일자}.csv'),
-                           index=False, encoding='cp949')
+        # 리포트 생성
+        plt.figure(figsize=[16, 9])
 
-            # log 기록
-            self.make_log(f'기준별 수익검증 완료({s_일자}, {n:,}개 예측 {n:,}개 성공, {s_모델})')
+        plt.subplot(2, 2, 1)
+        plt.title('[ 감시대상 종목 수 ]')
+        ary_x, ary_y = df_감시대상['일자'].values, df_감시대상['종목수'].values
+        li_색깔 = ['C1' if 종목수 > 15 else 'C0' for 종목수 in ary_y]
+        plt.bar(ary_x, ary_y, color=li_색깔)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.grid(linestyle='--', alpha=0.5)
+
+        # plt.subplot(2, 2, 3)
+        # plt.title('[ 상승예측 종목 수 ]')
+        # sri_상승예측종목수 = df_수익검증.drop_duplicates(subset=['일자', '종목코드']).groupby('일자')['종목코드'].count()
+        # ary_x, ary_y = sri_상승예측종목수.index.values, sri_상승예측종목수.values
+        # li_색깔 = ['C1' if 종목수 > 5 else 'C0' for 종목수 in ary_y]
+        # plt.bar(ary_x, ary_y, color=li_색깔)
+        # plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        # plt.grid(linestyle='--', alpha=0.5)
+
+        plt.subplot(2, 2, 2)
+        plt.title('[ 상승예측 건수 ]')
+        sri_상승예측건수 = df_수익검증.groupby('일자')['상승예측'].sum()
+        ary_x, ary_y = sri_상승예측건수.index.values, sri_상승예측건수.values
+        li_색깔 = ['C3' if 예측건수 > 10 else 'C0' for 예측건수 in ary_y]
+        plt.bar(ary_x, ary_y, color=li_색깔)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.grid(linestyle='--', alpha=0.5)
+
+        plt.subplot(2, 2, 4)
+        plt.title('[ 예측 성공률 (%) ]')
+        sri_예측성공건수 = df_수익검증.groupby('일자')['정답'].sum()
+        sri_예측성공률 = sri_예측성공건수 / sri_상승예측건수 * 100
+        ary_x, ary_y = sri_예측성공률.index.values, sri_예측성공률.values
+        li_색깔 = ['C0' if 성공률 > 70 else 'C3' for 성공률 in ary_y]
+        plt.bar(ary_x, ary_y, color=li_색깔)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.grid(linestyle='--', alpha=0.5)
+        plt.axhline(100, color='C0', alpha=0)
+        plt.axhline(70, color='C1')
+
+        plt.subplot(2, 2, 3)
+        plt.title('[ 예측 성공률 (%, 누적) ]')
+        sri_예측성공률_누적 = sri_예측성공건수.cumsum() / sri_상승예측건수.cumsum() * 100
+        ary_x, ary_y = sri_예측성공률_누적.index.values, sri_예측성공률_누적.values
+        plt.plot(ary_x, ary_y)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.grid(linestyle='--', alpha=0.5)
+        plt.axhline(100, color='C0', alpha=0)
+        plt.axhline(70, color='C1')
+
+        # 리포트 저장
+        plt.savefig(os.path.join(self.folder_수익검증, f'수익검증_리포트_{s_모델}_{self.s_오늘}.png'))
+        plt.close()
+
+        # 예측 엑셀 저장 (pkl 포함)
+        df_수익검증.to_pickle(os.path.join(self.folder_수익검증, f'df_수익검증_{s_모델}_{self.s_오늘}.pkl'))
+        df_수익검증.to_csv(os.path.join(self.folder_수익검증, f'수익검증_{s_모델}_{self.s_오늘}.csv'),
+                       index=False, encoding='cp949')
+
+        # log 기록
+        self.make_log(f'수익검증 리포트 생성 완료({self.s_오늘}, {s_모델})')
+
+    def 백테스팅_경계조건찾기(self, s_모델):
+        """ 상승여부 예측 결과에 따라 수익 극대화 관점의 케이스 산출 """
+        # 상승예측 데이터 불러오기
+        li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_상승예측)
+                  if f'df_상승예측_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+        li_df = [pd.read_pickle(os.path.join(self.folder_상승예측, 파일명)) for 파일명 in li_파일명]
+        df_예측 = pd.concat(li_df, axis=0)
+
+        # 예측한 값만 잘라내기
+        df_예측_상승 = df_예측[df_예측['상승예측'] == 1].drop_duplicates()
+
+        # 경계값 산출
+        from sklearn.tree import DecisionTreeClassifier
+
+        ary_x = df_예측_상승.loc[:, ['예측성공', '확률스펙']].values
+        ary_y = df_예측_상승['정답'].values
+
+        obj_모델_dt = DecisionTreeClassifier(max_depth=5)
+        obj_모델_dt.fit(ary_x, ary_y)
+
+        ary_경계값 = obj_모델_dt.tree_.threshold
+        n_경계값_x = [n for n in ary_경계값 if 0 < n < 50][0]
+        n_경계값_y = [n for n in ary_경계값 if n > 50][0]
+
+        # 그래프 저장
+        from sklearn.tree import plot_tree
+        import matplotlib.pyplot as plt
+
+        plt.figure(figsize=[32, 18])
+        plot_tree(obj_모델_dt, feature_names=['success_cnt', 'prob_spec'])
+        plt.savefig(os.path.join(self.folder_수익조건, 'tree_plot.png'))
+        plt.close()
+
+        plt.figure(figsize=[16, 9])
+        plt.scatter(df_예측_상승['예측성공'], df_예측_상승['확률스펙'], c=ary_y)
+        plt.axvline(n_경계값_x)
+        plt.axhline(n_경계값_y)
+        plt.savefig(os.path.join(self.folder_수익조건, 'scatter.png'))
+        plt.close()
+
+        # log 기록
+        self.make_log(f'수익조건 분석 완료({s_일자}, {len(dic_df_상승예측):,}개 종목, {s_모델})')
+
+
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
@@ -178,4 +297,5 @@ if __name__ == "__main__":
     a = Analyzer()
 
     a.백테스팅_상승예측(s_모델='rf')
-    # a.백테스팅_수익검증(s_모델='rf', n_최소성공이력=1, n_최소확률스펙=50)
+    a.백테스팅_수익검증(s_모델='rf')
+    # a.백테스팅_경계조건찾기(s_모델='rf')
