@@ -9,7 +9,7 @@
     "로그이름_analyzer" : "sp_analyzer",
     "로그이름_rotator" : "sp_rotator",
     "파일보관기간(개월)_log" : "12",
-    "파일보관기간(개월)_analyzer" : "9",
+    "파일보관기간(개월)_analyzer" : "8",
     "파일보관기간(개월)_collector" : "12",
     "파일보관기간(개월)_trader" : "12",
     "재구동_대기시간(초)" : "5",
