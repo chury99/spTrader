@@ -34,11 +34,13 @@ class Analyzer:
         self.folder_모델 = os.path.join(folder_분석, '30_모델')
         self.folder_성능평가 = os.path.join(folder_분석, '40_성능평가')
         self.folder_감시대상 = os.path.join(folder_분석, '감시대상')
+        self.folder_감시대상모델 = os.path.join(folder_분석, '모델_감시대상')
         os.makedirs(self.folder_변동성종목, exist_ok=True)
         os.makedirs(self.folder_데이터셋, exist_ok=True)
         os.makedirs(self.folder_모델, exist_ok=True)
         os.makedirs(self.folder_성능평가, exist_ok=True)
         os.makedirs(self.folder_감시대상, exist_ok=True)
+        os.makedirs(self.folder_감시대상모델, exist_ok=True)
 
         # 변수 설정
         dic_조건검색 = pd.read_pickle(os.path.join(self.folder_정보수집, 'dic_조건검색.pkl'))
@@ -46,10 +48,9 @@ class Analyzer:
         self.li_종목_분석대상 = list(df_분석대상종목['종목코드'].sort_values())
         self.dic_코드2종목명 = df_분석대상종목.set_index('종목코드').to_dict()['종목명']
 
-        self.li_일자_전체 = sorted([파일명.split('_')[3].replace('.pkl', '') for 파일명 in os.listdir(self.folder_캐시변환)
-                                if 'dic_코드별_10분봉_' in 파일명 and '.pkl' in 파일명])
         self.li_일자_전체 = sorted([re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
                                if 'dic_코드별_10분봉_' in 파일명 and '.pkl' in 파일명])
+        self.n_보관기간_analyzer = int(dic_config['파일보관기간(개월)_analyzer'])
 
         # 모델 생성 케이스 생성
         li_대기봉수 = [1, 2, 3]
@@ -67,7 +68,9 @@ class Analyzer:
         """ 전체 종목 분석해서 변동성이 큰 종목 선정 후 pkl, csv 저장 \n
             # 선정기준 : 10분봉 기준 3%이상 상승이 하루에 2회 이상 존재 """
         # 분석대상 일자 선정
-        li_일자_전체 = self.li_일자_전체[-180:]
+        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(months=self.n_보관기간_analyzer)
+        s_기준일자 = dt_기준일자.strftime('%Y%m%d')
+        li_일자_전체 = [일자 for 일자 in self.li_일자_전체 if 일자 > s_기준일자]
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_변동성종목)
                     if 'df_변동성종목_당일_' in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
@@ -392,6 +395,42 @@ class Analyzer:
             # log 기록
             self.make_log(f'감시대상 선정 완료({s_일자}, {len(df_감시대상):,}개 종목, {s_모델})')
 
+    def 모델_감시대상(self, s_모델):
+        """ 생성된 모델 중 감시대상에 해당하는 종목, 케이스만 골라서 별도 파일로 저장 (이후 동작 시 속도 향상 목적) """
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_감시대상)
+                    if f'df_감시대상_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_감시대상모델)
+                    if f'dic_모델_감시대상_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+        li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 감시대상 종목 불러오기
+            df_감시대상 = pd.read_pickle(os.path.join(self.folder_감시대상, f'df_감시대상_{s_모델}_{s_일자}.pkl'))
+
+            dic_모델_감시대상 = dict()
+            if len(df_감시대상) > 0:
+                # 케이스 처리
+                li_li_케이스 = [list(ary) for ary in df_감시대상.loc[:, '대기봉수': 'rf_깊이'].values]
+                df_감시대상['케이스'] = ['_'.join(str(n) for n in li) for li in li_li_케이스]
+                dic_종목코드2케이스 = df_감시대상.set_index('종목코드').to_dict()['케이스']
+
+                # 당일 모델 불러오기
+                dic_모델 = pd.read_pickle(os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자}.pkl'))
+
+                # 사용할 모델만 골라내기
+                for s_종목코드 in tqdm(df_감시대상['종목코드'], desc=f'{s_모델} 감시대상 모델 선정({s_일자})'):
+                    s_케이스 = dic_종목코드2케이스[s_종목코드]
+                    obj_모델 = dic_모델[s_종목코드][s_케이스]
+                    dic_모델_감시대상[s_종목코드] = {s_케이스: obj_모델}
+
+            # 모델 저장
+            pd.to_pickle(dic_모델_감시대상, os.path.join(self.folder_감시대상모델, f'dic_모델_감시대상_{s_모델}_{s_일자}.pkl'))
+
+            # log 기록
+            self.make_log(f'감시대상 모델 별도 저장 완료({s_일자}, {len(dic_모델_감시대상):,}개 종목, {s_모델})')
+
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
         """ 입력 받은 s_text에 시간 붙여서 self.path_log에 저장 """
@@ -421,3 +460,4 @@ if __name__ == "__main__":
     a.분석_모델생성(s_모델='rf')
     a.분석_성능평가(s_모델='rf')
     a.선정_감시대상(s_모델='rf')
+    a.모델_감시대상(s_모델='rf')
