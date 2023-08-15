@@ -4,6 +4,8 @@ import pandas as pd
 import json
 import re
 
+import shutil
+
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
 # noinspection PyShadowingNames
@@ -19,6 +21,8 @@ class Rotator:
 
         # 폴더 정의
         folder_work = dic_config['folder_work']
+        self.folder_work = folder_work
+
         self.dic_folder = dict()
         self.dic_folder['log'] = dic_config['folder_log']
 
@@ -155,6 +159,20 @@ class Rotator:
         # log 기록
         self.make_log(f'파일 삭제 완료({self.n_보관기간_trader}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
 
+    def 잔여공간확인(self):
+        """ folder_work 폴더가 위치한 드라이브의 잔여 공간 확인하여 출력 """
+        # 드라이브 위치 확인
+        s_드라이브 = self.folder_work[0]
+
+        # 용량 확인
+        obj_디스크공간 = shutil.disk_usage(self.folder_work)
+        n_잔여공간_GB = obj_디스크공간.free / (1024 ** 3)
+        n_전체공간_GB = obj_디스크공간.total / (1024 ** 3)
+        n_잔여비율_퍼센트 = n_잔여공간_GB / n_전체공간_GB * 100
+
+        # log 기록
+        self.make_log(f'{s_드라이브}드라이브 잔여 공간 - {n_잔여공간_GB:.1f}GB ({n_잔여비율_퍼센트:.0f}%)')
+
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
         """ 입력 받은 s_text에 시간 붙여서 self.path_log에 저장 """
@@ -179,8 +197,9 @@ class Rotator:
 if __name__ == "__main__":
     r = Rotator()
 
-    # ### log 파일은 안 지우는 게 좋을 듯 (icloud와 충돌 발생) ###
     # r.파일관리_log()
+    # ### log 파일은 안 지우는 게 좋을 듯 (icloud와 충돌 발생) ###
     r.파일관리_analyzer()
     r.파일관리_collector()
     r.파일관리_trader()
+    r.잔여공간확인()
