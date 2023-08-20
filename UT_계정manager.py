@@ -33,14 +33,14 @@ class Manager:
             dic_계정 = dict()
 
         # 정보 입력 (정보 입력 시에만 기입)
-        s_url = ''
+        s_host = ''
         s_port = ''
         s_id = ''
         s_pw = ''
 
         # 정보 저장
         dic_ftp = dict()
-        dic_ftp['url'] = ''.join([chr(ord(글자) + 369) for 글자 in list(s_url)])
+        dic_ftp['host'] = ''.join([chr(ord(글자) + 369) for 글자 in list(s_host)])
         dic_ftp['port'] = ''.join([chr(ord(글자) + 369) for 글자 in list(s_port)])
         dic_ftp['id'] = ''.join([chr(ord(글자) + 369) for 글자 in list(s_id)])
         dic_ftp['pw'] = ''.join([chr(ord(글자) + 369) for 글자 in list(s_pw)])
@@ -50,7 +50,7 @@ class Manager:
         pd.to_pickle(dic_계정, self.path_파일)
 
         # 복호화
-        # s_url2 = ''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['url'])])
+        # s_host2 = ''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['host'])])
         # s_port2 = ''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['port'])])
         # s_id2 = ''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['id'])])
         # s_pw2 = ''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['pw'])])
