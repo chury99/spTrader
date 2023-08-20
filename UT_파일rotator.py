@@ -55,6 +55,9 @@ class Rotator:
         self.n_보관기간_collector = int(dic_config['파일보관기간(개월)_collector'])
         self.n_보관기간_trader = int(dic_config['파일보관기간(개월)_trader'])
 
+        # 카카오 API 폴더 연결
+        sys.path.append(dic_config['folder_kakao'])
+
         # log 기록
         self.make_log(f'### 파일 보관기간 관리 시작 ###')
 
@@ -169,6 +172,13 @@ class Rotator:
         n_잔여공간_GB = obj_디스크공간.free / (1024 ** 3)
         n_전체공간_GB = obj_디스크공간.total / (1024 ** 3)
         n_잔여비율_퍼센트 = n_잔여공간_GB / n_전체공간_GB * 100
+
+        # 카톡 보내기 (잔여공간 10GB 미만 시)
+        if n_잔여공간_GB < 10:
+            import API_kakao
+            k = API_kakao.KakaoAPI()
+            result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[Warning] 저장 공간 Full 경고',
+                                    s_button_title=f'잔여 공간 - {n_잔여공간_GB:.1f}GB ({n_잔여비율_퍼센트:.0f}%)')
 
         # log 기록
         self.make_log(f'{s_드라이브}드라이브 잔여 공간 - {n_잔여공간_GB:.1f}GB ({n_잔여비율_퍼센트:.0f}%)')
