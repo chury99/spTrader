@@ -30,6 +30,7 @@ class Analyzer:
 
         # 폴더 정의
         folder_work = dic_config['folder_work']
+        self.folder_run = os.path.join(folder_work, 'run')
         folder_데이터 = os.path.join(folder_work, '데이터')
         self.folder_캐시변환 = os.path.join(folder_데이터, '캐시변환')
         self.folder_정보수집 = os.path.join(folder_데이터, '정보수집')
@@ -52,6 +53,9 @@ class Analyzer:
 
         self.li_일자_전체 = sorted([re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
                                 if 'dic_코드별_10분봉_' in 파일명 and '.pkl' in 파일명])
+
+        # 카카오 API 폴더 연결
+        sys.path.append(dic_config['folder_kakao'])
 
         # log 기록
         self.make_log(f'### 백테스팅 시작 ###')
@@ -224,6 +228,17 @@ class Analyzer:
         df_수익검증.to_csv(os.path.join(self.folder_수익검증, f'수익검증_{s_모델}_{self.s_오늘}.csv'),
                        index=False, encoding='cp949')
 
+        # 리포트 복사 to 서버
+        folder_서버 = 'kakao/수익검증'
+        s_파일명_리포트 = f'수익검증_리포트_{s_모델}_{self.s_오늘}.png'
+        self.to_ftp(파일명=s_파일명_리포트, folder_로컬=self.folder_수익검증, folder_서버=folder_서버)
+
+        # 카톡 보내기
+        import API_kakao
+        k = API_kakao.KakaoAPI()
+        result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'백테스팅 완료 - {self.s_오늘}',
+                                s_button_title='수익검증 리포트', s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
+
         # log 기록
         self.make_log(f'수익검증 리포트 생성 완료({self.s_오늘}, {s_모델})')
 
@@ -291,6 +306,30 @@ class Analyzer:
             with open(self.path_log, mode='at', encoding='cp949') as file:
                 file.write(f'{s_log}\n')
 
+    def to_ftp(self, 파일명, folder_로컬, folder_서버):
+        """ ftp 서버에 접속해서 파일을 folder_로컬에서 folder_서버로 업로드 """
+        import ftplib
+
+        # 정보 읽어오기
+        dic_ftp = pd.read_pickle(os.path.join(self.folder_run, 'acc_info.dll'))['ftp']
+
+        # ftp 서버 연결
+        with ftplib.FTP() as ftp:
+            ret_서버접속 = ftp.connect(host=''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['host'])]),
+                                  port=int(''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['port'])])))
+            ret_로그인 = ftp.login(user=''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['id'])]),
+                        passwd=''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['pw'])]))
+            ret_폴더변경 = ftp.cwd(dirname=f'/99.www/{folder_서버}')
+
+            # 기존파일 삭제
+            li_기존파일 = ftp.nlst()
+            for 파일명 in li_기존파일:
+                ret_삭제 = ftp.delete(filename=파일명)
+
+            # 신규파일 업로드
+            with open(os.path.join(folder_로컬, 파일명), 'rb') as file:
+                ret_업로드 = ftp.storbinary(f'STOR {파일명}', file)
+
 
 #######################################################################################################################
 if __name__ == "__main__":
@@ -298,4 +337,4 @@ if __name__ == "__main__":
 
     a.백테스팅_상승예측(s_모델='rf')
     a.백테스팅_수익검증(s_모델='rf')
-    # a.백테스팅_경계조건찾기(s_모델='rf')
+    # a.백테스팅_경계조건찾기(s_모델='rf')  # 이거는 안 쓰는거
