@@ -29,6 +29,7 @@ class LauncherCollector:
         sys.path.append(dic_config['folder_kakao'])
         import API_kakao
         self.k = API_kakao.KakaoAPI()
+        self.s_파일 = os.path.basename(sys.argv[0]).replace('.py', '')
 
         # log 기록
         self.make_log(f'### 구동 시작 ###')
@@ -47,7 +48,7 @@ class LauncherCollector:
 
         # 실패 시 카카오 메세지 송부
         if s_실행결과 == '실패':
-            s_메세지 = f'!!! 모듈 실행 중 오류 발생 - {sys._getframe(0).f_code.co_name} !!!'
+            s_메세지 = f'!!! [{self.s_파일}] 모듈 실행 중 오류 발생 - {sys._getframe(0).f_code.co_name} !!!'
             self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
 
         # log 기록
@@ -136,7 +137,7 @@ class LauncherCollector:
 
         # 실패 시 카카오 메세지 송부
         if s_실행결과 == '실패':
-            s_메세지 = f'!!! 모듈 실행 중 오류 발생 - {sys._getframe(0).f_code.co_name} !!!'
+            s_메세지 = f'!!! [{self.s_파일}] 모듈 실행 중 오류 발생 - {sys._getframe(0).f_code.co_name} !!!'
             self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
 
         # log 기록
