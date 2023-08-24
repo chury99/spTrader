@@ -177,7 +177,8 @@ class Rotator:
         if n_잔여공간_GB < 10:
             import API_kakao
             k = API_kakao.KakaoAPI()
-            result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[Warning] 저장 공간 Full 경고',
+            s_파일 = os.path.basename(sys.argv[0]).replace('.py', '')
+            result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{s_파일}] 저장 공간 Full 경고',
                                     s_button_title=f'잔여 공간 - {n_잔여공간_GB:.1f}GB ({n_잔여비율_퍼센트:.0f}%)')
 
         # log 기록
