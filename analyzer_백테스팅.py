@@ -236,7 +236,8 @@ class Analyzer:
         # 카톡 보내기
         import API_kakao
         k = API_kakao.KakaoAPI()
-        result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'백테스팅 완료 - {self.s_오늘}',
+        s_파일 = os.path.basename(sys.argv[0]).replace('.py', '')
+        result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{s_파일}] 백테스팅 완료 - {self.s_오늘}',
                                 s_button_title='수익검증 리포트', s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
 
         # log 기록
