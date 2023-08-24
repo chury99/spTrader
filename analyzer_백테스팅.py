@@ -56,6 +56,7 @@ class Analyzer:
 
         # 카카오 API 폴더 연결
         sys.path.append(dic_config['folder_kakao'])
+        self.s_파일 = os.path.basename(sys.argv[0]).replace('.py', '')
 
         # log 기록
         self.make_log(f'### 백테스팅 시작 ###')
@@ -231,13 +232,12 @@ class Analyzer:
         # 리포트 복사 to 서버
         folder_서버 = 'kakao/수익검증'
         s_파일명_리포트 = f'수익검증_리포트_{s_모델}_{self.s_오늘}.png'
-        self.to_ftp(파일명=s_파일명_리포트, folder_로컬=self.folder_수익검증, folder_서버=folder_서버)
+        self.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=self.folder_수익검증, folder_서버=folder_서버)
 
         # 카톡 보내기
         import API_kakao
         k = API_kakao.KakaoAPI()
-        s_파일 = os.path.basename(sys.argv[0]).replace('.py', '')
-        result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{s_파일}] 백테스팅 완료 - {self.s_오늘}',
+        result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 백테스팅 완료 - {self.s_오늘}',
                                 s_button_title='수익검증 리포트', s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
 
         # log 기록
@@ -286,8 +286,6 @@ class Analyzer:
         # log 기록
         self.make_log(f'수익조건 분석 완료({s_일자}, {len(dic_df_상승예측):,}개 종목, {s_모델})')
 
-
-
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
         """ 입력 받은 s_text에 시간 붙여서 self.path_log에 저장 """
@@ -307,9 +305,11 @@ class Analyzer:
             with open(self.path_log, mode='at', encoding='cp949') as file:
                 file.write(f'{s_log}\n')
 
-    def to_ftp(self, 파일명, folder_로컬, folder_서버):
+    def to_ftp(self, s_파일명, folder_로컬, folder_서버):
         """ ftp 서버에 접속해서 파일을 folder_로컬에서 folder_서버로 업로드 """
         import ftplib
+        import API_kakao
+        k = API_kakao.KakaoAPI()
 
         # 정보 읽어오기
         dic_ftp = pd.read_pickle(os.path.join(self.folder_run, 'acc_info.dll'))['ftp']
@@ -317,25 +317,45 @@ class Analyzer:
         # ftp 서버 연결
         with ftplib.FTP() as ftp:
             ret_서버접속 = ftp.connect(host=''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['host'])]),
-                                  port=int(''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['port'])])))
+                                   port=int(''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['port'])])))
+            if ret_서버접속[:3] != '220':
+                result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'!!! [{self.s_파일}] ftp 오류 !!!',
+                                        s_button_title=f'{ret_서버접속}')
             ret_로그인 = ftp.login(user=''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['id'])]),
-                        passwd=''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['pw'])]))
+                                passwd=''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['pw'])]))
+            if ret_로그인[:3] != '230':
+                result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'!!! [{self.s_파일}] ftp 오류 !!!',
+                                        s_button_title=f'{ret_로그인}')
             ret_폴더변경 = ftp.cwd(dirname=f'/99.www/{folder_서버}')
+            if ret_폴더변경[:3] != '250':
+                result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'!!! [{self.s_파일}] ftp 오류 !!!',
+                                        s_button_title=f'{ret_폴더변경}')
 
             # 기존파일 삭제
             li_기존파일 = ftp.nlst()
             for 파일명 in li_기존파일:
                 ret_삭제 = ftp.delete(filename=파일명)
+                if ret_삭제[:3] != '250':
+                    result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'!!! [{self.s_파일}] ftp 오류 !!!',
+                                            s_button_title=f'{ret_삭제}')
 
             # 신규파일 업로드
-            with open(os.path.join(folder_로컬, 파일명), 'rb') as file:
-                ret_업로드 = ftp.storbinary(f'STOR {파일명}', file)
+            with open(os.path.join(folder_로컬, s_파일명), 'rb') as file:
+                ret_업로드 = ftp.storbinary(f'STOR {s_파일명}', file)
+                if ret_업로드[:3] != '226':
+                    result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'!!! [{self.s_파일}] ftp 오류 !!!',
+                                            s_button_title=f'{ret_업로드}')
+            pass
 
 
 #######################################################################################################################
 if __name__ == "__main__":
     a = Analyzer()
 
-    a.백테스팅_상승예측(s_모델='rf')
-    a.백테스팅_수익검증(s_모델='rf')
+    # a.백테스팅_상승예측(s_모델='rf')
+    # a.백테스팅_수익검증(s_모델='rf')
     # a.백테스팅_경계조건찾기(s_모델='rf')  # 이거는 안 쓰는거
+
+    folder_서버 = 'kakao/수익검증'
+    s_파일명_리포트 = f'수익검증_리포트_rf_{20230824}.png'
+    a.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=a.folder_수익검증, folder_서버=folder_서버)
