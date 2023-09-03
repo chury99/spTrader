@@ -237,8 +237,9 @@ class Analyzer:
         # 카톡 보내기
         import API_kakao
         k = API_kakao.KakaoAPI()
-        result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 백테스팅 완료 - {self.s_오늘}',
-                                s_button_title='수익검증 리포트', s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
+        result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 백테스팅 완료',
+                                s_button_title=f'수익검증 리포트 - {self.s_오늘}',
+                                s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
 
         # log 기록
         self.make_log(f'수익검증 리포트 생성 완료({self.s_오늘}, {s_모델})')
@@ -331,10 +332,15 @@ class Analyzer:
                 result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'!!! [{self.s_파일}] ftp 오류 !!!',
                                         s_button_title=f'{ret_폴더변경}')
 
-            # 기존파일 삭제
+            # 기존파일 삭제 (30일 경과)
+            dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.Timedelta(days=30)
+            s_기준일자 = dt_기준일자.strftime('%Y%m%d')
+
             li_기존파일 = ftp.nlst()
-            for 파일명 in li_기존파일:
-                ret_삭제 = ftp.delete(filename=파일명)
+            li_파일_일자존재 = [파일 for 파일 in li_기존파일 if re.findall(r'\d{8}', 파일)]
+            li_파일_삭제대상 = [파일 for 파일 in li_파일_일자존재 if re.findall(r'\d{8}', 파일)[0] < s_기준일자]
+            for 파일 in li_파일_삭제대상:
+                ret_삭제 = ftp.delete(filename=파일)
                 if ret_삭제[:3] != '250':
                     result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'!!! [{self.s_파일}] ftp 오류 !!!',
                                             s_button_title=f'{ret_삭제}')
@@ -345,17 +351,12 @@ class Analyzer:
                 if ret_업로드[:3] != '226':
                     result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'!!! [{self.s_파일}] ftp 오류 !!!',
                                             s_button_title=f'{ret_업로드}')
-            pass
 
 
 #######################################################################################################################
 if __name__ == "__main__":
     a = Analyzer()
 
-    # a.백테스팅_상승예측(s_모델='rf')
-    # a.백테스팅_수익검증(s_모델='rf')
+    a.백테스팅_상승예측(s_모델='rf')
+    a.백테스팅_수익검증(s_모델='rf')
     # a.백테스팅_경계조건찾기(s_모델='rf')  # 이거는 안 쓰는거
-
-    folder_서버 = 'kakao/수익검증'
-    s_파일명_리포트 = f'수익검증_리포트_rf_{20230824}.png'
-    a.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=a.folder_수익검증, folder_서버=folder_서버)
