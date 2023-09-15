@@ -3,7 +3,6 @@ import sys
 import pandas as pd
 import json
 import subprocess
-import time
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
@@ -29,10 +28,10 @@ class LauncherAnalyzer:
         # log 기록
         self.make_log(f'### 구동 시작 ###')
 
-    def analyzer_분석(self):
-        """ 10분봉 데이터를 분석하여 모델 생성 및 감시대상 선정 """
+    def analyzer_분석1_종목(self):
+        """ 10분봉 데이터를 분석하여 종목별 모델 생성 및 감시대상 선정 """
         # 파일 지정
-        path_실행 = os.path.join(os.getcwd(), 'analyzer_분석.py')
+        path_실행 = os.path.join(os.getcwd(), 'analyzer_분석1_종목.py')
 
         # log 기록
         self.make_log(f'10분봉 데이터 분석 실행')
@@ -48,6 +47,26 @@ class LauncherAnalyzer:
 
         # log 기록
         self.make_log(f'10분봉 데이터 분석 완료 - {s_실행결과}')
+
+    def analyzer_분석2_공통(self):
+        """ 종목별 분석 결과를 바탕으로 통합 모델 생성 """
+        # 파일 지정
+        path_실행 = os.path.join(os.getcwd(), 'analyzer_분석2_공통.py')
+
+        # log 기록
+        self.make_log(f'공통 모델 생성 실행')
+
+        # 프로세스 실행
+        ret = subprocess.run([self.path_파이썬64, path_실행], shell=True)
+        s_실행결과 = '성공' if ret.returncode == 0 else '실패'
+
+        # 실패 시 카카오 메세지 송부
+        if s_실행결과 == '실패':
+            s_메세지 = f'!!! [{self.s_파일}] 모듈 실행 중 오류 발생 - {sys._getframe(0).f_code.co_name} !!!'
+            self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
+
+        # log 기록
+        self.make_log(f'공통 모델 생성 완료 - {s_실행결과}')
 
     def analyzer_백테스팅(self):
         """ 분석 결과 생성된 모델을 신규 데이터에 적용하여 수익 확인 """
@@ -113,6 +132,7 @@ class LauncherAnalyzer:
 if __name__ == "__main__":
     l = LauncherAnalyzer()
 
-    l.analyzer_분석()
+    l.analyzer_분석1_종목()
+    l.analyzer_분석2_공통()
     l.analyzer_백테스팅()
     l.UT_파일rotator()
