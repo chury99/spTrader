@@ -28,12 +28,11 @@ class Trader(QMainWindow, form_class):
             dic_config = json.load(file)
 
         # 폴더 정의
-        folder_work = dic_config['folder_work']
-        self.folder_run = os.path.join(folder_work, 'run')
-        folder_데이터 = os.path.join(folder_work, '데이터')
-        self.folder_정보수집 = os.path.join(folder_데이터, '정보수집')
-        folder_이력 = os.path.join(folder_work, '이력')
-        self.folder_체결잔고 = os.path.join(folder_이력, '체결잔고')
+        import UT_폴더정보
+        dic_폴더정보 = UT_폴더정보.dic_폴더정보
+        self.folder_run = dic_폴더정보['run']
+        self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
+        self.folder_체결잔고 = dic_폴더정보['이력|체결잔고']
 
         # 기준정보 정의
         self.s_오늘 = pd.Timestamp('now').strftime('%Y%m%d')
