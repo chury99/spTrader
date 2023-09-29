@@ -21,11 +21,11 @@ class Collector:
         self.path_log = os.path.join(dic_config['folder_log'], f'{dic_config["로그이름_collector"]}_{self.s_오늘}.log')
 
         # 폴더 정의
-        folder_work = dic_config['folder_work']
-        folder_데이터 = os.path.join(folder_work, '데이터')
-        self.folder_ohlcv = os.path.join(folder_데이터, 'ohlcv')
-        self.folder_캐시변환 = os.path.join(folder_데이터, '캐시변환')
-        self.folder_정보수집 = os.path.join(folder_데이터, '정보수집')
+        import UT_폴더정보
+        dic_폴더정보 = UT_폴더정보.dic_폴더정보
+        self.folder_ohlcv = dic_폴더정보['데이터|ohlcv']
+        self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
+        self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
 
         # log 기록
         self.make_log(f'### 데이터 변환 시작 ###')
