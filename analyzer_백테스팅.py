@@ -29,18 +29,16 @@ class Analyzer:
         self.path_log = os.path.join(dic_config['folder_log'], f'{dic_config["로그이름_analyzer"]}_{self.s_오늘}.log')
 
         # 폴더 정의
-        folder_work = dic_config['folder_work']
-        self.folder_run = os.path.join(folder_work, 'run')
-        folder_데이터 = os.path.join(folder_work, '데이터')
-        self.folder_캐시변환 = os.path.join(folder_데이터, '캐시변환')
-        self.folder_정보수집 = os.path.join(folder_데이터, '정보수집')
-        folder_분석 = os.path.join(folder_work, '분석')
-        self.folder_감시대상 = os.path.join(folder_분석, '감시대상')
-        self.folder_감시대상모델 = os.path.join(folder_분석, '모델_감시대상')
-        folder_백테스팅 = os.path.join(folder_work, '백테스팅')
-        self.folder_상승예측 = os.path.join(folder_백테스팅, '10_상승예측')
-        self.folder_수익검증 = os.path.join(folder_백테스팅, '20_수익검증')
-        self.folder_수익조건 = os.path.join(folder_백테스팅, '30_수익조건')
+        import UT_폴더정보
+        dic_폴더정보 = UT_폴더정보.dic_폴더정보
+        self.folder_run = dic_폴더정보['run']
+        self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
+        self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
+        self.folder_감시대상 = dic_폴더정보['분석1종목|감시대상']
+        self.folder_감시대상모델 = dic_폴더정보['분석1종목|모델_감시대상']
+        self.folder_상승예측 = dic_폴더정보['백테스팅|10_상승예측']
+        self.folder_수익검증 = dic_폴더정보['백테스팅|20_수익검증']
+        self.folder_수익조건 = dic_폴더정보['백테스팅|30_수익조건']
         os.makedirs(self.folder_상승예측, exist_ok=True)
         os.makedirs(self.folder_수익검증, exist_ok=True)
         os.makedirs(self.folder_수익조건, exist_ok=True)
