@@ -20,34 +20,30 @@ class Rotator:
         self.path_log = os.path.join(dic_config['folder_log'], f'{dic_config["로그이름_rotator"]}_{self.s_오늘}.log')
 
         # 폴더 정의
-        folder_work = dic_config['folder_work']
-        self.folder_work = folder_work
+        import UT_폴더정보
+        dic_폴더정보 = UT_폴더정보.dic_폴더정보
+        self.folder_work = dic_폴더정보['work']
 
         self.dic_folder = dict()
         self.dic_folder['log'] = dic_config['folder_log']
 
-        folder_분석 = os.path.join(folder_work, '분석')
-        folder_백테스팅 = os.path.join(folder_work, '백테스팅')
-        self.dic_folder['analyzer'] = {'변동성종목': os.path.join(folder_분석, '10_변동성종목'),
-                                       '데이터셋': os.path.join(folder_분석, '20_데이터셋'),
-                                       '모델': os.path.join(folder_분석, '30_모델'),
-                                       '성능평가': os.path.join(folder_분석, '40_성능평가'),
-                                       '감시대상': os.path.join(folder_분석, '감시대상'),
-                                       '감시대상모델': os.path.join(folder_분석, '모델_감시대상'),
-                                       '상승예측': os.path.join(folder_백테스팅, '10_상승예측'),
-                                       '수익검증': os.path.join(folder_백테스팅, '20_수익검증')}
+        self.dic_folder['analyzer'] = {'변동성종목': dic_폴더정보['분석1종목|10_변동성종목'],
+                                       '데이터셋': dic_폴더정보['분석1종목|20_데이터셋'],
+                                       '모델': dic_폴더정보['분석1종목|30_모델_종목'],
+                                       '성능평가': dic_폴더정보['분석1종목|40_성능평가'],
+                                       '감시대상': dic_폴더정보['분석1종목|감시대상'],
+                                       '감시대상모델': dic_폴더정보['분석1종목|모델_감시대상'],
+                                       '상승예측': dic_폴더정보['백테스팅|10_상승예측'],
+                                       '수익검증': dic_폴더정보['백테스팅|20_수익검증']}
 
-        folder_데이터 = os.path.join(folder_work, '데이터')
-        self.dic_folder['collector'] = {'ohlcv': os.path.join(folder_데이터, 'ohlcv'),
-                                        '정보수집': os.path.join(folder_데이터, '정보수집'),
-                                        '캐시변환': os.path.join(folder_데이터, '캐시변환')}
+        self.dic_folder['collector'] = {'ohlcv': dic_폴더정보['데이터|ohlcv'],
+                                        '정보수집': dic_폴더정보['데이터|정보수집'],
+                                        '캐시변환': dic_폴더정보['데이터|캐시변환']}
 
-        folder_run = os.path.join(folder_work, 'run')
-        folder_이력 = os.path.join(folder_work, '이력')
-        self.dic_folder['trader'] = {'run': folder_run,
-                                     '메세지': os.path.join(folder_이력, '메세지'),
-                                     '실시간': os.path.join(folder_이력, '실시간'),
-                                     '체결잔고': os.path.join(folder_이력, '체결잔고')}
+        self.dic_folder['trader'] = {'run': dic_폴더정보['run'],
+                                     '메세지': dic_폴더정보['이력|메세지'],
+                                     '실시간': dic_폴더정보['이력|실시간'],
+                                     '체결잔고': dic_폴더정보['이력|체결잔고']}
 
         # 변수 설정
         self.n_보관기간_log = int(dic_config['파일보관기간(개월)_log'])
