@@ -32,10 +32,11 @@ class KiwoomAPI(QAxWidget):
         self.n_딜레이 = 0.2
 
         # 폴더 정의
-        folder_work = dic_config['folder_work']
-        folder_체결잔고 = os.path.join(folder_work, '이력', '체결잔고')
-        folder_메세지 = os.path.join(folder_work, '이력', '메세지')
-        folder_실시간 = os.path.join(folder_work, '이력', '실시간')
+        import UT_폴더정보
+        dic_폴더정보 = UT_폴더정보.dic_폴더정보
+        folder_체결잔고 = dic_폴더정보['이력|체결잔고']
+        folder_메세지 = dic_폴더정보['이력|메세지']
+        folder_실시간 = dic_폴더정보['이력|실시간']
         os.makedirs(folder_체결잔고, exist_ok=True)
         os.makedirs(folder_메세지, exist_ok=True)
         os.makedirs(folder_실시간, exist_ok=True)
