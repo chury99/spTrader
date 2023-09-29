@@ -9,9 +9,9 @@ with open('config.json', mode='rt', encoding='utf-8') as file:
 dic_폴더정보 = dict()
 folder_work = dic_config['folder_work']
 
-# run 폴더 정의
-folder_run = os.path.join(folder_work, 'run')
-dic_폴더정보['run'] = folder_run
+# work, run 폴더 정의
+dic_폴더정보['work'] = folder_work
+dic_폴더정보['run'] = os.path.join(folder_work, 'run')
 
 # 이력 폴더 정의
 folder_이력 = os.path.join(folder_work, '이력')
