@@ -21,8 +21,9 @@ class LauncherTrader:
         self.path_파이썬64 = dic_config['path_파이썬64']
 
         # 폴더 정의
-        folder_work = dic_config['folder_work']
-        self.folder_run = os.path.join(folder_work, 'run')
+        import UT_폴더정보
+        dic_폴더정보 = UT_폴더정보.dic_폴더정보
+        self.folder_run = dic_폴더정보['run']
 
         # 재구동 대기시간 정의
         self.n_재구동대기시간_초 = int(dic_config['재구동_대기시간(초)'])
