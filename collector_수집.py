@@ -21,13 +21,13 @@ class Collector:
         self.n_딜레이 = 0.2
 
         # 폴더 정의
-        folder_work = dic_config['folder_work']
-        folder_데이터 = os.path.join(folder_work, '데이터')
-        self.folder_ohlcv = os.path.join(folder_데이터, 'ohlcv')
-        self.folder_캐시변환 = os.path.join(folder_데이터, '캐시변환')
+        import UT_폴더정보
+        dic_폴더정보 = UT_폴더정보.dic_폴더정보
+        self.folder_ohlcv = dic_폴더정보['데이터|ohlcv']
+        self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
+        self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
         os.makedirs(self.folder_ohlcv, exist_ok=True)
         os.makedirs(self.folder_캐시변환, exist_ok=True)
-        self.folder_정보수집 = os.path.join(folder_데이터, '정보수집')
 
         # 키움 api 연결
         import API_kiwoom
