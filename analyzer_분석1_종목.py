@@ -49,7 +49,7 @@ class Analyzer:
 
         self.li_일자_전체 = sorted([re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
                                if 'dic_코드별_10분봉_' in 파일명 and '.pkl' in 파일명])
-        self.n_보관기간_analyzer = int(dic_config['파일보관기간(개월)_analyzer'])
+        self.n_보관기간_analyzer = int(dic_config['파일보관기간(일)_analyzer'])
 
         # 모델 생성 케이스 생성
         li_대기봉수 = [1, 2, 3]
@@ -67,7 +67,7 @@ class Analyzer:
         """ 전체 종목 분석해서 변동성이 큰 종목 선정 후 pkl, csv 저장 \n
             # 선정기준 : 10분봉 기준 3%이상 상승이 하루에 2회 이상 존재 """
         # 분석대상 일자 선정
-        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(months=self.n_보관기간_analyzer)
+        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(days=self.n_보관기간_analyzer)
         s_기준일자 = dt_기준일자.strftime('%Y%m%d')
         li_일자_전체 = [일자 for 일자 in self.li_일자_전체 if 일자 > s_기준일자]
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_변동성종목)
