@@ -46,10 +46,10 @@ class Rotator:
                                      '체결잔고': dic_폴더정보['이력|체결잔고']}
 
         # 변수 설정
-        self.n_보관기간_log = int(dic_config['파일보관기간(개월)_log'])
-        self.n_보관기간_analyzer = int(dic_config['파일보관기간(개월)_analyzer'])
-        self.n_보관기간_collector = int(dic_config['파일보관기간(개월)_collector'])
-        self.n_보관기간_trader = int(dic_config['파일보관기간(개월)_trader'])
+        self.n_보관기간_log = int(dic_config['파일보관기간(일)_log'])
+        self.n_보관기간_analyzer = int(dic_config['파일보관기간(일)_analyzer'])
+        self.n_보관기간_collector = int(dic_config['파일보관기간(일)_collector'])
+        self.n_보관기간_trader = int(dic_config['파일보관기간(일)_trader'])
 
         # 카카오 API 폴더 연결
         sys.path.append(dic_config['folder_kakao'])
@@ -60,7 +60,7 @@ class Rotator:
     def 파일관리_log(self):
         """ 로그파일 확인하여 보관기간 지난 파일 삭제 """
         # 기준 일자 정의
-        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(months=self.n_보관기간_log)
+        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(days=self.n_보관기간_log)
         s_기준일자 = dt_기준일자.strftime('%Y%m%d')
 
         # 삭제대상 파일 찾기
@@ -75,12 +75,12 @@ class Rotator:
             os.system(f'del {s_패스}')
 
         # log 기록
-        self.make_log(f'파일 삭제 완료({self.n_보관기간_log}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
+        self.make_log(f'파일 삭제 완료({self.n_보관기간_log}일 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
 
     def 파일관리_analyzer(self):
         """ analyzer에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
         # 기준 일자 정의
-        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(months=self.n_보관기간_analyzer)
+        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(days=self.n_보관기간_analyzer)
         s_기준일자 = dt_기준일자.strftime('%Y%m%d')
 
         # 삭제대상 파일 찾기
@@ -102,12 +102,12 @@ class Rotator:
             os.system(f'del {s_패스}')
 
         # log 기록
-        self.make_log(f'파일 삭제 완료({self.n_보관기간_analyzer}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
+        self.make_log(f'파일 삭제 완료({self.n_보관기간_analyzer}일 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
 
     def 파일관리_collector(self):
         """ collector에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
         # 기준 일자 정의
-        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(months=self.n_보관기간_collector)
+        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(days=self.n_보관기간_collector)
         s_기준일자 = dt_기준일자.strftime('%Y%m%d')
 
         # 삭제대상 파일 찾기
@@ -129,12 +129,12 @@ class Rotator:
             os.system(f'del {s_패스}')
 
         # log 기록
-        self.make_log(f'파일 삭제 완료({self.n_보관기간_collector}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
+        self.make_log(f'파일 삭제 완료({self.n_보관기간_collector}일 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
 
     def 파일관리_trader(self):
         """ trader에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
         # 기준 일자 정의
-        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(months=self.n_보관기간_trader)
+        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(days=self.n_보관기간_trader)
         s_기준일자 = dt_기준일자.strftime('%Y%m%d')
 
         # 삭제대상 파일 찾기
@@ -156,7 +156,7 @@ class Rotator:
             os.system(f'del {s_패스}')
 
         # log 기록
-        self.make_log(f'파일 삭제 완료({self.n_보관기간_trader}개월 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
+        self.make_log(f'파일 삭제 완료({self.n_보관기간_trader}일 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
 
     def 잔여공간확인(self):
         """ folder_work 폴더가 위치한 드라이브의 잔여 공간 확인하여 출력 """
@@ -204,8 +204,7 @@ class Rotator:
 if __name__ == "__main__":
     r = Rotator()
 
-    # r.파일관리_log()
-    # ### log 파일은 안 지우는 게 좋을 듯 (icloud와 충돌 발생) ###
+    r.파일관리_log()
     r.파일관리_analyzer()
     r.파일관리_collector()
     r.파일관리_trader()
