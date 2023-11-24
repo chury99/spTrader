@@ -748,7 +748,11 @@ class KiwoomAPI(QAxWidget):
             n_거래대금 = n_현재가 * n_거래량
 
             # 현재가 등록 (갱신)
-            self.dic_실시간_현재가[s_종목코드] = n_현재가
+            try:
+                self.dic_실시간_현재가[s_종목코드] = n_현재가
+            except AttributeError:
+                pass
+
             # 화면 출력
             li_데이터 = [s_종목코드, n_현재가]
             s_텍스트 = f'실시간 | {s_실시간타입} | {li_데이터}'
