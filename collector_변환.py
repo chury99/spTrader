@@ -27,6 +27,24 @@ class Collector:
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
         self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
 
+        # 전체 항목 확인 (df_전체종목.pkl 확인)
+        df_전체종목 = pd.read_pickle(os.path.join(self.folder_정보수집, 'df_전체종목.pkl'))
+        self.li_종목코드_전체 = list(df_전체종목['종목코드'].values)
+
+        # 제외 항목 확인 - 일봉 (데이터 길이 0 인 종목코드)
+        try:
+            li_종목코드_제외_일봉 = pd.read_pickle(os.path.join(self.folder_정보수집, 'li_종목코드_제외_일봉.pkl'))
+        except FileNotFoundError:
+            li_종목코드_제외_일봉 = list()
+        self.li_종목코드_제외_일봉 = li_종목코드_제외_일봉
+
+        # 제외 항목 확인 - 분봉 (데이터 길이 0 인 종목코드)
+        try:
+            li_종목코드_제외_분봉 = pd.read_pickle(os.path.join(self.folder_정보수집, 'li_종목코드_제외_분봉.pkl'))
+        except FileNotFoundError:
+            li_종목코드_제외_분봉 = list()
+        self.li_종목코드_제외_분봉 = li_종목코드_제외_분봉
+
         # log 기록
         self.make_log(f'### 데이터 변환 시작 ###')
 
@@ -39,6 +57,13 @@ class Collector:
             df_일봉 = pd.read_pickle(path_pkl_임시)
         except FileNotFoundError:
             self.make_log(f'[error] {s_파일명} 파일 미존재')
+            return
+
+        # 데이터 무결성 확인
+        n_전체종목 = len(self.li_종목코드_전체)
+        n_제외종목 = len(self.li_종목코드_제외_일봉)
+        n_수집종목 = len(df_일봉['종목코드'].unique())
+        if n_전체종목 != n_수집종목 + n_제외종목:
             return
 
         # 일별로 분리
@@ -73,6 +98,13 @@ class Collector:
             df_분봉 = pd.read_pickle(path_pkl_임시)
         except FileNotFoundError:
             self.make_log(f'[error] {s_파일명} 파일 미존재')
+            return
+
+        # 데이터 무결성 확인
+        n_전체종목 = len(self.li_종목코드_전체)
+        n_제외종목 = len(self.li_종목코드_제외_분봉)
+        n_수집종목 = len(df_분봉['종목코드'].unique())
+        if n_전체종목 != n_수집종목 + n_제외종목:
             return
 
         # 일별로 분리
