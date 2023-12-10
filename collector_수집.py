@@ -122,6 +122,14 @@ class Collector:
 
     def 수집_일봉(self):
         """ 종목별 일봉 데이터 받아서 pkl 형식으로 임시 저장 """
+        # 데이터 없으면 종료
+        if self.s_최종일자_일봉 == self.s_오늘:
+            self.make_log(f'### 일봉 수집 종료 - 금일 데이터 존재 ###')
+            return
+        if self.n_완료항목_일봉 > 0 and self.n_완료항목_일봉 == len(self.li_종목코드_제외_일봉):
+            self.make_log(f'### 일봉 수집 종료 - 수집되는 데이터 미존재 ###')
+            return
+
         # 임시 pkl 불러오기
         s_파일명_임시pkl = 'df_ohlcv_일봉_임시.pkl'
         try:
@@ -129,6 +137,7 @@ class Collector:
         except FileNotFoundError:
             df_일봉 = pd.DataFrame()
 
+        # 데이터 수집
         for n_순번, s_종목코드 in enumerate(self.li_종목코드_잔여_일봉):
             # 일봉 조회
             df_일봉_추가 = self.api.get_tr_일봉조회(s_종목코드=s_종목코드, s_기준일자_부터=self.s_최종일자_일봉)
@@ -161,6 +170,14 @@ class Collector:
 
     def 수집_분봉(self):
         """ 종목별 분봉 데이터 받아서 pkl 형식으로 임시 저장 """
+        # 데이터 없으면 종료
+        if self.s_최종일자_분봉 == self.s_오늘:
+            self.make_log(f'### 분봉 수집 종료 - 금일 데이터 존재 ###')
+            return
+        if self.n_완료항목_분봉 > 0 and self.n_완료항목_분봉 == len(self.li_종목코드_제외_분봉):
+            self.make_log(f'### 분봉 수집 종료 - 수집되는 데이터 미존재 ###')
+            return
+
         # 임시 pkl 불러오기
         s_파일명_임시pkl = 'df_ohlcv_분봉_임시.pkl'
         try:
@@ -168,6 +185,7 @@ class Collector:
         except FileNotFoundError:
             df_분봉 = pd.DataFrame()
 
+        # 데이터 수집
         for n_순번, s_종목코드 in enumerate(self.li_종목코드_잔여_분봉):
             # 분봉 조회
             df_분봉_추가 = self.api.get_tr_분봉조회(s_종목코드=s_종목코드, n_틱범위=1, s_기준일자_부터=self.s_최종일자_분봉)
