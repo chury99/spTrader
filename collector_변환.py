@@ -64,6 +64,8 @@ class Collector:
         n_제외종목 = len(self.li_종목코드_제외_일봉)
         n_수집종목 = len(df_일봉['종목코드'].unique())
         if n_전체종목 != n_수집종목 + n_제외종목:
+            # log 기록
+            self.make_log(f'!!! 데이터 무결성 오류 - 전체 {n_전체종목:,}종목, 수집 {n_수집종목:,}종목, 제외 {n_제외종목:,}종목 !!!')
             return
 
         # 일별로 분리
@@ -105,6 +107,8 @@ class Collector:
         n_제외종목 = len(self.li_종목코드_제외_분봉)
         n_수집종목 = len(df_분봉['종목코드'].unique())
         if n_전체종목 != n_수집종목 + n_제외종목:
+            # log 기록
+            self.make_log(f'!!! 데이터 무결성 오류 - 전체 {n_전체종목:,}종목, 수집 {n_수집종목:,}종목, 제외 {n_제외종목:,}종목 !!!')
             return
 
         # 일별로 분리
