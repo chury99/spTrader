@@ -91,6 +91,12 @@ class Collector:
             # log 기록
             self.make_log(f'{s_일자} 데이터 저장 완료')
 
+        # 데이터 무결성 파일 생성
+        s_파일내용 = f'데이터 무결성 확인 완료\n   전체 {n_전체종목:,}종목\n   수집 {n_수집종목:,}종목\n   제외 {n_제외종목:,}종목'
+        with open(os.path.join(self.folder_정보수집, '데이터무결성_일봉.txt'), 'wt') as 파일:
+            파일.writelines(s_파일내용)
+        self.make_log(f'데이터 무결성 파일 생성 완료')
+
     def db저장_분봉(self):
         """ pkl 형식으로 임시 저장된 분봉 파일 읽어와서 db 파일 저장 """
         # pkl 읽어오기
@@ -128,6 +134,12 @@ class Collector:
 
             # log 기록
             self.make_log(f'{s_일자} 데이터 저장 완료')
+
+        # 데이터 무결성 파일 생성
+        s_파일내용 = f'데이터 무결성 확인 완료\n   전체 {n_전체종목:,}종목\n   수집 {n_수집종목:,}종목\n   제외 {n_제외종목:,}종목'
+        with open(os.path.join(self.folder_정보수집, '데이터무결성_분봉.txt'), 'wt') as 파일:
+            파일.writelines(s_파일내용)
+        self.make_log(f'데이터 무결성 파일 생성 완료')
 
     def 캐시저장_일봉(self):
         """ db 파일 불러와서 종목별 분류 후 pkl 파일 저장 (일봉) """
