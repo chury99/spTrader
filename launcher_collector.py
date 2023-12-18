@@ -62,16 +62,20 @@ class LauncherCollector:
         path_모니터링_분봉 = os.path.join(self.folder_정보수집, 'df_ohlcv_분봉_임시.pkl')
         path_제외종목_일봉 = os.path.join(self.folder_정보수집, 'li_종목코드_제외_일봉.pkl')
         path_제외종목_분봉 = os.path.join(self.folder_정보수집, 'li_종목코드_제외_분봉.pkl')
+        path_데이터무결성_일봉 = os.path.join(self.folder_정보수집, '데이터무결성_일봉.txt')
+        path_데이터무결성_분봉 = os.path.join(self.folder_정보수집, '데이터무결성_분봉.txt')
 
-        # ohlcv 임시 파일 삭제 (데이터 혼입 방지)
-        if os.path.exists(path_모니터링_일봉):
-            os.system(f'del {path_모니터링_일봉}')
-        if os.path.exists(path_모니터링_분봉):
-            os.system(f'del {path_모니터링_분봉}')
-        if os.path.exists(path_제외종목_일봉):
-            os.system(f'del {path_제외종목_일봉}')
-        if os.path.exists(path_제외종목_분봉):
-            os.system(f'del {path_제외종목_분봉}')
+        # ohlcv 임시 파일 삭제 (데이터 혼입 방지) - 데이터무결성 파일 존재 시에만 삭제
+        if os.path.exists(path_데이터무결성_일봉) and os.path.exists(path_데이터무결성_분봉):
+            os.system(f'del {path_데이터무결성_일봉} {path_데이터무결성_분봉}')
+            if os.path.exists(path_모니터링_일봉):
+                os.system(f'del {path_모니터링_일봉}')
+            if os.path.exists(path_모니터링_분봉):
+                os.system(f'del {path_모니터링_분봉}')
+            if os.path.exists(path_제외종목_일봉):
+                os.system(f'del {path_제외종목_일봉}')
+            if os.path.exists(path_제외종목_분봉):
+                os.system(f'del {path_제외종목_분봉}')
 
         # 프로세스 실행
         프로세스 = subprocess.Popen([self.path_파이썬32, path_실행], shell=True)
