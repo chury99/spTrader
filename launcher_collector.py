@@ -81,6 +81,7 @@ class LauncherCollector:
         프로세스 = subprocess.Popen([self.path_파이썬32, path_실행], shell=True)
         s_pid = 프로세스.pid
         time.sleep(30)
+        dt_접속시각 = pd.Timestamp('now')
 
         # 모니터링 진행
         dt_시작시각 = pd.Timestamp('now')
@@ -129,14 +130,19 @@ class LauncherCollector:
                 ret = subprocess.run(f'taskkill /f /t /pid {s_pid}', shell=True)
                 s_종료요청 = '성공' if ret.returncode == 0 else '실패'
                 time.sleep(1)
+                # 접속후 1분 이내에 종료 되었으면 60초 대기 후 재접속
+                if pd.Timestamp('now') < dt_접속시각 + pd.Timedelta(seconds=60):
+                    time.sleep(60)
 
                 # 프로세스 재실행 (종료요청 성공 시)
                 if s_종료요청 == '성공':
                     # log 기록
                     self.make_log(f'서버 재접속 요청')
+                    # 프로세스 실행
                     프로세스 = subprocess.Popen([self.path_파이썬32, path_실행], shell=True)
                     s_pid = 프로세스.pid
                     time.sleep(30)
+                    dt_접속시각 = pd.Timestamp('now')
                 else:
                     # log 기록
                     self.make_log(f'강제종료 실패')
