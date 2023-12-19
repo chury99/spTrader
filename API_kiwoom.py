@@ -454,6 +454,10 @@ class KiwoomAPI(QAxWidget):
             # 기준일자 재확인
             s_최소일자 = df_분봉['체결시간'].apply(lambda x: x[:8]).unique()[:-1].min()
 
+            # 예외처리 (추가 조회한 분봉의 데이터 900개 미만)
+            if len(df_분봉_추가) < 900:
+                break
+
         # 데이터 정리
         df_분봉['종목코드'] = s_종목코드
         df_분봉['종목명'] = self.get_코드별종목명(s_종목코드)
