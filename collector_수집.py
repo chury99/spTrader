@@ -125,9 +125,17 @@ class Collector:
         # 데이터 없으면 종료
         if self.s_최종일자_일봉 == self.s_오늘:
             self.make_log(f'### 일봉 수집 종료 - 금일 데이터 존재 ###')
+            # 데이터 무결성 파일 생성
+            with open(os.path.join(self.folder_정보수집, '데이터무결성_일봉.txt'), 'wt') as 파일:
+                파일.writelines(f'일봉 수집 종료 - 금일 데이터 존재')
+            self.make_log(f'데이터 무결성 파일 생성 완료 - 금일 데이터 존재')
             return
         if self.n_완료항목_일봉 > 0 and self.n_완료항목_일봉 == len(self.li_종목코드_제외_일봉):
             self.make_log(f'### 일봉 수집 종료 - 수집되는 데이터 미존재 ###')
+            # 데이터 무결성 파일 생성
+            with open(os.path.join(self.folder_정보수집, '데이터무결성_일봉.txt'), 'wt') as 파일:
+                파일.writelines(f'일봉 수집 종료 - 수집되는 데이터 미존재')
+            self.make_log(f'데이터 무결성 파일 생성 완료 - 수집되는 데이터 미존재')
             return
 
         # 임시 pkl 불러오기
@@ -173,9 +181,17 @@ class Collector:
         # 데이터 없으면 종료
         if self.s_최종일자_분봉 == self.s_오늘:
             self.make_log(f'### 분봉 수집 종료 - 금일 데이터 존재 ###')
+            # 데이터 무결성 파일 생성
+            with open(os.path.join(self.folder_정보수집, '데이터무결성_분봉.txt'), 'wt') as 파일:
+                파일.writelines(f'분봉 수집 종료 - 금일 데이터 존재')
+            self.make_log(f'데이터 무결성 파일 생성 완료 - 금일 데이터 존재')
             return
         if self.n_완료항목_분봉 > 0 and self.n_완료항목_분봉 == len(self.li_종목코드_제외_분봉):
             self.make_log(f'### 분봉 수집 종료 - 수집되는 데이터 미존재 ###')
+            # 데이터 무결성 파일 생성
+            with open(os.path.join(self.folder_정보수집, '데이터무결성_분봉.txt'), 'wt') as 파일:
+                파일.writelines(f'분봉 수집 종료 - 수집되는 데이터 미존재')
+            self.make_log(f'데이터 무결성 파일 생성 완료 - 수집되는 데이터 미존재')
             return
 
         # 임시 pkl 불러오기
@@ -191,8 +207,11 @@ class Collector:
             df_분봉_추가 = self.api.get_tr_분봉조회(s_종목코드=s_종목코드, n_틱범위=1, s_기준일자_부터=self.s_최종일자_분봉)
             time.sleep(self.n_딜레이)
 
-            # 해당 일자 골라내기
+            # 해당 일자 골라내기 (최대 7일)
             df_분봉_추가 = df_분봉_추가[df_분봉_추가['일자'] > self.s_최종일자_분봉]
+            dt_최대일자 = pd.Timestamp(self.s_최종일자_분봉) + pd.Timedelta(days=7)
+            s_최대일자 = dt_최대일자.strftime('%Y%m%d')
+            df_분봉_추가 = df_분봉_추가[df_분봉_추가['일자'] < s_최대일자]
 
             # 데이터 없는 종목코드 별도 저장
             if len(df_분봉_추가) == 0:
