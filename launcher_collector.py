@@ -130,8 +130,8 @@ class LauncherCollector:
                 ret = subprocess.run(f'taskkill /f /t /pid {s_pid}', shell=True)
                 s_종료요청 = '성공' if ret.returncode == 0 else '실패'
                 time.sleep(1)
-                # 접속후 40초 이내에 종료 되었으면 지연시간 1초씩 증가
-                if pd.Timestamp('now') < dt_접속시각 + pd.Timedelta(seconds=40):
+                # 접속후 30초 이내에 종료 되었으면 지연시간 1초씩 증가
+                if pd.Timestamp('now') < dt_접속시각 + pd.Timedelta(seconds=30):
                     n_지연시간_초 = n_지연시간_초 + 1
                     self.make_log(f'지연시간 조정 ({n_지연시간_초 - 1}초 -> {n_지연시간_초}초)')
 
