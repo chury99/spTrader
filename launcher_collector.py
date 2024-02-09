@@ -43,12 +43,19 @@ class LauncherCollector:
         self.make_log(f'서버 데이터 다운로드 실행')
 
         # 프로세스 실행
-        ret = subprocess.run([self.path_파이썬32, path_실행], shell=True)
-        s_실행결과 = '성공' if ret.returncode == 0 else '실패'
+        try:
+            ret = subprocess.run([self.path_파이썬32, path_실행], shell=True, timeout=180)
+            s_실행결과 = '성공' if ret.returncode == 0 else '실패'
+        except subprocess.TimeoutExpired:
+            s_실행결과 = '타임아웃'
 
         # 실패 시 카카오 메세지 송부
         if s_실행결과 == '실패':
             s_메세지 = f'!!! [{self.s_파일}] 모듈 실행 중 오류 발생 - {sys._getframe(0).f_code.co_name} !!!'
+            self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
+
+        if s_실행결과 == '타임아웃':
+            s_메세지 = f'!!! [{self.s_파일}] 모듈 실행시간 초과 - {sys._getframe(0).f_code.co_name} !!!'
             self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
 
         # log 기록
