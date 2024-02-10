@@ -320,11 +320,61 @@ class Analyzer:
                 obj_모델 = Logic.make_모델_rf(dic_데이터셋=dic_데이터셋, n_rf_트리=100, n_rf_깊이=10)
 
                 # 모델 저장
-                pd.to_pickle(obj_모델, os.path.join(self.folder_공통모델, f'obj_모델_{s_모델}_{s_일자}.pkl'))
+                pd.to_pickle(obj_모델, os.path.join(self.folder_공통모델, f'obj_공통모델_{s_모델}_{s_일자}.pkl'))
                 self.make_log(f'공통모델 생성 완료({s_일자}, {s_모델})')
 
     def 공통분석_성능평가(self, s_모델):
-        return
+        """ 전일 생성된 종목 및 공통 모델을 기반으로 금일 데이터로 예측 결과 확인하여 평가결과 저장 """
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_공통모델)
+                    if f'obj_공통모델_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_성능평가)
+                    if f'df_성능평가_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+        li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 전일 일자 확인
+            try:
+                s_일자_전일 = max([일자 for 일자 in li_일자_전체 if 일자 < s_일자])
+            except ValueError:
+                continue
+
+            # 데이터셋 및 모델 불러오기 (전일 모델로 당일 데이터 검증)
+            df_데이터셋 = pd.read_pickle(os.path.join(self.folder_데이터셋, f'df_데이터셋_{s_모델}_{s_일자}.pkl'))
+            obj_공통모델_전일 = pd.read_pickle(os.path.join(self.folder_공통모델, f'obj_공통모델_{s_모델}_{s_일자_전일}.pkl'))
+            df_데이터셋_당일 = df_데이터셋[df_데이터셋['일자'] == s_일자]
+            if len(df_데이터셋_당일) == 0:
+                continue
+
+            # 입력용 xy 생성
+            s_라벨 = '정답'
+            li_인자 = [컬럼 for 컬럼 in df_데이터셋_당일.columns if 컬럼 not in ['일자', '종목코드', '종목명', '시간', s_라벨]]
+            ary_x_평가 = df_데이터셋_당일.loc[:, li_인자].values
+            ary_y_정답 = df_데이터셋_당일[s_라벨].values
+
+            # 상승확률 산출
+            df_성능평가 = df_데이터셋_당일.copy()
+            s_col_확률 = f'공통확률(%)'
+            try:
+                df_성능평가[s_col_확률] = obj_공통모델_전일.predict_proba(ary_x_평가)[:, 1] * 100
+            except IndexError:
+                df_성능평가[s_col_확률] = 0
+
+            # 예측결과 입력 (50% 초과)
+            df_성능평가['예측'] = (df_성능평가[s_col_확률] > 50) * 1
+
+            # 컬럼 재정리
+            li_컬럼명 = [컬럼 for 컬럼 in df_성능평가.columns if 컬럼 not in ['정답']] + ['정답']
+            df_성능평가 = df_성능평가.loc[:, li_컬럼명]
+
+            # 평가 결과 저장
+            df_성능평가.to_pickle(os.path.join(self.folder_성능평가, f'df_성능평가_{s_모델}_{s_일자}.pkl'))
+            df_성능평가.to_csv(os.path.join(self.folder_성능평가, f'df_성능평가_{s_모델}_{s_일자}.csv'),
+                           index=False, encoding='cp949')
+
+            # log 기록
+            self.make_log(f'공통모델 성능평가 완료({s_일자}, {s_모델})')
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
