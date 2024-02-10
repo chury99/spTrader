@@ -42,10 +42,12 @@ class Analyzer:
         self.folder_수익검증 = dic_폴더정보['분석2공통|20_수익검증']
         self.folder_데이터셋 = dic_폴더정보['분석2공통|30_데이터셋']
         self.folder_공통모델 = dic_폴더정보['분석2공통|40_공통모델']
+        self.folder_성능평가 = dic_폴더정보['분석2공통|50_성능평가']
         os.makedirs(self.folder_상승예측, exist_ok=True)
         os.makedirs(self.folder_수익검증, exist_ok=True)
         os.makedirs(self.folder_데이터셋, exist_ok=True)
         os.makedirs(self.folder_공통모델, exist_ok=True)
+        os.makedirs(self.folder_성능평가, exist_ok=True)
 
         # 변수 설정
         dic_조건검색 = pd.read_pickle(os.path.join(self.folder_정보수집, 'dic_조건검색.pkl'))
@@ -299,93 +301,30 @@ class Analyzer:
 
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
-            # 대상종목 불러오기
-            df_대상종목 = pd.read_pickle(os.path.join(self.folder_변동성종목, f'df_변동성종목_당일_{s_일자}.pkl'))
-            li_대상종목 = list(df_대상종목['종목코드'])
-
             # 데이터셋 불러오기
-            dic_df_데이터셋 = pd.read_pickle(os.path.join(self.folder_데이터셋, f'dic_df_데이터셋_{s_모델}_{s_일자}.pkl'))
+            df_데이터 = pd.read_pickle(os.path.join(self.folder_데이터셋, f'df_데이터셋_{s_모델}_{s_일자}.pkl'))
 
-            # [ 당일 모델 생성 ] ########################################################################################
+            # 공통모델 생성
+            if s_모델 == 'rf':
+                # 입력용 xy 생성
+                s_라벨 = '정답'
+                li_인자 = [컬럼명 for 컬럼명 in df_데이터.columns if 컬럼명 not in ['일자', '종목코드', '종목명', '시간', s_라벨]]
+                ary_x_학습 = df_데이터.loc[:, li_인자].values
+                ary_y_학습 = df_데이터[s_라벨].values
 
-            # 종목별 모델 생성 (당일)
-            dic_모델 = dict()
-            for s_종목코드 in tqdm(li_대상종목, desc=f'{s_모델} 모델 생성({s_일자})'):
-                # 해당 데이터셋 설정
-                df_데이터셋 = dic_df_데이터셋[s_종목코드]
+                dic_데이터셋 = dict()
+                dic_데이터셋['ary_x_학습'] = ary_x_학습
+                dic_데이터셋['ary_y_학습'] = ary_y_학습
 
-                if s_모델 == 'rf':
-                    dic_모델_케이스 = dict()
-                    for li_케이스 in self.li_케이스_전체:
-                        # 케이스 설정
-                        n_대기봉수, n_학습일수, n_rf_트리, n_rf_깊이 = li_케이스
+                # 모델 생성
+                obj_모델 = Logic.make_모델_rf(dic_데이터셋=dic_데이터셋, n_rf_트리=100, n_rf_깊이=10)
 
-                        # 라벨 데이터 생성 (대기봉수 설정)
-                        df_데이터셋 = Logic.make_라벨데이터_rf(df=df_데이터셋, n_대기봉수=n_대기봉수)
-                        # 입력용 xy로 변경 (학습일수 설정)
-                        dic_데이터셋 = Logic.make_입력용xy_rf(df=df_데이터셋, n_학습일수=n_학습일수)
-                        # 데이터셋 미존재 시 종료 (데이터량 부족)
-                        if dic_데이터셋 is None:
-                            continue
-                        # 모델 생성 (rf 트리수, rf 깊이 설정)
-                        obj_모델 = Logic.make_모델_rf(dic_데이터셋=dic_데이터셋, n_rf_트리=n_rf_트리, n_rf_깊이=n_rf_깊이)
+                # 모델 저장
+                pd.to_pickle(obj_모델, os.path.join(self.folder_공통모델, f'obj_모델_{s_모델}_{s_일자}.pkl'))
+                self.make_log(f'공통모델 생성 완료({s_일자}, {s_모델})')
 
-                        # 케이스별 모델 저장
-                        s_케이스 = '_'.join(str(n) for n in li_케이스)
-                        dic_모델_케이스[s_케이스] = obj_모델
-
-                    # 모델 등록
-                    dic_모델[s_종목코드] = dic_모델_케이스
-
-            # [ 전일 모델 생성 ] ########################################################################################
-
-            # 전일 일자 확인
-            try:
-                s_일자_전일 = max([일자 for 일자 in self.li_일자_전체 if 일자 < s_일자])
-            except ValueError:
-                continue
-
-            # 전일 모델 불러오기
-            dic_모델_전일 = pd.read_pickle(os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자_전일}.pkl'))
-
-            # 전일 모델에 미존재 하는 종목코드 찾기
-            li_대상종목_전일 = [종목코드 for 종목코드 in li_대상종목 if 종목코드 not in dic_모델_전일.keys()]
-
-            for s_종목코드 in tqdm(li_대상종목_전일, desc=f'{s_모델} 모델 생성(전일-{s_일자_전일})'):
-                # 해당 데이터셋 설정 (전일까지만)
-                df_데이터셋 = dic_df_데이터셋[s_종목코드]
-                df_데이터셋 = df_데이터셋[df_데이터셋['일자'] < s_일자]
-
-                if s_모델 == 'rf':
-                    dic_모델_케이스_전일 = dict()
-                    for li_케이스 in self.li_케이스_전체:
-                        # 케이스 설정
-                        n_대기봉수, n_학습일수, n_rf_트리, n_rf_깊이 = li_케이스
-
-                        # 라벨 데이터 생성 (대기봉수 설정)
-                        df_데이터셋 = Logic.make_라벨데이터_rf(df=df_데이터셋, n_대기봉수=n_대기봉수)
-                        # 입력용 xy로 변경 (학습일수 설정)
-                        dic_데이터셋 = Logic.make_입력용xy_rf(df=df_데이터셋, n_학습일수=n_학습일수)
-                        # 데이터셋 미존재 시 종료 (데이터량 부족)
-                        if dic_데이터셋 is None:
-                            continue
-                        # 모델 생성 (rf 트리수, rf 깊이 설정)
-                        obj_모델 = Logic.make_모델_rf(dic_데이터셋=dic_데이터셋, n_rf_트리=n_rf_트리, n_rf_깊이=n_rf_깊이)
-
-                        # 케이스별 모델 저장
-                        s_케이스 = '_'.join(str(n) for n in li_케이스)
-                        dic_모델_케이스_전일[s_케이스] = obj_모델
-
-                    # 모델 등록 (전일)
-                    dic_모델_전일[s_종목코드] = dic_모델_케이스_전일
-
-            # 모델 저장 (전일 모델)
-            pd.to_pickle(dic_모델_전일, os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자_전일}.pkl'))
-            self.make_log(f'모델 생성 완료(전일-{s_일자_전일}, {len(li_대상종목_전일):,}개 종목, {s_모델})')
-
-            # 모델 저장 (당일 모델)
-            pd.to_pickle(dic_모델, os.path.join(self.folder_모델, f'dic_모델_{s_모델}_{s_일자}.pkl'))
-            self.make_log(f'모델 생성 완료({s_일자}, {len(li_대상종목):,}개 종목, {s_모델})')
+    def 공통분석_성능평가(self, s_모델):
+        return
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
@@ -462,4 +401,5 @@ if __name__ == "__main__":
     a.종목분석_상승예측(s_모델='rf')
     a.종목분석_수익검증(s_모델='rf')
     a.공통분석_데이터셋(s_모델='rf')
-    # a.공통분석_모델생성(s_모델='rf')
+    a.공통분석_모델생성(s_모델='rf')
+    a.공통분석_성능평가(s_모델='rf')
