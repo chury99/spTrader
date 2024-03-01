@@ -42,6 +42,9 @@ folder_분석2공통 = os.path.join(folder_work, '분석2공통')
 dic_폴더정보['분석2공통'] = folder_분석2공통
 dic_폴더정보['분석2공통|10_상승예측'] = os.path.join(folder_분석2공통, '10_상승예측')
 dic_폴더정보['분석2공통|20_수익검증'] = os.path.join(folder_분석2공통, '20_수익검증')
+dic_폴더정보['분석2공통|30_데이터셋'] = os.path.join(folder_분석2공통, '30_데이터셋')
+dic_폴더정보['분석2공통|40_공통모델'] = os.path.join(folder_분석2공통, '40_공통모델')
+dic_폴더정보['분석2공통|50_성능평가'] = os.path.join(folder_분석2공통, '50_성능평가')
 
 # 백테스팅 폴더 정의
 folder_백테스팅 = os.path.join(folder_work, '백테스팅')
