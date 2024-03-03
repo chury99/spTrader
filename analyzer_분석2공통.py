@@ -344,8 +344,6 @@ class Analyzer:
             df_데이터셋 = pd.read_pickle(os.path.join(self.folder_데이터셋, f'df_데이터셋_{s_모델}_{s_일자}.pkl'))
             obj_공통모델_전일 = pd.read_pickle(os.path.join(self.folder_공통모델, f'obj_공통모델_{s_모델}_{s_일자_전일}.pkl'))
             df_데이터셋_당일 = df_데이터셋[df_데이터셋['일자'] == s_일자]
-            if len(df_데이터셋_당일) == 0:
-                continue
 
             # 입력용 xy 생성
             s_라벨 = '정답'
@@ -353,13 +351,15 @@ class Analyzer:
             ary_x_평가 = df_데이터셋_당일.loc[:, li_인자].values
             ary_y_정답 = df_데이터셋_당일[s_라벨].values
 
-            # 상승확률 산출
+            # 상승확률 산출 (확률 0일 시 IndexError 처리, 당일 데이터 미존재 시 ValueError 처리)
             df_성능평가 = df_데이터셋_당일.copy()
             s_col_확률 = f'공통확률(%)'
             try:
                 df_성능평가[s_col_확률] = obj_공통모델_전일.predict_proba(ary_x_평가)[:, 1] * 100
             except IndexError:
                 df_성능평가[s_col_확률] = 0
+            except ValueError:
+                df_성능평가[s_col_확률] = []
 
             # 예측결과 입력 (50% 초과)
             df_성능평가['예측'] = (df_성능평가[s_col_확률] > 50) * 1
