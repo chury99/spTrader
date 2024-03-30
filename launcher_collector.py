@@ -22,7 +22,7 @@ class LauncherCollector:
 
         # 폴더 정의
         import UT_폴더manager
-        dic_폴더정보 = UT_폴더정보.dic_폴더정보
+        dic_폴더정보 = UT_폴더manager.dic_폴더정보
         self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
 
         # 카카오 API 연결
