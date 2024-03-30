@@ -29,11 +29,11 @@ class Analyzer:
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
         self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
         self.folder_변동성종목 = dic_폴더정보['분석1종목|10_변동성종목']
-        self.folder_데이터셋 = dic_폴더정보['분석1종목|20_데이터셋']
-        self.folder_모델 = dic_폴더정보['분석1종목|30_모델_종목']
-        self.folder_성능평가 = dic_폴더정보['분석1종목|40_성능평가']
-        self.folder_감시대상 = dic_폴더정보['분석1종목|감시대상']
-        self.folder_감시대상모델 = dic_폴더정보['분석1종목|모델_감시대상']
+        self.folder_데이터셋 = dic_폴더정보['분석1종목|20_종목_데이터셋']
+        self.folder_모델 = dic_폴더정보['분석1종목|30_종목_모델']
+        self.folder_성능평가 = dic_폴더정보['분석1종목|40_종목_성능평가']
+        self.folder_감시대상 = dic_폴더정보['분석1종목|50_종목_감시대상']
+        self.folder_감시대상모델 = dic_폴더정보['분석1종목|60_종목_모델_감시대상']
         os.makedirs(self.folder_변동성종목, exist_ok=True)
         os.makedirs(self.folder_데이터셋, exist_ok=True)
         os.makedirs(self.folder_모델, exist_ok=True)
