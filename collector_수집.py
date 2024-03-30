@@ -21,7 +21,7 @@ class Collector:
         self.n_딜레이 = 0.2
 
         # 폴더 정의
-        import UT_폴더정보
+        import UT_폴더manager
         dic_폴더정보 = UT_폴더정보.dic_폴더정보
         self.folder_ohlcv = dic_폴더정보['데이터|ohlcv']
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
