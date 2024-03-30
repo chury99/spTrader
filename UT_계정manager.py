@@ -18,7 +18,7 @@ class Manager:
 
         # 파일 정의
         import UT_폴더manager
-        dic_폴더정보 = UT_폴더정보.dic_폴더정보
+        dic_폴더정보 = UT_폴더manager.dic_폴더정보
         folder_run = dic_폴더정보['run']
         self.path_파일 = os.path.join(folder_run, 'acc_info.dll')
 
