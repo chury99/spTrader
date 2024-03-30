@@ -17,7 +17,7 @@ class Manager:
         self.path_log = os.path.join(dic_config['folder_log'], f'sp_acc_manager_{self.s_오늘}.log')
 
         # 파일 정의
-        import UT_폴더정보
+        import UT_폴더manager
         dic_폴더정보 = UT_폴더정보.dic_폴더정보
         folder_run = dic_폴더정보['run']
         self.path_파일 = os.path.join(folder_run, 'acc_info.dll')
