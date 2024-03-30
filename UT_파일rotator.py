@@ -20,7 +20,7 @@ class Rotator:
         self.path_log = os.path.join(dic_config['folder_log'], f'{dic_config["로그이름_rotator"]}_{self.s_오늘}.log')
 
         # 폴더 정의
-        import UT_폴더정보
+        import UT_폴더manager
         dic_폴더정보 = UT_폴더정보.dic_폴더정보
         self.folder_work = dic_폴더정보['work']
 
