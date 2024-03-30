@@ -29,7 +29,7 @@ class Trader(QMainWindow, form_class):
 
         # 폴더 정의
         import UT_폴더manager
-        dic_폴더정보 = UT_폴더정보.dic_폴더정보
+        dic_폴더정보 = UT_폴더manager.dic_폴더정보
         self.folder_run = dic_폴더정보['run']
         self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
         self.folder_체결잔고 = dic_폴더정보['이력|체결잔고']
