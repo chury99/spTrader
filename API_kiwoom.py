@@ -32,7 +32,7 @@ class KiwoomAPI(QAxWidget):
         self.n_딜레이 = 0.2
 
         # 폴더 정의
-        import UT_폴더정보
+        import UT_폴더manager
         dic_폴더정보 = UT_폴더정보.dic_폴더정보
         folder_체결잔고 = dic_폴더정보['이력|체결잔고']
         folder_메세지 = dic_폴더정보['이력|메세지']
