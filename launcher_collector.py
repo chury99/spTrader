@@ -21,7 +21,7 @@ class LauncherCollector:
         self.path_파이썬64 = dic_config['path_파이썬64']
 
         # 폴더 정의
-        import UT_폴더정보
+        import UT_폴더manager
         dic_폴더정보 = UT_폴더정보.dic_폴더정보
         self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
 
