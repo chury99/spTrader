@@ -180,7 +180,6 @@ class Analyzer:
             df_수익검증.to_csv(os.path.join(self.folder_수익검증, f'수익검증_{s_모델}_{s_일자}.csv'),
                            index=False, encoding='cp949')
 
-            # ### 리포트 생성 및 처리 ###
             # 감시대상 종목 정보 생성
             li_감시대상_파일명 = [파일명 for 파일명 in os.listdir(self.folder_감시대상)
                            if f'df_감시대상_{s_모델}_' in 파일명 and '.pkl' in 파일명]
@@ -193,57 +192,15 @@ class Analyzer:
                               for 파일명 in li_감시대상_파일명]
 
             # 리포트 생성
-            plt.figure(figsize=[16, 9])
-
-            plt.subplot(2, 2, 1)
-            plt.title('[ 감시대상 종목 수 ]')
-            ary_x, ary_y = df_감시대상['일자'].values, df_감시대상['종목수'].values
-            li_색깔 = ['C1' if 종목수 > 15 else 'C0' for 종목수 in ary_y]
-            plt.bar(ary_x, ary_y, color=li_색깔)
-            plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
-            plt.grid(linestyle='--', alpha=0.5)
-
-            plt.subplot(2, 2, 2)
-            plt.title('[ 상승예측 건수 ]')
-            sri_상승예측건수 = df_수익검증.groupby('일자')['상승예측'].sum()
-            ary_x, ary_y = sri_상승예측건수.index.values, sri_상승예측건수.values
-            li_색깔 = ['C3' if 예측건수 > 10 else 'C0' for 예측건수 in ary_y]
-            plt.bar(ary_x, ary_y, color=li_색깔)
-            plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
-            plt.grid(linestyle='--', alpha=0.5)
-
-            plt.subplot(2, 2, 4)
-            plt.title('[ 예측 성공률 (%) ]')
-            sri_예측성공건수 = df_수익검증.groupby('일자')['정답'].sum()
-            sri_예측성공률 = sri_예측성공건수 / sri_상승예측건수 * 100
-            ary_x, ary_y = sri_예측성공률.index.values, sri_예측성공률.values
-            li_색깔 = ['C0' if 성공률 > 70 else 'C3' for 성공률 in ary_y]
-            plt.bar(ary_x, ary_y, color=li_색깔)
-            plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
-            plt.grid(linestyle='--', alpha=0.5)
-            plt.axhline(100, color='C0', alpha=0)
-            plt.axhline(70, color='C1')
-
-            plt.subplot(2, 2, 3)
-            plt.title('[ 예측 성공률 (%, 누적) ]')
-            sri_예측성공률_누적 = sri_예측성공건수.cumsum() / sri_상승예측건수.cumsum() * 100
-            ary_x, ary_y = sri_예측성공률_누적.index.values, sri_예측성공률_누적.values
-            plt.plot(ary_x, ary_y)
-            plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
-            plt.grid(linestyle='--', alpha=0.5)
-            plt.axhline(100, color='C0', alpha=0)
-            plt.axhline(70, color='C1')
-
-            # 리포트 저장
-            plt.savefig(os.path.join(self.folder_수익검증, f'수익검증_리포트_{s_모델}_{s_일자}.png'))
-            plt.close()
+            folder_리포트 = self.folder_수익검증
+            s_파일명_리포트 = f'수익검증_리포트_{s_모델}_{s_일자}.png'
+            self.make_리포트(df_감시대상=df_감시대상, df_수익검증=df_수익검증, folder_저장=folder_리포트, s_파일명=s_파일명_리포트)
 
             # 리포트 복사 to 서버
             import UT_배치worker
             w = UT_배치worker.Worker()
             folder_서버 = 'kakao/수익검증'
-            s_파일명_리포트 = f'수익검증_리포트_{s_모델}_{s_일자}.png'
-            w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=self.folder_수익검증, folder_서버=folder_서버)
+            w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
 
             # 카톡 보내기
             import API_kakao
@@ -395,6 +352,59 @@ class Analyzer:
         if '파일' in li_출력:
             with open(self.path_log, mode='at', encoding='cp949') as file:
                 file.write(f'{s_log}\n')
+
+    @staticmethod
+    def make_리포트(df_감시대상, df_수익검증, folder_저장, s_파일명):
+        """ 수익검증 데이터를 기반으로 daily 리포트 생성 및 png 파일로 저장 """
+        # 그래프 설정
+        plt.figure(figsize=[16, 9])
+
+        # 일별 감시대상 종목수
+        plt.subplot(2, 2, 1)
+        plt.title('[ 감시대상 종목수 ]')
+        ary_x, ary_y = df_감시대상['일자'].values, df_감시대상['종목수'].values
+        li_색깔 = ['C1' if 종목수 > 15 else 'C0' for 종목수 in ary_y]
+        plt.bar(ary_x, ary_y, color=li_색깔)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.grid(linestyle='--', alpha=0.5)
+
+        # 일별 상승예측건수
+        plt.subplot(2, 2, 2)
+        plt.title('[ 상승예측 건수 ]')
+        sri_상승예측건수 = df_수익검증.groupby('일자')['상승예측'].sum()
+        ary_x, ary_y = sri_상승예측건수.index.values, sri_상승예측건수.values
+        li_색깔 = ['C3' if 예측건수 > 10 else 'C0' for 예측건수 in ary_y]
+        plt.bar(ary_x, ary_y, color=li_색깔)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.grid(linestyle='--', alpha=0.5)
+
+        # 일별 예측성공률
+        plt.subplot(2, 2, 4)
+        plt.title('[ 예측 성공률 (%) ]')
+        sri_예측성공건수 = df_수익검증.groupby('일자')['정답'].sum()
+        sri_예측성공률 = sri_예측성공건수 / sri_상승예측건수 * 100
+        ary_x, ary_y = sri_예측성공률.index.values, sri_예측성공률.values
+        li_색깔 = ['C0' if 성공률 > 70 else 'C3' for 성공률 in ary_y]
+        plt.bar(ary_x, ary_y, color=li_색깔)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.grid(linestyle='--', alpha=0.5)
+        plt.axhline(100, color='C0', alpha=0)
+        plt.axhline(70, color='C1')
+
+        # 누적 예측성공률
+        plt.subplot(2, 2, 3)
+        plt.title('[ 예측 성공률 (%, 누적) ]')
+        sri_예측성공률_누적 = sri_예측성공건수.cumsum() / sri_상승예측건수.cumsum() * 100
+        ary_x, ary_y = sri_예측성공률_누적.index.values, sri_예측성공률_누적.values
+        plt.plot(ary_x, ary_y)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.grid(linestyle='--', alpha=0.5)
+        plt.axhline(100, color='C0', alpha=0)
+        plt.axhline(70, color='C1')
+
+        # 리포트 저장
+        plt.savefig(os.path.join(folder_저장, s_파일명))
+        plt.close()
 
 
 #######################################################################################################################
