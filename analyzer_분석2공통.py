@@ -35,18 +35,20 @@ class Analyzer:
         self.folder_ohlcv = dic_폴더정보['데이터|ohlcv']
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
         self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
-        self.folder_감시대상 = dic_폴더정보['분석1종목|감시대상']
-        self.folder_감시대상모델 = dic_폴더정보['분석1종목|모델_감시대상']
-        self.folder_상승예측 = dic_폴더정보['분석2공통|10_상승예측']
-        self.folder_수익검증 = dic_폴더정보['분석2공통|20_수익검증']
-        self.folder_데이터셋 = dic_폴더정보['분석2공통|30_데이터셋']
-        self.folder_공통모델 = dic_폴더정보['분석2공통|40_공통모델']
-        self.folder_성능평가 = dic_폴더정보['분석2공통|50_성능평가']
-        os.makedirs(self.folder_상승예측, exist_ok=True)
-        os.makedirs(self.folder_수익검증, exist_ok=True)
-        os.makedirs(self.folder_데이터셋, exist_ok=True)
+        self.folder_감시대상 = dic_폴더정보['분석1종목|50_종목_감시대상']
+        self.folder_감시대상모델 = dic_폴더정보['분석1종목|60_종목_모델_감시대상']
+        self.folder_종목상승예측 = dic_폴더정보['분석2공통|10_종목_상승예측']
+        self.folder_종목수익검증 = dic_폴더정보['분석2공통|20_종목_수익검증']
+        self.folder_공통데이터셋 = dic_폴더정보['분석2공통|30_공통_데이터셋']
+        self.folder_공통모델 = dic_폴더정보['분석2공통|40_공통_모델']
+        self.folder_공통성능평가 = dic_폴더정보['분석2공통|50_공통_성능평가']
+        self.folder_공통수익검증 = dic_폴더정보['분석2공통|60_공통_수익검증']
+        os.makedirs(self.folder_종목상승예측, exist_ok=True)
+        os.makedirs(self.folder_종목수익검증, exist_ok=True)
+        os.makedirs(self.folder_공통데이터셋, exist_ok=True)
         os.makedirs(self.folder_공통모델, exist_ok=True)
-        os.makedirs(self.folder_성능평가, exist_ok=True)
+        os.makedirs(self.folder_공통성능평가, exist_ok=True)
+        os.makedirs(self.folder_공통수익검증, exist_ok=True)
 
         # 변수 설정
         dic_조건검색 = pd.read_pickle(os.path.join(self.folder_정보수집, 'dic_조건검색.pkl'))
@@ -69,7 +71,7 @@ class Analyzer:
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_감시대상)
                     if f'df_감시대상_{s_모델}_' in 파일명 and '.pkl' in 파일명]
-        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_상승예측)
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_종목상승예측)
                     if f'df_상승예측_{s_모델}_' in 파일명 and f'.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
@@ -147,8 +149,8 @@ class Analyzer:
             df_상승예측 = pd.concat(li_df, axis=0)
 
             # 결과 저장
-            df_상승예측.to_pickle(os.path.join(self.folder_상승예측, f'df_상승예측_{s_모델}_{s_일자}.pkl'))
-            df_상승예측.to_csv(os.path.join(self.folder_상승예측, f'상승예측_{s_모델}_{s_일자}.csv'),
+            df_상승예측.to_pickle(os.path.join(self.folder_종목상승예측, f'df_상승예측_{s_모델}_{s_일자}.pkl'))
+            df_상승예측.to_csv(os.path.join(self.folder_종목상승예측, f'상승예측_{s_모델}_{s_일자}.csv'),
                            index=False, encoding='cp949')
 
             # log 기록
@@ -157,27 +159,27 @@ class Analyzer:
     def 종목분석_수익검증(self, s_모델):
         """ 상승여부 예측한 결과를 바탕으로 종목선정 조건에 따른 결과 확인 (예측 엑셀, 리포트 저장) """
         # 분석대상 일자 선정
-        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_상승예측)
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_종목상승예측)
                     if f'df_상승예측_{s_모델}_' in 파일명 and '.pkl' in 파일명]
-        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_수익검증)
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_종목수익검증)
                     if f'df_수익검증_{s_모델}_' in 파일명 and f'.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
             # 상승예측 데이터 불러오기
-            li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_상승예측)
+            li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_종목상승예측)
                       if f'df_상승예측_{s_모델}_' in 파일명 and '.pkl' in 파일명]
             li_파일명 = [파일명 for 파일명 in li_파일명 if re.findall(r'\d{8}', 파일명)[0] <= s_일자]
-            li_df = [pd.read_pickle(os.path.join(self.folder_상승예측, 파일명)) for 파일명 in li_파일명]
+            li_df = [pd.read_pickle(os.path.join(self.folder_종목상승예측, 파일명)) for 파일명 in li_파일명]
             df_상승예측 = pd.concat(li_df, axis=0)
 
             # 예측한 값만 잘라내기
             df_수익검증 = df_상승예측[df_상승예측['상승예측'] == 1].drop_duplicates()
 
             # 예측 엑셀 저장 (pkl 포함)
-            df_수익검증.to_pickle(os.path.join(self.folder_수익검증, f'df_수익검증_{s_모델}_{s_일자}.pkl'))
-            df_수익검증.to_csv(os.path.join(self.folder_수익검증, f'수익검증_{s_모델}_{s_일자}.csv'),
+            df_수익검증.to_pickle(os.path.join(self.folder_종목수익검증, f'df_수익검증_{s_모델}_{s_일자}.pkl'))
+            df_수익검증.to_csv(os.path.join(self.folder_종목수익검증, f'수익검증_{s_모델}_{s_일자}.csv'),
                            index=False, encoding='cp949')
 
             # 감시대상 종목 정보 생성
@@ -192,7 +194,7 @@ class Analyzer:
                               for 파일명 in li_감시대상_파일명]
 
             # 리포트 생성
-            folder_리포트 = self.folder_수익검증
+            folder_리포트 = self.folder_종목수익검증
             s_파일명_리포트 = f'수익검증_리포트_{s_모델}_{s_일자}.png'
             self.make_리포트(df_감시대상=df_감시대상, df_수익검증=df_수익검증, folder_저장=folder_리포트, s_파일명=s_파일명_리포트)
 
@@ -215,16 +217,16 @@ class Analyzer:
     def 공통분석_데이터셋(self, s_모델):
         """ 종목분석 수익검증 결과를 바탕으로 공통 분석을 위한 데이터셋 df 생성 후 저장 """
         # 분석대상 일자 선정
-        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_수익검증)
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_종목수익검증)
                     if f'df_수익검증_{s_모델}_' in 파일명 and '.pkl' in 파일명]
-        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_데이터셋)
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_공통데이터셋)
                     if f'df_데이터셋_{s_모델}_' in 파일명 and f'.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
             # 수익검증 파일 불러오기
-            df_수익검증 = pd.read_pickle(os.path.join(self.folder_수익검증, f'df_수익검증_rf_{s_일자}.pkl'))
+            df_수익검증 = pd.read_pickle(os.path.join(self.folder_종목수익검증, f'df_수익검증_rf_{s_일자}.pkl'))
 
             # 비율 데이터 추가 (가격은 전일종가 기준, 거래량은 해당분봉 거래량 기준)
             for s_컬럼명 in ['시가', '고가', '저가', '종가', '종가ma5', '종가ma10', '종가ma20', '종가ma60', '종가ma120']:
@@ -241,8 +243,8 @@ class Analyzer:
             df_데이터셋 = df_수익검증.loc[:, li_컬럼명]
 
             # 데이터셋 저장
-            pd.to_pickle(df_데이터셋, os.path.join(self.folder_데이터셋, f'df_데이터셋_{s_모델}_{s_일자}.pkl'))
-            df_데이터셋.to_csv(os.path.join(self.folder_데이터셋, f'df_데이터셋_{s_모델}_{s_일자}.csv'),
+            pd.to_pickle(df_데이터셋, os.path.join(self.folder_공통데이터셋, f'df_데이터셋_{s_모델}_{s_일자}.pkl'))
+            df_데이터셋.to_csv(os.path.join(self.folder_공통데이터셋, f'df_데이터셋_{s_모델}_{s_일자}.csv'),
                            index=False, encoding='cp949')
 
             # log 기록
@@ -251,7 +253,7 @@ class Analyzer:
     def 공통분석_모델생성(self, s_모델):
         """ 데이터셋을 바탕으로 일자별 공통분석 모델 생성 후 저장 """
         # 분석대상 일자 선정
-        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_데이터셋)
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_공통데이터셋)
                     if f'df_데이터셋_{s_모델}_' in 파일명 and '.pkl' in 파일명]
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_공통모델)
                     if f'obj_공통모델_{s_모델}_' in 파일명 and '.pkl' in 파일명]
@@ -260,7 +262,7 @@ class Analyzer:
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
             # 데이터셋 불러오기
-            df_데이터 = pd.read_pickle(os.path.join(self.folder_데이터셋, f'df_데이터셋_{s_모델}_{s_일자}.pkl'))
+            df_데이터 = pd.read_pickle(os.path.join(self.folder_공통데이터셋, f'df_데이터셋_{s_모델}_{s_일자}.pkl'))
 
             # 공통모델 생성
             if s_모델 == 'rf':
@@ -286,7 +288,7 @@ class Analyzer:
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_공통모델)
                     if f'obj_공통모델_{s_모델}_' in 파일명 and '.pkl' in 파일명]
-        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_성능평가)
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_공통성능평가)
                     if f'df_성능평가_{s_모델}_' in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
@@ -299,7 +301,7 @@ class Analyzer:
                 continue
 
             # 데이터셋 및 모델 불러오기 (전일 모델로 당일 데이터 검증)
-            df_데이터셋 = pd.read_pickle(os.path.join(self.folder_데이터셋, f'df_데이터셋_{s_모델}_{s_일자}.pkl'))
+            df_데이터셋 = pd.read_pickle(os.path.join(self.folder_공통데이터셋, f'df_데이터셋_{s_모델}_{s_일자}.pkl'))
             obj_공통모델_전일 = pd.read_pickle(os.path.join(self.folder_공통모델, f'obj_공통모델_{s_모델}_{s_일자_전일}.pkl'))
             df_데이터셋_당일 = df_데이터셋[df_데이터셋['일자'] == s_일자]
 
@@ -327,12 +329,70 @@ class Analyzer:
             df_성능평가 = df_성능평가.loc[:, li_컬럼명]
 
             # 평가 결과 저장
-            df_성능평가.to_pickle(os.path.join(self.folder_성능평가, f'df_성능평가_{s_모델}_{s_일자}.pkl'))
-            df_성능평가.to_csv(os.path.join(self.folder_성능평가, f'df_성능평가_{s_모델}_{s_일자}.csv'),
+            df_성능평가.to_pickle(os.path.join(self.folder_공통성능평가, f'df_성능평가_{s_모델}_{s_일자}.pkl'))
+            df_성능평가.to_csv(os.path.join(self.folder_공통성능평가, f'df_성능평가_{s_모델}_{s_일자}.csv'),
                            index=False, encoding='cp949')
 
             # log 기록
             self.make_log(f'공통모델 성능평가 완료({s_일자}, {s_모델})')
+
+    def 공통분석_수익검증(self, s_모델):
+        """ 공통모델 사용하여 예측한 결과를 바탕으로 수익관점 결과 확인 (엑셀, 리포트 저장) """
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_공통성능평가)
+                    if f'df_성능평가_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_공통수익검증)
+                    if f'df_공통수익검증_{s_모델}_' in 파일명 and f'.pkl' in 파일명]
+        li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 상승예측 데이터 불러오기
+            li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_공통성능평가)
+                      if f'df_성능평가_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+            li_파일명 = [파일명 for 파일명 in li_파일명 if re.findall(r'\d{8}', 파일명)[0] <= s_일자]
+            li_df = [pd.read_pickle(os.path.join(self.folder_종목상승예측, 파일명)) for 파일명 in li_파일명]
+            df_상승예측 = pd.concat(li_df, axis=0)
+
+            # 예측한 값만 잘라내기
+            df_수익검증 = df_상승예측[df_상승예측['상승예측'] == 1].drop_duplicates()
+
+            # 예측 엑셀 저장 (pkl 포함)
+            df_수익검증.to_pickle(os.path.join(self.folder_종목수익검증, f'df_수익검증_{s_모델}_{s_일자}.pkl'))
+            df_수익검증.to_csv(os.path.join(self.folder_종목수익검증, f'수익검증_{s_모델}_{s_일자}.csv'),
+                           index=False, encoding='cp949')
+
+            # 감시대상 종목 정보 생성
+            li_감시대상_파일명 = [파일명 for 파일명 in os.listdir(self.folder_감시대상)
+                           if f'df_감시대상_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+            s_시작일자 = min([re.findall(r'\d{8}', 파일명)[0] for 파일명 in li_파일명])
+            li_감시대상_파일명 = [파일명 for 파일명 in li_감시대상_파일명 if re.findall(r'\d{8}', 파일명)[0] <= s_일자]
+            li_감시대상_파일명 = [파일명 for 파일명 in li_감시대상_파일명 if re.findall(r'\d{8}', 파일명)[0] >= s_시작일자]
+            df_감시대상 = pd.DataFrame()
+            df_감시대상['일자'] = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in li_감시대상_파일명]
+            df_감시대상['종목수'] = [len(pd.read_pickle(os.path.join(self.folder_감시대상, 파일명)))
+                              for 파일명 in li_감시대상_파일명]
+
+            # 리포트 생성
+            folder_리포트 = self.folder_종목수익검증
+            s_파일명_리포트 = f'수익검증_리포트_{s_모델}_{s_일자}.png'
+            self.make_리포트(df_감시대상=df_감시대상, df_수익검증=df_수익검증, folder_저장=folder_리포트, s_파일명=s_파일명_리포트)
+
+            # 리포트 복사 to 서버
+            import UT_배치worker
+            w = UT_배치worker.Worker()
+            folder_서버 = 'kakao/수익검증'
+            w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
+
+            # 카톡 보내기
+            import API_kakao
+            k = API_kakao.KakaoAPI()
+            result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 분석1검증 완료',
+                                    s_button_title=f'수익검증 리포트 - {s_일자}',
+                                    s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
+
+            # log 기록
+            self.make_log(f'수익검증 리포트 생성 완료({s_일자}, {s_모델})')
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
@@ -416,3 +476,4 @@ if __name__ == "__main__":
     a.공통분석_데이터셋(s_모델='rf')
     a.공통분석_모델생성(s_모델='rf')
     a.공통분석_성능평가(s_모델='rf')
+    # a.공통분석_수익검증(s_모델='rf')
