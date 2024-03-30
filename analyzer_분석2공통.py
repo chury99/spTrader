@@ -30,7 +30,7 @@ class Analyzer:
         self.n_파일보관기간 = int(dic_config['파일보관기간(일)_analyzer'])
 
         # 폴더 정의
-        import UT_폴더정보
+        import UT_폴더manager
         dic_폴더정보 = UT_폴더정보.dic_폴더정보
         self.folder_run = dic_폴더정보['run']
         self.folder_ohlcv = dic_폴더정보['데이터|ohlcv']
