@@ -31,20 +31,21 @@ dic_폴더정보['데이터|정보수집'] = os.path.join(folder_데이터, '정
 folder_분석1종목 = os.path.join(folder_work, '분석1종목')
 dic_폴더정보['분석1종목'] = folder_분석1종목
 dic_폴더정보['분석1종목|10_변동성종목'] = os.path.join(folder_분석1종목, '10_변동성종목')
-dic_폴더정보['분석1종목|20_데이터셋'] = os.path.join(folder_분석1종목, '20_데이터셋')
-dic_폴더정보['분석1종목|30_모델_종목'] = os.path.join(folder_분석1종목, '30_모델_종목')
-dic_폴더정보['분석1종목|40_성능평가'] = os.path.join(folder_분석1종목, '40_성능평가')
-dic_폴더정보['분석1종목|감시대상'] = os.path.join(folder_분석1종목, '감시대상')
-dic_폴더정보['분석1종목|모델_감시대상'] = os.path.join(folder_분석1종목, '모델_감시대상')
+dic_폴더정보['분석1종목|20_종목_데이터셋'] = os.path.join(folder_분석1종목, '20_종목_데이터셋')
+dic_폴더정보['분석1종목|30_종목_모델'] = os.path.join(folder_분석1종목, '30_종목_모델')
+dic_폴더정보['분석1종목|40_종목_성능평가'] = os.path.join(folder_분석1종목, '40_종목_성능평가')
+dic_폴더정보['분석1종목|50_종목_감시대상'] = os.path.join(folder_분석1종목, '50_종목_감시대상')
+dic_폴더정보['분석1종목|60_종목_모델_감시대상'] = os.path.join(folder_분석1종목, '60_종목_모델_감시대상')
 
 # 분석2공통 폴더 정의
 folder_분석2공통 = os.path.join(folder_work, '분석2공통')
 dic_폴더정보['분석2공통'] = folder_분석2공통
-dic_폴더정보['분석2공통|10_상승예측'] = os.path.join(folder_분석2공통, '10_상승예측')
-dic_폴더정보['분석2공통|20_수익검증'] = os.path.join(folder_분석2공통, '20_수익검증')
-dic_폴더정보['분석2공통|30_데이터셋'] = os.path.join(folder_분석2공통, '30_데이터셋')
-dic_폴더정보['분석2공통|40_공통모델'] = os.path.join(folder_분석2공통, '40_공통모델')
-dic_폴더정보['분석2공통|50_성능평가'] = os.path.join(folder_분석2공통, '50_성능평가')
+dic_폴더정보['분석2공통|10_종목_상승예측'] = os.path.join(folder_분석2공통, '10_종목_상승예측')
+dic_폴더정보['분석2공통|20_종목_수익검증'] = os.path.join(folder_분석2공통, '20_종목_수익검증')
+dic_폴더정보['분석2공통|30_공통_데이터셋'] = os.path.join(folder_분석2공통, '30_공통_데이터셋')
+dic_폴더정보['분석2공통|40_공통_모델'] = os.path.join(folder_분석2공통, '40_공통_모델')
+dic_폴더정보['분석2공통|50_공통_성능평가'] = os.path.join(folder_분석2공통, '50_공통_성능평가')
+dic_폴더정보['분석2공통|60_공통_수익검증'] = os.path.join(folder_분석2공통, '60_공통_수익검증')
 
 # 백테스팅 폴더 정의
 folder_백테스팅 = os.path.join(folder_work, '백테스팅')
