@@ -28,7 +28,7 @@ class Trader(QMainWindow, form_class):
             dic_config = json.load(file)
 
         # 폴더 정의
-        import UT_폴더정보
+        import UT_폴더manager
         dic_폴더정보 = UT_폴더정보.dic_폴더정보
         self.folder_run = dic_폴더정보['run']
         self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
