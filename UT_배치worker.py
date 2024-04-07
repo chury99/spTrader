@@ -40,22 +40,33 @@ class Worker:
 
         # ftp 서버 연결
         with ftplib.FTP() as ftp:
-            ret_서버접속 = ftp.connect(host=''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['host'])]),
-                                   port=int(''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['port'])])))
-            if ret_서버접속[:3] != '220':
+            try:
+                ret_서버접속 = ftp.connect(host=''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['host'])]),
+                                       port=int(''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['port'])])))
+            except ftplib.error_perm as error:
+                s_에러코드 = error.args[0]
                 result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'!!! [{s_호출파일}] ftp 오류 !!!',
-                                        s_button_title=f'{ret_서버접속}')
+                                        s_button_title=f'{s_에러코드}')
 
-            ret_로그인 = ftp.login(user=''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['id'])]),
-                                passwd=''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['pw'])]))
-            if ret_로그인[:3] != '230':
+            try:
+                ret_로그인 = ftp.login(user=''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['id'])]),
+                                    passwd=''.join([chr(ord(글자) - 369) for 글자 in list(dic_ftp['pw'])]))
+            except ftplib.error_perm as error:
+                s_에러코드 = error.args[0]
                 result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'!!! [{s_호출파일}] ftp 오류 !!!',
-                                        s_button_title=f'{ret_로그인}')
+                                        s_button_title=f'{s_에러코드}')
 
-            ret_폴더변경 = ftp.cwd(dirname=f'/99.www/{folder_서버}')
-            if ret_폴더변경[:3] != '250':
+            try:
+                ret_폴더생성 = ftp.mkd(dirname=f'/99.www/{folder_서버}')
+            except ftplib.error_perm as error:
+                s_에러코드 = error.args[0]
+
+            try:
+                ret_폴더변경 = ftp.cwd(dirname=f'/99.www/{folder_서버}')
+            except ftplib.error_perm as error:
+                s_에러코드 = error.args[0]
                 result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'!!! [{s_호출파일}] ftp 오류 !!!',
-                                        s_button_title=f'{ret_폴더변경}')
+                                        s_button_title=f'{s_에러코드}')
 
             # 신규파일 업로드
             with open(os.path.join(folder_로컬, s_파일명), 'rb') as file:
