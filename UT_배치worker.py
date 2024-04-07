@@ -83,8 +83,10 @@ class Worker:
             li_파일_일자존재 = [파일 for 파일 in li_기존파일 if re.findall(r'\d{8}', 파일)]
             li_파일_삭제대상 = [파일 for 파일 in li_파일_일자존재 if re.findall(r'\d{8}', 파일)[0] < s_기준일자]
             for 파일 in li_파일_삭제대상:
-                ret_삭제 = ftp.delete(filename=파일)
-                if ret_삭제[:3] != '250':
+                try:
+                    ret_삭제 = ftp.delete(filename=파일)
+                except ftplib.error_perm as error:
+                    s_에러코드 = error.args[0]
                     result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'!!! [{s_호출파일}] ftp 오류 !!!',
                                             s_button_title=f'{ret_삭제}')
 
