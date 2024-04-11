@@ -182,37 +182,42 @@ class Analyzer:
             df_수익검증.to_csv(os.path.join(self.folder_종목수익검증, f'수익검증_{s_모델}_{s_일자}.csv'),
                            index=False, encoding='cp949')
 
-            # 감시대상 종목 정보 생성
-            li_감시대상_파일명 = [파일명 for 파일명 in os.listdir(self.folder_감시대상)
-                           if f'df_감시대상_{s_모델}_' in 파일명 and '.pkl' in 파일명]
-            s_시작일자 = min([re.findall(r'\d{8}', 파일명)[0] for 파일명 in li_파일명])
-            li_감시대상_파일명 = [파일명 for 파일명 in li_감시대상_파일명 if re.findall(r'\d{8}', 파일명)[0] <= s_일자]
-            li_감시대상_파일명 = [파일명 for 파일명 in li_감시대상_파일명 if re.findall(r'\d{8}', 파일명)[0] >= s_시작일자]
-            df_감시대상 = pd.DataFrame()
-            df_감시대상['일자'] = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in li_감시대상_파일명]
-            df_감시대상['종목수'] = [len(pd.read_pickle(os.path.join(self.folder_감시대상, 파일명)))
-                              for 파일명 in li_감시대상_파일명]
-
-            # 리포트 생성
-            folder_리포트 = self.folder_종목수익검증
-            s_파일명_리포트 = f'수익검증_리포트_{s_모델}_{s_일자}.png'
-            self.make_리포트(df_감시대상=df_감시대상, df_수익검증=df_수익검증, folder_저장=folder_리포트, s_파일명=s_파일명_리포트)
-
-            # 리포트 복사 to 서버
-            import UT_배치worker
-            w = UT_배치worker.Worker()
-            folder_서버 = 'kakao/수익검증'
-            w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
-
-            # 카톡 보내기
-            import API_kakao
-            k = API_kakao.KakaoAPI()
-            result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 분석1검증 완료',
-                                    s_button_title=f'수익검증 리포트 - {s_일자}',
-                                    s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
-
             # log 기록
-            self.make_log(f'수익검증 리포트 생성 완료({s_일자}, {s_모델})')
+            self.make_log(f'종목별 수익검증 완료({s_일자}, {s_모델})')
+
+            # # 감시대상 종목 정보 생성
+            # li_감시대상_파일명 = [파일명 for 파일명 in os.listdir(self.folder_감시대상)
+            #                if f'df_감시대상_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+            # s_시작일자 = min([re.findall(r'\d{8}', 파일명)[0] for 파일명 in li_파일명])
+            # li_감시대상_파일명 = [파일명 for 파일명 in li_감시대상_파일명 if re.findall(r'\d{8}', 파일명)[0] <= s_일자]
+            # li_감시대상_파일명 = [파일명 for 파일명 in li_감시대상_파일명 if re.findall(r'\d{8}', 파일명)[0] >= s_시작일자]
+            # df_감시대상 = pd.DataFrame()
+            # df_감시대상['일자'] = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in li_감시대상_파일명]
+            # df_감시대상['종목수'] = [len(pd.read_pickle(os.path.join(self.folder_감시대상, 파일명)))
+            #                   for 파일명 in li_감시대상_파일명]
+            #
+            # # 리포트 생성
+            # folder_리포트 = self.folder_종목수익검증
+            # s_파일명_리포트 = f'수익검증_리포트_{s_모델}_{s_일자}.png'
+            # self.make_리포트_종목(df_감시대상=df_감시대상, df_수익검증=df_수익검증)
+            # plt.savefig(os.path.join(folder_리포트, s_파일명_리포트))
+            # plt.close()
+            #
+            # # 리포트 복사 to 서버
+            # import UT_배치worker
+            # w = UT_배치worker.Worker()
+            # folder_서버 = 'kakao/수익검증_종목'
+            # w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
+            #
+            # # 카톡 보내기
+            # import API_kakao
+            # k = API_kakao.KakaoAPI()
+            # result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 종목분석검증 완료',
+            #                         s_button_title=f'수익검증 리포트 - {s_일자}',
+            #                         s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
+            #
+            # # log 기록
+            # self.make_log(f'수익검증 리포트 생성 완료({s_일자}, {s_모델})')
 
     def 공통분석_데이터셋(self, s_모델):
         """ 종목분석 수익검증 결과를 바탕으로 공통 분석을 위한 데이터셋 df 생성 후 저장 """
@@ -351,16 +356,27 @@ class Analyzer:
             li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_공통성능평가)
                       if f'df_성능평가_{s_모델}_' in 파일명 and '.pkl' in 파일명]
             li_파일명 = [파일명 for 파일명 in li_파일명 if re.findall(r'\d{8}', 파일명)[0] <= s_일자]
-            li_df = [pd.read_pickle(os.path.join(self.folder_종목상승예측, 파일명)) for 파일명 in li_파일명]
-            df_상승예측 = pd.concat(li_df, axis=0)
 
-            # 예측한 값만 잘라내기
-            df_수익검증 = df_상승예측[df_상승예측['상승예측'] == 1].drop_duplicates()
+            # 예측한 값만 잘라내기 (예측값 없을 시 해당 날짜는 None 반환)
+            li_df_수익검증 = list()
+            for s_파일명 in li_파일명:
+                df_상승예측_일별 = pd.read_pickle(os.path.join(self.folder_공통성능평가, s_파일명))
+                df_상승예측_일별['예측'] = (df_상승예측_일별['공통확률(%)'] >= 50) * 1
+                df_수익검증_일별 = df_상승예측_일별[df_상승예측_일별['예측'] == 1].drop_duplicates()
+                if len(df_수익검증_일별) == 0:
+                    df_수익검증_일별.loc[0] = None
+                    df_수익검증_일별['일자'] = re.findall(r'\d{8}', s_파일명)[0]
+                    df_수익검증_일별.index = df_수익검증_일별['일자'].astype('datetime64[ns]')
+                li_df_수익검증.append(df_수익검증_일별)
+            df_수익검증 = pd.concat(li_df_수익검증, axis=0)
 
             # 예측 엑셀 저장 (pkl 포함)
-            df_수익검증.to_pickle(os.path.join(self.folder_종목수익검증, f'df_수익검증_{s_모델}_{s_일자}.pkl'))
-            df_수익검증.to_csv(os.path.join(self.folder_종목수익검증, f'수익검증_{s_모델}_{s_일자}.csv'),
+            df_수익검증.to_pickle(os.path.join(self.folder_공통수익검증, f'df_공통수익검증_{s_모델}_{s_일자}.pkl'))
+            df_수익검증.to_csv(os.path.join(self.folder_공통수익검증, f'df_공통수익검증_{s_모델}_{s_일자}.csv'),
                            index=False, encoding='cp949')
+
+            # log 기록
+            self.make_log(f'공통모델 수익검증 완료({s_일자}, {s_모델})')
 
             # 감시대상 종목 정보 생성
             li_감시대상_파일명 = [파일명 for 파일명 in os.listdir(self.folder_감시대상)
@@ -374,20 +390,22 @@ class Analyzer:
                               for 파일명 in li_감시대상_파일명]
 
             # 리포트 생성
-            folder_리포트 = self.folder_종목수익검증
+            folder_리포트 = self.folder_공통수익검증
             s_파일명_리포트 = f'수익검증_리포트_{s_모델}_{s_일자}.png'
-            self.make_리포트(df_감시대상=df_감시대상, df_수익검증=df_수익검증, folder_저장=folder_리포트, s_파일명=s_파일명_리포트)
+            self.make_리포트_공통(df_감시대상=df_감시대상, df_수익검증=df_수익검증)
+            plt.savefig(os.path.join(folder_리포트, s_파일명_리포트))
+            plt.close()
 
             # 리포트 복사 to 서버
             import UT_배치worker
             w = UT_배치worker.Worker()
-            folder_서버 = 'kakao/수익검증'
+            folder_서버 = 'kakao/수익검증_공통'
             w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
 
             # 카톡 보내기
             import API_kakao
             k = API_kakao.KakaoAPI()
-            result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 분석1검증 완료',
+            result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 공통분석검증 완료',
                                     s_button_title=f'수익검증 리포트 - {s_일자}',
                                     s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
 
@@ -414,7 +432,7 @@ class Analyzer:
                 file.write(f'{s_log}\n')
 
     @staticmethod
-    def make_리포트(df_감시대상, df_수익검증, folder_저장, s_파일명):
+    def make_리포트_종목(df_감시대상, df_수익검증):
         """ 수익검증 데이터를 기반으로 daily 리포트 생성 및 png 파일로 저장 """
         # 그래프 설정
         plt.figure(figsize=[16, 9])
@@ -462,9 +480,120 @@ class Analyzer:
         plt.axhline(100, color='C0', alpha=0)
         plt.axhline(70, color='C1')
 
-        # 리포트 저장
-        plt.savefig(os.path.join(folder_저장, s_파일명))
-        plt.close()
+    @staticmethod
+    def make_리포트_공통(df_감시대상, df_수익검증):
+        """ 수익검증 데이터를 기반으로 daily 리포트 생성 및 png 파일로 저장 """
+        # 그래프 설정
+        plt.figure(figsize=[16, 18])
+
+        # 일별 감시대상 종목수
+        plt.subplot(5, 2, 1)
+        plt.title('[ 감시대상 종목수 ]')
+        ary_x, ary_y = df_감시대상['일자'].values, df_감시대상['종목수'].values
+        li_색깔 = ['C1' if 종목수 > 15 else 'C0' for 종목수 in ary_y]
+        plt.bar(ary_x, ary_y, color=li_색깔)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.grid(linestyle='--', alpha=0.5)
+
+        # 일별 상승예측건수
+        plt.subplot(5, 2, 2)
+        plt.title('[ 상승예측 건수 ]')
+        sri_상승예측건수 = df_수익검증.groupby('일자')['예측'].sum()
+        ary_x, ary_y = sri_상승예측건수.index.values, sri_상승예측건수.values
+        li_색깔 = ['C3' if 예측건수 > 10 else 'C0' for 예측건수 in ary_y]
+        plt.bar(ary_x, ary_y, color=li_색깔)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.grid(linestyle='--', alpha=0.5)
+
+        # 일별 예측성공률
+        plt.subplot(5, 2, 4)
+        plt.title('[ 예측 성공률 (%) ]')
+        sri_예측성공건수 = df_수익검증.groupby('일자')['정답'].sum()
+        sri_예측성공률 = sri_예측성공건수 / sri_상승예측건수 * 100
+        ary_x, ary_y = sri_예측성공률.index.values, sri_예측성공률.values
+        li_색깔 = ['C0' if 성공률 > 70 else 'C3' for 성공률 in ary_y]
+        plt.bar(ary_x, ary_y, color=li_색깔)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.grid(linestyle='--', alpha=0.5)
+        plt.axhline(100, color='C0', alpha=0)
+        plt.axhline(70, color='C1')
+
+        # 누적 예측성공률
+        plt.subplot(5, 2, 3)
+        plt.title('[ 예측 성공률 (%, 누적) ]')
+        sri_예측성공률_누적 = sri_예측성공건수.cumsum() / sri_상승예측건수.cumsum() * 100
+        ary_x, ary_y = sri_예측성공률_누적.index.values, sri_예측성공률_누적.values
+        plt.plot(ary_x, ary_y)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.grid(linestyle='--', alpha=0.5)
+        plt.axhline(100, color='C0', alpha=0)
+        plt.axhline(70, color='C1')
+
+        # 월별 데이터 생성
+        df_수익검증['년월'] = [년월일[:6] for 년월일 in df_수익검증['일자']]
+        sri_년월 = df_수익검증.groupby('년월')['년월'].first()
+
+        dic_df_월별테이블 = dict()
+        for n_확률스펙 in [50, 55, 60]:
+            li_월별테이블 = [sri_년월]
+            df_수익검증_확률스펙 = df_수익검증[(df_수익검증['공통확률(%)'].isna()) | (df_수익검증['공통확률(%)'] >= n_확률스펙)]
+            li_월별테이블.append(df_수익검증_확률스펙.groupby('년월')['예측'].sum())
+            li_월별테이블.append(df_수익검증_확률스펙.groupby('년월')['정답'].sum())
+            df_월별테이블 = pd.concat(li_월별테이블, axis=1)
+            df_월별테이블['성공률'] = df_월별테이블['정답'] / df_월별테이블['예측'] * 100
+            df_월별테이블['기대수익'] = df_월별테이블['정답'] * 2.5 - (df_월별테이블['예측'] - df_월별테이블['정답']) * 3.5
+            for 컬럼명 in ['예측', '정답', '성공률']:
+                df_월별테이블[컬럼명] = df_월별테이블[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
+            df_월별테이블['기대수익'] = df_월별테이블['기대수익'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
+            df_월별테이블_T = df_월별테이블[-8:].T
+            df_월별테이블_T.index = ['년월', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
+            dic_df_월별테이블[f'{n_확률스펙}퍼'] = df_월별테이블
+            dic_df_월별테이블[f'{n_확률스펙}퍼T'] = df_월별테이블_T
+
+        # 일별 데이터 생성
+        df_수익검증['년월일'] = [년월일[2:] for 년월일 in df_수익검증['일자']]
+        sri_일자 = df_수익검증.groupby('년월일')['년월일'].first()
+
+        dic_df_일별테이블 = dict()
+        for n_확률스펙 in [50, 55, 60]:
+            li_일별테이블 = [sri_일자]
+            df_수익검증_확률스펙 = df_수익검증[(df_수익검증['공통확률(%)'].isna()) | (df_수익검증['공통확률(%)'] >= n_확률스펙)]
+            li_일별테이블.append(df_수익검증_확률스펙.groupby('년월일')['예측'].sum())
+            li_일별테이블.append(df_수익검증_확률스펙.groupby('년월일')['정답'].sum())
+            df_일별테이블 = pd.concat(li_일별테이블, axis=1)
+            df_일별테이블['성공률'] = df_일별테이블['정답'] / df_일별테이블['예측'] * 100
+            df_일별테이블['기대수익'] = df_일별테이블['정답'] * 2.5 - (df_일별테이블['예측'] - df_일별테이블['정답']) * 3.5
+            for 컬럼명 in ['예측', '정답', '성공률']:
+                df_일별테이블[컬럼명] = df_일별테이블[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
+            df_일별테이블['기대수익'] = df_일별테이블['기대수익'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
+            df_일별테이블_T = df_일별테이블[-10:].T
+            df_일별테이블_T.index = ['년월일', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
+            dic_df_일별테이블[f'{n_확률스펙}퍼'] = df_일별테이블
+            dic_df_일별테이블[f'{n_확률스펙}퍼T'] = df_일별테이블_T
+
+        # 월별 성공률
+        for i, n_확률스펙 in enumerate([50, 55, 60]):
+            plt.subplot(5, 2, 5 + 2 * i)
+            plt.title(f'[ 월별 성공률 (확률스펙 {n_확률스펙}%) ]')
+            df = dic_df_월별테이블[f'{n_확률스펙}퍼T']
+            plt.axis('tight')
+            plt.axis('off')
+            테이블 = plt.table(cellText=df.values, rowLabels=df.index, loc='center', cellLoc='center')
+            테이블.auto_set_font_size(False)
+            테이블.set_fontsize(12)
+            테이블.scale(1.0, 2.4)
+
+        # 일별 성공률
+        for i, n_확률스펙 in enumerate([50, 55, 60]):
+            plt.subplot(5, 2, 6 + 2 * i)
+            plt.title(f'[ 일별 성공률 (확률스펙 {n_확률스펙}%) ]')
+            df = dic_df_일별테이블[f'{n_확률스펙}퍼T']
+            plt.axis('tight')
+            plt.axis('off')
+            테이블 = plt.table(cellText=df.values, rowLabels=df.index, loc='center', cellLoc='center')
+            테이블.auto_set_font_size(False)
+            테이블.set_fontsize(12)
+            테이블.scale(1.0, 2.4)
 
 
 #######################################################################################################################
@@ -476,4 +605,4 @@ if __name__ == "__main__":
     a.공통분석_데이터셋(s_모델='rf')
     a.공통분석_모델생성(s_모델='rf')
     a.공통분석_성능평가(s_모델='rf')
-    # a.공통분석_수익검증(s_모델='rf')
+    a.공통분석_수익검증(s_모델='rf')
