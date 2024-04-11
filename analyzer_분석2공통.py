@@ -389,10 +389,13 @@ class Analyzer:
             df_감시대상['종목수'] = [len(pd.read_pickle(os.path.join(self.folder_감시대상, 파일명)))
                               for 파일명 in li_감시대상_파일명]
 
+            # 종목모델 수익검증 결과 불러오기
+            df_수익검증_종목 = pd.read_pickle(os.path.join(self.folder_종목수익검증, f'df_수익검증_rf_{s_일자}.pkl'))
+
             # 리포트 생성
             folder_리포트 = self.folder_공통수익검증
             s_파일명_리포트 = f'수익검증_리포트_{s_모델}_{s_일자}.png'
-            self.make_리포트_공통(df_감시대상=df_감시대상, df_수익검증=df_수익검증)
+            self.make_리포트_공통(df_감시대상=df_감시대상, df_수익검증_종목=df_수익검증_종목, df_수익검증_공통=df_수익검증)
             plt.savefig(os.path.join(folder_리포트, s_파일명_리포트))
             plt.close()
 
@@ -481,64 +484,19 @@ class Analyzer:
         plt.axhline(70, color='C1')
 
     @staticmethod
-    def make_리포트_공통(df_감시대상, df_수익검증):
+    def make_리포트_공통(df_감시대상, df_수익검증_종목, df_수익검증_공통):
         """ 수익검증 데이터를 기반으로 daily 리포트 생성 및 png 파일로 저장 """
-        # 그래프 설정
-        plt.figure(figsize=[16, 18])
+        # 월별 데이터 생성 - 공통검증
+        df_수익검증_공통['년월'] = [년월일[:6] for 년월일 in df_수익검증_공통['일자']]
+        sri_년월 = df_수익검증_공통.groupby('년월')['년월'].first()
 
-        # 일별 감시대상 종목수
-        plt.subplot(5, 2, 1)
-        plt.title('[ 감시대상 종목수 ]')
-        ary_x, ary_y = df_감시대상['일자'].values, df_감시대상['종목수'].values
-        li_색깔 = ['C1' if 종목수 > 15 else 'C0' for 종목수 in ary_y]
-        plt.bar(ary_x, ary_y, color=li_색깔)
-        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
-        plt.grid(linestyle='--', alpha=0.5)
-
-        # 일별 상승예측건수
-        plt.subplot(5, 2, 2)
-        plt.title('[ 상승예측 건수 ]')
-        sri_상승예측건수 = df_수익검증.groupby('일자')['예측'].sum()
-        ary_x, ary_y = sri_상승예측건수.index.values, sri_상승예측건수.values
-        li_색깔 = ['C3' if 예측건수 > 10 else 'C0' for 예측건수 in ary_y]
-        plt.bar(ary_x, ary_y, color=li_색깔)
-        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
-        plt.grid(linestyle='--', alpha=0.5)
-
-        # 일별 예측성공률
-        plt.subplot(5, 2, 4)
-        plt.title('[ 예측 성공률 (%) ]')
-        sri_예측성공건수 = df_수익검증.groupby('일자')['정답'].sum()
-        sri_예측성공률 = sri_예측성공건수 / sri_상승예측건수 * 100
-        ary_x, ary_y = sri_예측성공률.index.values, sri_예측성공률.values
-        li_색깔 = ['C0' if 성공률 > 70 else 'C3' for 성공률 in ary_y]
-        plt.bar(ary_x, ary_y, color=li_색깔)
-        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
-        plt.grid(linestyle='--', alpha=0.5)
-        plt.axhline(100, color='C0', alpha=0)
-        plt.axhline(70, color='C1')
-
-        # 누적 예측성공률
-        plt.subplot(5, 2, 3)
-        plt.title('[ 예측 성공률 (%, 누적) ]')
-        sri_예측성공률_누적 = sri_예측성공건수.cumsum() / sri_상승예측건수.cumsum() * 100
-        ary_x, ary_y = sri_예측성공률_누적.index.values, sri_예측성공률_누적.values
-        plt.plot(ary_x, ary_y)
-        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
-        plt.grid(linestyle='--', alpha=0.5)
-        plt.axhline(100, color='C0', alpha=0)
-        plt.axhline(70, color='C1')
-
-        # 월별 데이터 생성
-        df_수익검증['년월'] = [년월일[:6] for 년월일 in df_수익검증['일자']]
-        sri_년월 = df_수익검증.groupby('년월')['년월'].first()
-
-        dic_df_월별테이블 = dict()
+        dic_df_월별테이블_공통 = dict()
         for n_확률스펙 in [50, 55, 60]:
             li_월별테이블 = [sri_년월]
-            df_수익검증_확률스펙 = df_수익검증[(df_수익검증['공통확률(%)'].isna()) | (df_수익검증['공통확률(%)'] >= n_확률스펙)]
-            li_월별테이블.append(df_수익검증_확률스펙.groupby('년월')['예측'].sum())
-            li_월별테이블.append(df_수익검증_확률스펙.groupby('년월')['정답'].sum())
+            df_수익검증_공통_확률스펙 = df_수익검증_공통[(df_수익검증_공통['공통확률(%)'].isna())
+                                         | (df_수익검증_공통['공통확률(%)'] >= n_확률스펙)]
+            li_월별테이블.append(df_수익검증_공통_확률스펙.groupby('년월')['예측'].sum())
+            li_월별테이블.append(df_수익검증_공통_확률스펙.groupby('년월')['정답'].sum())
             df_월별테이블 = pd.concat(li_월별테이블, axis=1)
             df_월별테이블['성공률'] = df_월별테이블['정답'] / df_월별테이블['예측'] * 100
             df_월별테이블['기대수익'] = df_월별테이블['정답'] * 2.5 - (df_월별테이블['예측'] - df_월별테이블['정답']) * 3.5
@@ -547,19 +505,42 @@ class Analyzer:
             df_월별테이블['기대수익'] = df_월별테이블['기대수익'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
             df_월별테이블_T = df_월별테이블[-8:].T
             df_월별테이블_T.index = ['년월', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
-            dic_df_월별테이블[f'{n_확률스펙}퍼'] = df_월별테이블
-            dic_df_월별테이블[f'{n_확률스펙}퍼T'] = df_월별테이블_T
+            dic_df_월별테이블_공통[f'{n_확률스펙}퍼'] = df_월별테이블
+            dic_df_월별테이블_공통[f'{n_확률스펙}퍼T'] = df_월별테이블_T
 
-        # 일별 데이터 생성
-        df_수익검증['년월일'] = [년월일[2:] for 년월일 in df_수익검증['일자']]
-        sri_일자 = df_수익검증.groupby('년월일')['년월일'].first()
+        # 월별 데이터 생성 - 종목검증
+        df_수익검증_종목['년월'] = [년월일[:6] for 년월일 in df_수익검증_종목['일자']]
+        sri_년월 = df_수익검증_종목.groupby('년월')['년월'].first()
 
-        dic_df_일별테이블 = dict()
+        dic_df_월별테이블_종목 = dict()
+        for n_확률스펙 in [50, 55, 60]:
+            li_월별테이블 = [sri_년월]
+            df_수익검증_종목_확률스펙 = df_수익검증_종목[(df_수익검증_종목['상승확률(%)'].isna())
+                                         | (df_수익검증_종목['상승확률(%)'] >= n_확률스펙)]
+            li_월별테이블.append(df_수익검증_종목_확률스펙.groupby('년월')['상승예측'].sum())
+            li_월별테이블.append(df_수익검증_종목_확률스펙.groupby('년월')['정답'].sum())
+            df_월별테이블 = pd.concat(li_월별테이블, axis=1)
+            df_월별테이블['성공률'] = df_월별테이블['정답'] / df_월별테이블['상승예측'] * 100
+            df_월별테이블['기대수익'] = df_월별테이블['정답'] * 2.5 - (df_월별테이블['상승예측'] - df_월별테이블['정답']) * 3.5
+            for 컬럼명 in ['상승예측', '정답', '성공률']:
+                df_월별테이블[컬럼명] = df_월별테이블[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
+            df_월별테이블['기대수익'] = df_월별테이블['기대수익'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
+            df_월별테이블_T = df_월별테이블[-8:].T
+            df_월별테이블_T.index = ['년월', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
+            dic_df_월별테이블_종목[f'{n_확률스펙}퍼'] = df_월별테이블
+            dic_df_월별테이블_종목[f'{n_확률스펙}퍼T'] = df_월별테이블_T
+
+        # 일별 데이터 생성 - 공통검증
+        df_수익검증_공통['년월일'] = [년월일[2:] for 년월일 in df_수익검증_공통['일자']]
+        sri_일자 = df_수익검증_공통.groupby('년월일')['년월일'].first()
+
+        dic_df_일별테이블_공통 = dict()
         for n_확률스펙 in [50, 55, 60]:
             li_일별테이블 = [sri_일자]
-            df_수익검증_확률스펙 = df_수익검증[(df_수익검증['공통확률(%)'].isna()) | (df_수익검증['공통확률(%)'] >= n_확률스펙)]
-            li_일별테이블.append(df_수익검증_확률스펙.groupby('년월일')['예측'].sum())
-            li_일별테이블.append(df_수익검증_확률스펙.groupby('년월일')['정답'].sum())
+            df_수익검증_공통_확률스펙 = df_수익검증_공통[(df_수익검증_공통['공통확률(%)'].isna())
+                                         | (df_수익검증_공통['공통확률(%)'] >= n_확률스펙)]
+            li_일별테이블.append(df_수익검증_공통_확률스펙.groupby('년월일')['예측'].sum())
+            li_일별테이블.append(df_수익검증_공통_확률스펙.groupby('년월일')['정답'].sum())
             df_일별테이블 = pd.concat(li_일별테이블, axis=1)
             df_일별테이블['성공률'] = df_일별테이블['정답'] / df_일별테이블['예측'] * 100
             df_일별테이블['기대수익'] = df_일별테이블['정답'] * 2.5 - (df_일별테이블['예측'] - df_일별테이블['정답']) * 3.5
@@ -568,14 +549,114 @@ class Analyzer:
             df_일별테이블['기대수익'] = df_일별테이블['기대수익'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
             df_일별테이블_T = df_일별테이블[-10:].T
             df_일별테이블_T.index = ['년월일', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
-            dic_df_일별테이블[f'{n_확률스펙}퍼'] = df_일별테이블
-            dic_df_일별테이블[f'{n_확률스펙}퍼T'] = df_일별테이블_T
+            dic_df_일별테이블_공통[f'{n_확률스펙}퍼'] = df_일별테이블
+            dic_df_일별테이블_공통[f'{n_확률스펙}퍼T'] = df_일별테이블_T
 
-        # 월별 성공률
+        # 일별 데이터 생성 - 종목검증
+        df_수익검증_종목['년월일'] = [년월일[2:] for 년월일 in df_수익검증_종목['일자']]
+        sri_일자 = df_수익검증_종목.groupby('년월일')['년월일'].first()
+
+        dic_df_일별테이블_종목 = dict()
+        for n_확률스펙 in [50, 55, 60]:
+            li_일별테이블 = [sri_일자]
+            df_수익검증_종목_확률스펙 = df_수익검증_종목[(df_수익검증_종목['상승확률(%)'].isna())
+                                         | (df_수익검증_종목['상승확률(%)'] >= n_확률스펙)]
+            li_일별테이블.append(df_수익검증_종목_확률스펙.groupby('년월일')['상승예측'].sum())
+            li_일별테이블.append(df_수익검증_종목_확률스펙.groupby('년월일')['정답'].sum())
+            df_일별테이블 = pd.concat(li_일별테이블, axis=1)
+            df_일별테이블['성공률'] = df_일별테이블['정답'] / df_일별테이블['상승예측'] * 100
+            df_일별테이블['기대수익'] = df_일별테이블['정답'] * 2.5 - (df_일별테이블['상승예측'] - df_일별테이블['정답']) * 3.5
+            for 컬럼명 in ['상승예측', '정답', '성공률']:
+                df_일별테이블[컬럼명] = df_일별테이블[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
+            df_일별테이블['기대수익'] = df_일별테이블['기대수익'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
+            df_일별테이블_T = df_일별테이블[-10:].T
+            df_일별테이블_T.index = ['년월일', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
+            dic_df_일별테이블_종목[f'{n_확률스펙}퍼'] = df_일별테이블
+            dic_df_일별테이블_종목[f'{n_확률스펙}퍼T'] = df_일별테이블_T
+
+        # 그래프 표시할 확률스펙 설정
+        n_확률스펙 = 55
+        df_수익검증_공통_확률스펙 = df_수익검증_공통[(df_수익검증_공통['공통확률(%)'].isna())
+                                     | (df_수익검증_공통['공통확률(%)'] >= n_확률스펙)]
+
+        # 그래프 설정
+        plt.figure(figsize=[16, 20])
+
+        # 일별 감시대상 종목수
+        plt.subplot(6, 2, 1)
+        plt.title('[ 감시대상 종목수 ]')
+        ary_x, ary_y = df_감시대상['일자'].values, df_감시대상['종목수'].values.astype(int)
+        li_색깔 = ['C1' if 종목수 > 15 else 'C0' for 종목수 in ary_y]
+        plt.bar(ary_x, ary_y, color=li_색깔)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.grid(linestyle='--', alpha=0.5)
+
+        # 일별 상승예측건수
+        plt.subplot(6, 2, 2)
+        plt.title(f'[ 상승예측 건수 (확률스펙 {n_확률스펙}%) ]')
+        sri_상승예측건수 = df_수익검증_공통_확률스펙.groupby('일자')['예측'].sum()
+        ary_x, ary_y = sri_상승예측건수.index.values, sri_상승예측건수.values.astype(int)
+        li_색깔 = ['C3' if 예측건수 > 10 else 'C0' for 예측건수 in ary_y]
+        plt.bar(ary_x, ary_y, color=li_색깔)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.yticks(range(0, max(ary_y) + 1, 1))
+        plt.grid(linestyle='--', alpha=0.5)
+
+        # 일별 예측성공률
+        plt.subplot(6, 2, 4)
+        plt.title(f'[ 예측 성공률 (%, 확률스펙 {n_확률스펙}%) ]')
+        sri_예측성공건수 = df_수익검증_공통_확률스펙.groupby('일자')['정답'].sum()
+        sri_예측성공률 = sri_예측성공건수 / sri_상승예측건수 * 100
+        ary_x, ary_y = sri_예측성공률.index.values, sri_예측성공률.values
+        li_색깔 = ['C0' if 성공률 > 70 else 'C3' for 성공률 in ary_y]
+        plt.bar(ary_x, ary_y, color=li_색깔)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.yticks(range(0, 101, 20))
+        plt.grid(linestyle='--', alpha=0.5)
+        plt.axhline(100, color='C0', alpha=0)
+        plt.axhline(70, color='C1')
+
+        # 누적 예측성공률
+        plt.subplot(6, 2, 3)
+        plt.title(f'[ 예측 성공률 (%, 누적, 확률스펙 {n_확률스펙}%) ]')
+        sri_예측성공률_누적 = sri_예측성공건수.cumsum() / sri_상승예측건수.cumsum() * 100
+        ary_x, ary_y = sri_예측성공률_누적.index.values, sri_예측성공률_누적.values
+        plt.plot(ary_x, ary_y)
+        plt.xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        plt.yticks(range(0, 101, 20))
+        plt.grid(linestyle='--', alpha=0.5)
+        plt.axhline(100, color='C0', alpha=0)
+        plt.axhline(70, color='C1')
+
+        # 월별 성공률 - 종목검증
+        plt.subplot(6, 2, 5)
+        n_확률스펙 = 50
+        plt.title(f'[ 월별 성공률 - 종목 (확률스펙 {n_확률스펙}%) ]')
+        df = dic_df_월별테이블_종목[f'{n_확률스펙}퍼T']
+        plt.axis('tight')
+        plt.axis('off')
+        테이블 = plt.table(cellText=df.values, rowLabels=df.index, loc='center', cellLoc='center')
+        테이블.auto_set_font_size(False)
+        테이블.set_fontsize(12)
+        테이블.scale(1.0, 2.4)
+
+        # 일별 성공률 - 종목검증
+        plt.subplot(6, 2, 6)
+        n_확률스펙 = 50
+        plt.title(f'[ 일별 성공률 - 종목 (확률스펙 {n_확률스펙}%) ]')
+        df = dic_df_일별테이블_종목[f'{n_확률스펙}퍼T']
+        plt.axis('tight')
+        plt.axis('off')
+        테이블 = plt.table(cellText=df.values, rowLabels=df.index, loc='center', cellLoc='center')
+        테이블.auto_set_font_size(False)
+        테이블.set_fontsize(12)
+        테이블.scale(1.0, 2.4)
+
+        # 월별 성공률 - 공통검증
         for i, n_확률스펙 in enumerate([50, 55, 60]):
-            plt.subplot(5, 2, 5 + 2 * i)
-            plt.title(f'[ 월별 성공률 (확률스펙 {n_확률스펙}%) ]')
-            df = dic_df_월별테이블[f'{n_확률스펙}퍼T']
+            plt.subplot(6, 2, 7 + 2 * i)
+            plt.title(f'[ 월별 성공률 - 공통 (확률스펙 {n_확률스펙}%) ]')
+            df = dic_df_월별테이블_공통[f'{n_확률스펙}퍼T']
             plt.axis('tight')
             plt.axis('off')
             테이블 = plt.table(cellText=df.values, rowLabels=df.index, loc='center', cellLoc='center')
@@ -583,11 +664,11 @@ class Analyzer:
             테이블.set_fontsize(12)
             테이블.scale(1.0, 2.4)
 
-        # 일별 성공률
+        # 일별 성공률 - 공통검증
         for i, n_확률스펙 in enumerate([50, 55, 60]):
-            plt.subplot(5, 2, 6 + 2 * i)
-            plt.title(f'[ 일별 성공률 (확률스펙 {n_확률스펙}%) ]')
-            df = dic_df_일별테이블[f'{n_확률스펙}퍼T']
+            plt.subplot(6, 2, 8 + 2 * i)
+            plt.title(f'[ 일별 성공률 - 공통 (확률스펙 {n_확률스펙}%) ]')
+            df = dic_df_일별테이블_공통[f'{n_확률스펙}퍼T']
             plt.axis('tight')
             plt.axis('off')
             테이블 = plt.table(cellText=df.values, rowLabels=df.index, loc='center', cellLoc='center')
