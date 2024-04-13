@@ -148,6 +148,11 @@ class Analyzer:
             li_df = [pd.DataFrame()] + [dic_df_상승예측[종목코드] for 종목코드 in dic_df_상승예측.keys()]
             df_상승예측 = pd.concat(li_df, axis=0)
 
+            # 상승예측 없을 시 빈 df로 설정
+            df_상승예측 = pd.read_pickle(os.path.join(self.folder_종목상승예측, f'df_상승예측_{s_모델}_{s_일자_전일}.pkl'))
+            df_상승예측 = df_상승예측.drop(df_상승예측.index)
+            df_상승예측.loc[0] = None
+
             # 결과 저장
             df_상승예측.to_pickle(os.path.join(self.folder_종목상승예측, f'df_상승예측_{s_모델}_{s_일자}.pkl'))
             df_상승예측.to_csv(os.path.join(self.folder_종목상승예측, f'상승예측_{s_모델}_{s_일자}.csv'),
@@ -171,11 +176,19 @@ class Analyzer:
             li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_종목상승예측)
                       if f'df_상승예측_{s_모델}_' in 파일명 and '.pkl' in 파일명]
             li_파일명 = [파일명 for 파일명 in li_파일명 if re.findall(r'\d{8}', 파일명)[0] <= s_일자]
-            li_df = [pd.read_pickle(os.path.join(self.folder_종목상승예측, 파일명)) for 파일명 in li_파일명]
-            df_상승예측 = pd.concat(li_df, axis=0)
 
-            # 예측한 값만 잘라내기
-            df_수익검증 = df_상승예측[df_상승예측['상승예측'] == 1].drop_duplicates()
+            # 예측한 값만 잘라내기 (예측값 없을 시 해당 날짜는 None 반환)
+            li_df_수익검증 = list()
+            for s_파일명 in li_파일명:
+                df_상승예측_일별 = pd.read_pickle(os.path.join(self.folder_종목상승예측, s_파일명))
+                df_상승예측_일별['상승예측'] = (df_상승예측_일별['상승확률(%)'] >= 50) * 1
+                df_수익검증_일별 = df_상승예측_일별[df_상승예측_일별['상승예측'] == 1].drop_duplicates()
+                if len(df_수익검증_일별) == 0:
+                    df_수익검증_일별.loc[0] = None
+                    df_수익검증_일별['일자'] = re.findall(r'\d{8}', s_파일명)[0]
+                    df_수익검증_일별.index = df_수익검증_일별['일자'].astype('datetime64[ns]')
+                li_df_수익검증.append(df_수익검증_일별)
+            df_수익검증 = pd.concat(li_df_수익검증, axis=0)
 
             # 예측 엑셀 저장 (pkl 포함)
             df_수익검증.to_pickle(os.path.join(self.folder_종목수익검증, f'df_수익검증_{s_모델}_{s_일자}.pkl'))
