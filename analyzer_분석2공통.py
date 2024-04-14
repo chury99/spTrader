@@ -31,8 +31,6 @@ class Analyzer:
         # 폴더 정의
         import UT_폴더manager
         dic_폴더정보 = UT_폴더manager.dic_폴더정보
-        self.folder_run = dic_폴더정보['run']
-        self.folder_ohlcv = dic_폴더정보['데이터|ohlcv']
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
         self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
         self.folder_감시대상 = dic_폴더정보['분석1종목|50_종목_감시대상']
@@ -49,15 +47,6 @@ class Analyzer:
         os.makedirs(self.folder_공통모델, exist_ok=True)
         os.makedirs(self.folder_공통성능평가, exist_ok=True)
         os.makedirs(self.folder_공통수익검증, exist_ok=True)
-
-        # 변수 설정
-        dic_조건검색 = pd.read_pickle(os.path.join(self.folder_정보수집, 'dic_조건검색.pkl'))
-        df_분석대상종목 = dic_조건검색['분석대상종목']
-        self.li_종목_분석대상 = list(df_분석대상종목['종목코드'].sort_values())
-        self.dic_코드2종목명 = df_분석대상종목.set_index('종목코드').to_dict()['종목명']
-
-        self.li_일자_전체 = sorted([re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
-                               if 'dic_코드별_10분봉_' in 파일명 and '.pkl' in 파일명])
 
         # 카카오 API 폴더 연결
         sys.path.append(dic_config['folder_kakao'])
