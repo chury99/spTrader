@@ -44,7 +44,7 @@ class Analyzer:
         os.makedirs(self.folder_종목준비, exist_ok=True)
         os.makedirs(self.folder_종목데이터셋, exist_ok=True)
         os.makedirs(self.folder_종목매수검증, exist_ok=True)
-        # os.makedirs(self.folder_공통데이터셋, exist_ok=True)
+        os.makedirs(self.folder_공통데이터셋, exist_ok=True)
         # os.makedirs(self.folder_공통매수검증, exist_ok=True)
 
         # 카카오 API 폴더 연결
@@ -198,7 +198,10 @@ class Analyzer:
                     ary_x = Logic.make_1개검증용x_rf(df=df_데이터셋_tr)
 
                     # 상승확률 산출
-                    n_상승확률 = obj_종목모델.predict_proba(ary_x)[:, 1][0] * 100
+                    try:
+                        n_상승확률 = obj_종목모델.predict_proba(ary_x)[:, 1][0] * 100
+                    except (IndexError, ValueError):
+                        n_상승확률 = 0
 
                     # 데이터 입력
                     df_검증 = df_데이터셋.loc[:, : '거래량ma120']
