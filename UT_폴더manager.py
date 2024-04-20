@@ -50,10 +50,7 @@ dic_폴더정보['분석2공통|60_공통_수익검증'] = os.path.join(folder_�
 # 백테스팅 폴더 정의
 folder_백테스팅 = os.path.join(folder_work, '백테스팅')
 dic_폴더정보['백테스팅'] = folder_백테스팅
-dic_폴더정보['백테스팅|10_종목준비'] = os.path.join(folder_백테스팅, '10_종목준비')
-dic_폴더정보['백테스팅|20_데이터셋_종목'] = os.path.join(folder_백테스팅, '20_데이터셋_종목')
-dic_폴더정보['백테스팅|30_매수검증_종목'] = os.path.join(folder_백테스팅, '30_매수검증_종목')
-dic_폴더정보['백테스팅|40_데이터셋_공통'] = os.path.join(folder_백테스팅, '40_데이터셋_공통')
-dic_폴더정보['백테스팅|50_매수검증_공통'] = os.path.join(folder_백테스팅, '50_매수검증_공통')
-dic_폴더정보['백테스팅|60_매도검증'] = os.path.join(folder_백테스팅, '60_매도검증')
-dic_폴더정보['백테스팅|70_수익검증'] = os.path.join(folder_백테스팅, '70_수익검증')
+dic_폴더정보['백테스팅|10_데이터준비'] = os.path.join(folder_백테스팅, '10_데이터준비')
+dic_폴더정보['백테스팅|20_매수검증'] = os.path.join(folder_백테스팅, '20_매수검증')
+dic_폴더정보['백테스팅|30_매도검증'] = os.path.join(folder_백테스팅, '30_매도검증')
+dic_폴더정보['백테스팅|40_수익검증'] = os.path.join(folder_백테스팅, '40_수익검증')
