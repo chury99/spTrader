@@ -105,7 +105,7 @@ class Analyzer:
 
                 # 데이터셋 준비 (추가 데이터 생성, 라벨 생성, 당일만 잘라내기, 입력용 ary로 변환)
                 df_10분봉 = pd.concat([dic_df_10분봉_전일[s_종목코드], dic_df_10분봉_당일[s_종목코드]], axis=0).sort_index()
-                df_데이터셋 = Logic.make_추가데이터_rf(df=df_10분봉)
+                df_데이터셋 = Logic.trd_make_추가데이터_종목모델_rf(df=df_10분봉)
                 df_데이터셋 = Logic.make_라벨데이터_rf(df=df_데이터셋, n_대기봉수=n_대기봉수)
                 df_데이터셋 = df_데이터셋[df_데이터셋['일자'] == s_일자]
                 if len(df_데이터셋) == 0 or len(df_데이터셋) != len(df_10분봉[df_10분봉['일자'] == s_일자]):
