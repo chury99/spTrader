@@ -147,7 +147,7 @@ class Analyzer:
             dic_df_데이터셋 = dict()
             for s_종목코드 in tqdm(li_대상종목, desc=f'데이터셋 생성({s_일자})'):
                 df_10분봉 = dic_df_10분봉[s_종목코드].dropna()
-                df_데이터셋 = Logic.make_추가데이터_rf(df=df_10분봉) if s_모델 == 'rf'\
+                df_데이터셋 = Logic.trd_make_추가데이터_종목모델_rf(df=df_10분봉) if s_모델 == 'rf'\
                     else Logic.make_추가데이터_lstm(df=df_10분봉) if s_모델 == 'lstm'\
                     else None
                 dic_df_데이터셋[s_종목코드] = df_데이터셋
