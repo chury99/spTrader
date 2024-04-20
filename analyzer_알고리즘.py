@@ -20,7 +20,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tqdm import tqdm
 
 
-def make_이동평균(df):
+def trd_make_이동평균(df):
     """ tr 수신한 ohlcv 데이터를 받아서 ma 데이터 생성 후 df 리턴 (na 삭제)
         # 입력 df 인덱스 무관 (인덱스 dt 형식으로 재설정)
         # 입력 df 컬럼 (9개) : 일자, 종목코드, 종목명, 시간, 시가, 고가, 저가, 종가, 거래량 """
@@ -49,7 +49,7 @@ def make_이동평균(df):
     return df_정리
 
 
-def make_추가데이터_rf(df):
+def trd_make_추가데이터_종목모델_rf(df):
     """ ohlcv 데이터 (ma 포함, na 삭제) 받아서 분석을 위한 추가 데이터 처리 후 df 리턴
         # 입력 df 인덱스는 dt 형식
         # 입력 df 컬럼 (20개) : 일자, 종목코드, 종목명, 시간, 시가, 고가, 저가, 종가, 거래량, 전일종가, 전일대비(%),
@@ -145,6 +145,13 @@ def make_추가데이터_rf(df):
     return df_추가
 
 
+def trd_make_추가데이터_공통모델_rf(df):
+    """ ohlcv 데이터 (ma 포함, na 삭제) 받아서 분석을 위한 추가 데이터 처리 후 df 리턴
+        # 입력 df 인덱스는 dt 형식
+        # 입력 df 컬럼 (20개) : 일자, 종목코드, 종목명, 시간, 시가, 고가, 저가, 종가, 거래량, 전일종가, 전일대비(%),
+                              종가ma5, 종가ma10, 종가ma20, 종가ma60, 종가ma120, 거래량ma5, 거래량ma20, 거래량ma60, 거래량ma120 """
+    return df_추가
+
 # noinspection PyPep8Naming
 def make_라벨데이터_rf(df, n_대기봉수):
     """ 데이터셋을 입력 받아서 라벨 데이터 생성 후 df 리턴 """
@@ -202,7 +209,7 @@ def make_입력용xy_rf(df, n_학습일수):
     return dic_데이터셋
 
 
-def make_1개검증용x_rf(df):
+def trd_make_x_1개검증용_rf(df):
     """ trader 실행 시 모델에 사용할 1개 데이터 정리하여 ary_x 리턴 (입력 시 라벨 데이터 없음) """
     df = df.sort_index()
     li_인자 = [컬럼명 for 컬럼명 in df.columns if 컬럼명 not in ['일자', '종목코드', '종목명', '시간']]
@@ -226,6 +233,8 @@ def make_모델_rf(dic_데이터셋, n_rf_트리, n_rf_깊이):
     모델.fit(ary_x_학습, ary_y_학습)
 
     return 모델
+
+#######################################################################################################################
 
 
 # noinspection PyArgumentList
