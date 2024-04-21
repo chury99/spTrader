@@ -83,6 +83,9 @@ class Analyzer:
             df_감시대상_전일 = pd.read_pickle(os.path.join(self.folder_감시대상, f'df_감시대상_{s_모델}_{s_일자_전일}.pkl'))
             li_데이터종목 = df_감시대상_전일['종목코드'].values if len(df_감시대상_전일) > 0 else list()
 
+            # 전일 종가 데이터 불러오기 (당일 기준 - 분봉 데이터 처리 시 사용)
+            dic_전일종가 = Logic.trd_load_전일종가(s_일자=s_일자, li_데이터종목=li_데이터종목)
+
             # 분봉 데이터 불러오기 (당일 기준 - 매도 검증 시 사용)
             dic_분봉 = dict()
             dic_분봉_전체 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_분봉_{s_일자}.pkl'))
@@ -108,6 +111,7 @@ class Analyzer:
             pd.to_pickle(df_종목조건, os.path.join(self.folder_데이터준비, f'df_종목조건_{s_모델}_{s_일자}.pkl'))
             df_종목조건.to_csv(os.path.join(self.folder_데이터준비, f'df_종목조건_{s_모델}_{s_일자}.csv'),
                            index=False, encoding='cp949')
+            pd.to_pickle(dic_전일종가, os.path.join(self.folder_데이터준비, f'dic_전일종가_{s_모델}_{s_일자}.pkl'))
             pd.to_pickle(dic_분봉, os.path.join(self.folder_데이터준비, f'dic_분봉_{s_모델}_{s_일자}.pkl'))
             pd.to_pickle(dic_10분봉, os.path.join(self.folder_데이터준비, f'dic_10분봉_{s_모델}_{s_일자}.pkl'))
 
@@ -131,8 +135,9 @@ class Analyzer:
             except ValueError:
                 continue
 
-            # 데이터 파일 불러오기 (전일 종목, 모델 기준으로 당일 데이터 검증)
+            # 데이터 파일 불러오기 (전일 종목, 모델 기준으로 당일 데이터 검증 => 종목-전일, ohlcv-당일, 모델-전일)
             dic_종목조건 = pd.read_pickle(os.path.join(self.folder_데이터준비, f'dic_종목조건_{s_모델}_{s_일자_전일}.pkl'))
+            dic_전일종가_전체 = pd.read_pickle(os.path.join(self.folder_데이터준비, f'dic_전일종가_{s_모델}_{s_일자}.pkl'))
             dic_10분봉 = pd.read_pickle(os.path.join(self.folder_데이터준비, f'dic_10분봉_{s_모델}_{s_일자}.pkl'))
             dic_종목모델 = pd.read_pickle(os.path.join(self.folder_종목모델, f'dic_모델_감시대상_{s_모델}_{s_일자_전일}.pkl'))
             obj_공통모델 = pd.read_pickle(os.path.join(self.folder_공통모델, f'obj_공통모델_{s_모델}_{s_일자_전일}.pkl'))
@@ -159,16 +164,21 @@ class Analyzer:
                     # 데이터 불러오기
                     df_10분봉 = dic_10분봉[s_종목코드]
                     s_케이스 = dic_케이스[s_종목코드]
+                    n_확률스펙 = dic_종목조건[s_종목코드][5]
                     obj_종목모델 = dic_종목모델[s_종목코드][s_케이스]
                     obj_공통모델 = obj_공통모델
                     s_종목명 = df_10분봉['종목명'].values[-1]
+                    dic_전일종가 = dic_전일종가_전체[s_종목코드]
 
-                    # 필요 데이터 골라내기 (tr 조회해서 가공한 df와 동일) => trd (tr 조회 후 trd_make_이동평균 실행한 상태)
+                    # 필요 데이터 골라내기 (tr 조회한 df와 동일) => trd
                     dt_시점 = pd.Timestamp(f'{s_일자} {s_시간}')
-                    df_10분봉_tr = df_10분봉[df_10분봉.index < dt_시점]
+                    df_10분봉_tr = df_10분봉[df_10분봉.index < dt_시점].sort_index(ascending=False)
+
+                    # 이동평균 데이터 생성 => trd
+                    df_10분봉_ma = Logic.trd_make_이동평균_분봉(df_분봉=df_10분봉_tr, dic_전일종가=dic_전일종가)
 
                     # 종목모델 데이터셋 생성 => trd
-                    df_데이터셋_종목 = Logic.trd_make_추가데이터_종목모델_rf(df=df_10분봉_tr)
+                    df_데이터셋_종목 = Logic.trd_make_추가데이터_종목모델_rf(df=df_10분봉_ma)
                     ary_x = Logic.trd_make_x_1개검증용_rf(df=df_데이터셋_종목)
 
                     # 종목모델 상승확률 산출 => trd
@@ -178,7 +188,8 @@ class Analyzer:
                         n_상승확률_종목 = 0
 
                     # 공통모델 데이터셋 생성 => trd
-                    df_데이터셋_공통 = Logic.trd_make_추가데이터_공통모델_rf(df=df_10분봉_tr)
+                    df_데이터셋_공통 = Logic.trd_make_추가데이터_공통모델_rf(df=df_10분봉_ma,
+                                                              n_상승확률_종목=n_상승확률_종목, n_확률스펙=n_확률스펙)
                     ary_x = Logic.trd_make_x_1개검증용_rf(df=df_데이터셋_공통)
 
                     # 공통모델 상승확률 산출 => trd
@@ -192,20 +203,33 @@ class Analyzer:
                     df_검증 = pd.DataFrame([[s_일자, s_종목코드, s_종목명, s_시간]], columns=li_컬럼명)
                     df_검증['일자시간'] = pd.to_datetime(df_검증['일자'] + ' ' + df_검증['시간'], format='%Y%m%d %H:%M:%S')
                     df_검증 = df_검증.set_index(keys='일자시간').sort_index(ascending=True)
+                    df_검증['확률스펙종목(%)'] = n_확률스펙
                     df_검증['종목확률(%)'] = n_상승확률_종목
                     df_검증['공통확률(%)'] = n_상승확률_공통
 
-                    # 데이터 입력
+                    # 매수 신호 생성
+                    df_검증['종목신호'] = (df_검증['종목확률(%)'] >= 50) * 1
+                    df_검증['공통신호'] = (df_검증['공통확률(%)'] >= 55) * 1
+                    df_검증['매수신호'] = df_검증['종목신호'] * df_검증['공통신호']
+                    li_df_매수검증.append(df_검증)
+
+                    # 종목 데이터셋 입력
                     try:
                         dic_데이터셋_종목[s_종목코드][dt_시점] = df_데이터셋_종목
                     except KeyError:
                         dic_데이터셋_종목[s_종목코드] = dict()
                         dic_데이터셋_종목[s_종목코드][dt_시점] = df_데이터셋_종목
-                    li_df_매수검증.append(df_검증)
+
+                    # 공통 데이터셋 입력
+                    try:
+                        dic_데이터셋_공통[s_종목코드][dt_시점] = df_데이터셋_공통
+                    except KeyError:
+                        dic_데이터셋_공통[s_종목코드] = dict()
+                        dic_데이터셋_공통[s_종목코드][dt_시점] = df_데이터셋_공통
 
             # df 정리 (데이터 없을 시 df에 None 출력)
             if len(li_df_매수검증) == 0:
-                li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_종목매수검증)
+                li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_매수검증)
                           if f'df_매수검증_{s_모델}_' in 파일명 and '.pkl' in 파일명]
                 s_전일파일 = max(li_파일명)
                 df_매수검증 = pd.read_pickle(os.path.join(self.folder_매수검증, s_전일파일))
@@ -215,6 +239,8 @@ class Analyzer:
                 df_매수검증 = pd.concat(li_df_매수검증, axis=0).drop_duplicates()
 
             # 결과 저장
+            pd.to_pickle(dic_데이터셋_종목, os.path.join(self.folder_매수검증, f'dic_데이터셋_종목_{s_모델}_{s_일자}.pkl'))
+            pd.to_pickle(dic_데이터셋_공통, os.path.join(self.folder_매수검증, f'dic_데이터셋_공통_{s_모델}_{s_일자}.pkl'))
             pd.to_pickle(df_매수검증, os.path.join(self.folder_매수검증, f'df_매수검증_{s_모델}_{s_일자}.pkl'))
             df_매수검증.to_csv(os.path.join(self.folder_매수검증, f'df_매수검증_{s_모델}_{s_일자}.csv'),
                            index=False, encoding='cp949')
