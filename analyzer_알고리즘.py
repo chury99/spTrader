@@ -20,17 +20,69 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tqdm import tqdm
 
 
-def trd_make_이동평균(df):
-    """ tr 수신한 ohlcv 데이터를 받아서 ma 데이터 생성 후 df 리턴 (na 삭제)
-        # 입력 df 인덱스 무관 (인덱스 dt 형식으로 재설정)
+# noinspection PyPep8Naming
+def trd_load_전일종가(s_일자, li_데이터종목):
+    """ 저장된 캐시파일 조회하여 일자별 전일종가 dic 형식으로 리턴 \n
+        # s_일자 : yyyymmdd 형태의 str \n
+        # 리턴값 : dic[s_종목코드] - dic[s_일자] - n_전일종가 """
+    # 폴더 정보 읽어오기
+    import UT_폴더manager
+    dic_폴더정보 = UT_폴더manager.dic_폴더정보
+    folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
+
+    # 일봉 데이터 읽어오기
+    s_년월 = s_일자[:6]
+    s_년월_전월 = (pd.Timestamp(s_일자) - pd.DateOffset(months=1)).strftime('%Y%m')
+    dic_일봉_전체 = pd.read_pickle(os.path.join(folder_캐시변환, f'dic_코드별_일봉_{s_년월}.pkl'))
+    dic_일봉_전체_전월 = pd.read_pickle(os.path.join(folder_캐시변환, f'dic_코드별_일봉_{s_년월_전월}.pkl'))
+
+    # 종목별 전일종가 데이터 정리
+    dic_전일종가 = dict()
+    for s_종목코드 in li_데이터종목:
+        try:
+            df_일봉_당월 = dic_일봉_전체[s_종목코드]
+        except KeyError:
+            df_일봉_당월 = pd.DataFrame()
+        try:
+            df_일봉_전월 = dic_일봉_전체_전월[s_종목코드]
+        except KeyError:
+            df_일봉_전월 = pd.DataFrame()
+        df_일봉 = pd.concat([df_일봉_전월, df_일봉_당월], axis=0).sort_values('일자', ascending=True)
+        df_일봉 = df_일봉[-30:]
+        dic_전일종가_일별 = df_일봉.set_index('일자').to_dict()['전일종가']
+        dic_전일종가[s_종목코드] = dic_전일종가_일별
+
+    return dic_전일종가
+
+
+# noinspection PyPep8Naming
+def trd_make_이동평균_분봉(df_분봉, dic_전일종가):
+    """ tr 수신한 ohlcv 데이터를 받아서 ma 데이터 생성 후 df 리턴 (na 삭제) \n
+        # 입력 df 인덱스 무관 (인덱스 dt 형식으로 재설정) \n
         # 입력 df 컬럼 (9개) : 일자, 종목코드, 종목명, 시간, 시가, 고가, 저가, 종가, 거래량 """
+    # 입력 데이터 확인
+    li_생성컬럼명 = ['일자', '종목코드', '종목명', '시간', '시가', '고가', '저가', '종가', '거래량',
+                '전일종가', '전일대비(%)',
+                '종가ma5', '종가ma10', '종가ma20', '종가ma60', '종가ma120',
+                '거래량ma5', '거래량ma20', '거래량ma60', '거래량ma120']
+    li_컬럼확인 = [1 if 컬럼 in li_생성컬럼명 else 0 for 컬럼 in df_분봉.columns]
+    if sum(li_컬럼확인) == len(li_컬럼확인):
+        df_분봉['일자시간'] = df_분봉['일자'] + ' ' + df_분봉['시간']
+        df_분봉['일자시간'] = pd.to_datetime(df_분봉['일자시간'], format='%Y%m%d %H:%M:%S')
+        df_분봉 = df_분봉.set_index(keys='일자시간').sort_index(ascending=True)
+        return df_분봉
+
     # df 추가 생성
-    df_정리 = df.loc[:, ['일자', '종목코드', '종목명', '시간', '시가', '고가', '저가', '종가', '거래량']].copy()
+    df_정리 = df_분봉.loc[:, ['일자', '종목코드', '종목명', '시간', '시가', '고가', '저가', '종가', '거래량']].copy()
 
     # 인덱스 설정
     df_정리['일자시간'] = df_정리['일자'] + ' ' + df_정리['시간']
     df_정리['일자시간'] = pd.to_datetime(df_정리['일자시간'], format='%Y%m%d %H:%M:%S')
     df_정리 = df_정리.set_index(keys='일자시간').sort_index(ascending=True)
+
+    # 전일대비(%) 생성
+    df_정리['전일종가'] = df_정리['일자'].apply(lambda x: dic_전일종가[x])
+    df_정리['전일대비(%)'] = (df_정리['종가'] / df_정리['전일종가'] - 1) * 100
 
     # 이동평균 생성
     df_정리['종가ma5'] = df_정리['종가'].rolling(5).mean()
@@ -50,11 +102,12 @@ def trd_make_이동평균(df):
 
 
 def trd_make_추가데이터_종목모델_rf(df):
-    """ ohlcv 데이터 (ma 포함, na 삭제) 받아서 분석을 위한 추가 데이터 처리 후 df 리턴
-        # 입력 df 인덱스는 dt 형식
+    """ ohlcv 데이터 (ma 포함) 받아서 분석을 위한 추가 데이터 처리 후 df 리턴 \n
+        # 입력 df 인덱스는 dt 형식 \n
         # 입력 df 컬럼 (20개) : 일자, 종목코드, 종목명, 시간, 시가, 고가, 저가, 종가, 거래량, 전일종가, 전일대비(%),
                               종가ma5, 종가ma10, 종가ma20, 종가ma60, 종가ma120, 거래량ma5, 거래량ma20, 거래량ma60, 거래량ma120 """
     # df_추가 생성
+    df = df.sort_index(ascending=True)
     df_추가 = df.loc[:, ['일자', '종목코드', '종목명', '시간', '시가', '고가', '저가', '종가', '거래량']].copy()
 
     # 상승률 생성
@@ -145,12 +198,41 @@ def trd_make_추가데이터_종목모델_rf(df):
     return df_추가
 
 
-def trd_make_추가데이터_공통모델_rf(df):
-    """ ohlcv 데이터 (ma 포함, na 삭제) 받아서 분석을 위한 추가 데이터 처리 후 df 리턴
-        # 입력 df 인덱스는 dt 형식
+# noinspection PyPep8Naming
+def trd_make_추가데이터_공통모델_rf(df, n_상승확률_종목, n_확률스펙):
+    """ ohlcv 데이터 (ma 포함) 받아서 분석을 위한 추가 데이터 처리 후 df 리턴 \n
+        # 입력 df 인덱스는 dt 형식 \n
         # 입력 df 컬럼 (20개) : 일자, 종목코드, 종목명, 시간, 시가, 고가, 저가, 종가, 거래량, 전일종가, 전일대비(%),
-                              종가ma5, 종가ma10, 종가ma20, 종가ma60, 종가ma120, 거래량ma5, 거래량ma20, 거래량ma60, 거래량ma120 """
+                              종가ma5, 종가ma10, 종가ma20, 종가ma60, 종가ma120, 거래량ma5, 거래량ma20, 거래량ma60, 거래량ma120 \n
+        # 당일 데이터 외에는 신뢰성 없음 """
+    # df_추가 생성 (마지막 데이터만 사용)
+    df = df.sort_index(ascending=True)[-1:]
+    df_추가 = df.loc[:, ['일자', '종목코드', '종목명', '시간']].copy()
+
+    # 전일대비(%) 생성
+    df_추가['전일대비(%)'] = df['전일대비(%)']
+
+    # 상승확률(%) 생성
+    df_추가['상승확률(%)'] = n_상승확률_종목
+
+    # 시고저종(%) 생성
+    for s_컬럼명 in ['시가', '고가', '저가', '종가']:
+        df_추가[f'{s_컬럼명}(%)'] = (df[s_컬럼명] / df['전일종가'] - 1) * 100
+
+    # 종가ma(%) 생성
+    for s_컬럼명 in ['종가ma5', '종가ma10', '종가ma20', '종가ma60', '종가ma120']:
+        df_추가[f'{s_컬럼명}(%)'] = (df[s_컬럼명] / df['전일종가'] - 1) * 100
+
+    # 거래량ma(%) 생성
+    for s_컬럼명 in ['거래량ma5', '거래량ma20', '거래량ma60', '거래량ma120']:
+        df_추가[f'{s_컬럼명}(%)'] = df[s_컬럼명] / df['거래량'] * 100
+
+    # 확률스펙 입력 (종목모델 ok 조건)
+    df_추가['확률스펙(%)'] = n_확률스펙
+    df_추가['스펙대비(%)'] = df_추가['상승확률(%)'] - df_추가['확률스펙(%)']
+
     return df_추가
+
 
 # noinspection PyPep8Naming
 def make_라벨데이터_rf(df, n_대기봉수):
