@@ -49,7 +49,9 @@ def trd_load_전일종가(s_일자, li_데이터종목):
             df_일봉_전월 = pd.DataFrame()
         df_일봉 = pd.concat([df_일봉_전월, df_일봉_당월], axis=0).sort_values('일자', ascending=True)
         df_일봉 = df_일봉[-30:]
+        df_일봉['전일종가'] = df_일봉['전일종가'].astype(int)
         dic_전일종가_일별 = df_일봉.set_index('일자').to_dict()['전일종가']
+        dic_전일종가_일별['마지막'] = int(df_일봉['종가'].values[-1])
         dic_전일종가[s_종목코드] = dic_전일종가_일별
 
     return dic_전일종가
@@ -80,8 +82,11 @@ def trd_make_이동평균_분봉(df_분봉, dic_전일종가):
     df_정리['일자시간'] = pd.to_datetime(df_정리['일자시간'], format='%Y%m%d %H:%M:%S')
     df_정리 = df_정리.set_index(keys='일자시간').sort_index(ascending=True)
 
+    # 전일종가 생성
+    df_정리.loc[-1, '일자'] = '20240427'
+    df_정리['전일종가'] = df_정리['일자'].apply(lambda x: dic_전일종가[x] if x in dic_전일종가.keys() else dic_전일종가['마지막'])
+
     # 전일대비(%) 생성
-    df_정리['전일종가'] = df_정리['일자'].apply(lambda x: dic_전일종가[x])
     df_정리['전일대비(%)'] = (df_정리['종가'] / df_정리['전일종가'] - 1) * 100
 
     # 이동평균 생성
