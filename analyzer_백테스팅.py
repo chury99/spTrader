@@ -41,8 +41,8 @@ class Analyzer:
         self.folder_수익검증 = dic_폴더정보['백테스팅|40_수익검증']
         os.makedirs(self.folder_데이터준비, exist_ok=True)
         os.makedirs(self.folder_매수검증, exist_ok=True)
-        # os.makedirs(self.folder_매도검증, exist_ok=True)
-        # os.makedirs(self.folder_수익검증, exist_ok=True)
+        os.makedirs(self.folder_매도검증, exist_ok=True)
+        os.makedirs(self.folder_수익검증, exist_ok=True)
 
         # 카카오 API 폴더 연결
         sys.path.append(dic_config['folder_kakao'])
@@ -203,6 +203,7 @@ class Analyzer:
                     df_검증 = pd.DataFrame([[s_일자, s_종목코드, s_종목명, s_시간]], columns=li_컬럼명)
                     df_검증['일자시간'] = pd.to_datetime(df_검증['일자'] + ' ' + df_검증['시간'], format='%Y%m%d %H:%M:%S')
                     df_검증 = df_검증.set_index(keys='일자시간').sort_index(ascending=True)
+                    df_검증['종목케이스'] = s_케이스
                     df_검증['확률스펙종목(%)'] = n_확률스펙
                     df_검증['종목확률(%)'] = n_상승확률_종목
                     df_검증['공통확률(%)'] = n_상승확률_공통
@@ -250,13 +251,163 @@ class Analyzer:
 
     def 백테스팅_매도검증(self, s_모델):
         """ 1분봉 기준 매도 조건 검증 후 결과 저장 """
-        # 공통/종목모델 모두 ok인 항목 대상
-        # 1분봉 기준 h가 +3% 이상이면 +2.5%
-        # 1분봉 기준 l이 -3% 이하이면 -3.5%
-        # 결과는 df로 저장 (매수시점, 매도시점 표기)
-        pass
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매수검증)
+                    if f'df_매수검증_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매도검증)
+                    if f'df_매도검증_{s_모델}_' in 파일명 and f'.pkl' in 파일명]
+        li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 데이터 파일 불러오기 (전일 종목, 모델 기준으로 당일 데이터 검증 => 종목-전일, ohlcv-당일, 모델-전일)
+            df_매수검증 = pd.read_pickle(os.path.join(self.folder_매수검증, f'df_매수검증_{s_모델}_{s_일자}.pkl'))
+            dic_10분봉 = pd.read_pickle(os.path.join(self.folder_데이터준비, f'dic_10분봉_{s_모델}_{s_일자}.pkl'))
+            dic_분봉 = pd.read_pickle(os.path.join(self.folder_데이터준비, f'dic_분봉_{s_모델}_{s_일자}.pkl'))
+
+            # 기준시간 생성
+            try:
+                s_코드 = max(dic_분봉, key=lambda x: len(dic_분봉[x]))
+                li_시간_전체 = list(dic_분봉[s_코드]['시간'].unique())
+            except ValueError:
+                li_시간_전체 = []
+
+            # 매수신호 재점검
+            df_매수검증['종목신호'] = (df_매수검증['종목확률(%)'] >= 50) * 1
+            df_매수검증['공통신호'] = (df_매수검증['공통확률(%)'] >= 55) * 1
+            df_매수검증['매수신호'] = df_매수검증['종목신호'] * df_매수검증['공통신호']
+
+            # 매수신호 골라내기
+            df_매수 = df_매수검증[df_매수검증['매수신호'] == 1]
+            li_시간_매수 = list(df_매수['시간'].unique())
+
+            # 매도 검증
+            s_검증시간 = '08:59:00'
+            li_df_매도검증 = []
+            for s_시간 in tqdm(li_시간_매수, desc=f'매도검증 ({s_일자})'):
+                # 마감시간 확인 (마감시간 전에는 다른 동작 불가)
+                if s_시간 <= s_검증시간:
+                    continue
+                # 매수종목 선택 (먼저 나오는 종목)
+                df_매수_시간 = df_매수[df_매수['시간'] == s_시간]
+                s_종목코드 = df_매수_시간['종목코드'].values[0]
+                s_종목명 = df_매수_시간['종목명'].values[0]
+                s_종목케이스 = df_매수_시간['종목케이스'].values[0]
+                s_대기봉수, s_학습일수, s_rf_트리, s_rf_깊이 = s_종목케이스.split('_')
+
+                # 분봉 데이터 불러오기
+                dt_시작 = pd.Timestamp(f'{s_일자} {s_시간}')
+                dt_종료 = pd.Timestamp(f'{s_일자} {s_시간}') + pd.Timedelta(minutes=(int(s_대기봉수) * 10))
+                df_분봉 = dic_분봉[s_종목코드]
+                df_분봉 = df_분봉[df_분봉.index >= dt_시작]
+                df_분봉 = df_분봉[df_분봉.index <= dt_종료]
+                if len(df_분봉) == 0:
+                    break
+
+                # 매수 정보 산출
+                s_시간_매수 = df_분봉['시간'].values[0]
+                n_단가_매수 = int(df_분봉['고가'].values[0])
+
+                # 기준가 불러오기 불러오기 (10분봉 기준 이전 분봉 종가)
+                df_10분봉 = dic_10분봉[s_종목코드]
+                df_10분봉_tr = df_10분봉[df_10분봉.index <= dt_시작].sort_index(ascending=False)
+                n_단가_기준 = int(df_10분봉_tr['종가'].values[1])
+
+                # 분봉 검증 (매수, 매도)
+                li_li_매도검증 = []
+                for s_검증시간 in df_분봉['시간']:
+                    # 데이터 확인
+                    df_검증 = df_분봉[df_분봉['시간'] == s_검증시간]
+                    n_시가 = int(df_검증['시가'].values[0])
+                    n_고가 = int(df_검증['고가'].values[0])
+                    n_저가 = int(df_검증['저가'].values[0])
+                    n_종가 = int(df_검증['종가'].values[0])
+                    n_비율_시가 = (n_시가 / n_단가_기준 - 1) * 100
+                    n_비율_고가 = (n_고가 / n_단가_기준 - 1) * 100
+                    n_비율_저가 = (n_저가 / n_단가_기준 - 1) * 100
+                    n_비율_종가 = (n_종가 / n_단가_기준 - 1) * 100
+
+                    # 익절 확인
+                    n_손익비율_익절 = 3.0
+                    if n_비율_고가 >= n_손익비율_익절:
+                        s_시간_매도 = s_검증시간
+                        n_단가_매도 = int(n_단가_기준 * (1 + n_손익비율_익절 / 100))
+                        li_매도검증 = [s_일자, s_종목코드, s_종목명, s_대기봉수, n_단가_기준,
+                                   s_시간_매수, n_단가_매수, s_시간_매도, n_단가_매도]
+                        li_li_매도검증.append(li_매도검증)
+                        break
+
+                    # 손절 확인
+                    n_손익비율_손절 = -3.0
+                    if n_비율_저가 <= n_손익비율_손절:
+                        s_시간_매도 = s_검증시간
+                        n_단가_매도 = int(n_단가_기준 * (1 + n_손익비율_손절 / 100))
+                        li_매도검증 = [s_일자, s_종목코드, s_종목명, s_대기봉수, n_단가_기준,
+                                   s_시간_매수, n_단가_매수, s_시간_매도, n_단가_매도]
+                        li_li_매도검증.append(li_매도검증)
+                        break
+
+                    # 시간 종료 확인
+                    if s_검증시간 == df_분봉['시간'].values[-1]:
+                        s_시간_매도 = s_검증시간
+                        n_단가_매도 = n_종가
+                        li_매도검증 = [s_일자, s_종목코드, s_종목명, s_대기봉수, n_단가_기준,
+                                   s_시간_매수, n_단가_매수, s_시간_매도, n_단가_매도]
+                        li_li_매도검증.append(li_매도검증)
+
+                # 매도검증 df 생성
+                li_컬럼명 = ['일자', '종목코드', '종목명', '대기봉수', '단가_기준', '시간_매수', '단가_매수', '시간_매도', '단가_매도']
+                df_매도검증_시간 = pd.DataFrame(li_li_매도검증, columns=li_컬럼명)
+                li_df_매도검증.append(df_매도검증_시간)
+
+            # 전체 매도검증 취합
+            if len(li_df_매도검증) == 0:
+                li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_매도검증)
+                          if f'df_매도검증_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+                if len(li_파일명) == 0:
+                    df_매도검증 = pd.DataFrame()
+                else:
+                    s_참고파일 = max(li_파일명)
+                    df_매도검증 = pd.read_pickle(os.path.join(self.folder_매도검증, s_참고파일))
+                    df_매도검증 = df_매도검증.drop(df_매도검증.index)
+                    df_매도검증.loc[0] = None
+
+            else:
+                df_매도검증 = pd.concat(li_df_매도검증, axis=0).drop_duplicates()
+                df_매도검증['일자시간'] = df_매도검증['일자'] + ' ' + df_매도검증['시간_매수']
+                df_매도검증['일자시간'] = pd.to_datetime(df_매도검증['일자시간'], format='%Y%m%d %H:%M:%S')
+                df_매도검증 = df_매도검증.set_index(keys='일자시간').sort_index(ascending=True)
+                df_매도검증['기준대비(%)'] = (df_매도검증['단가_매도'] / df_매도검증['단가_기준'] - 1) * 100
+                df_매도검증['매수대비(%)'] = (df_매도검증['단가_매도'] / df_매도검증['단가_매수'] - 1) * 100
+
+            # 결과 저장
+            pd.to_pickle(df_매도검증, os.path.join(self.folder_매도검증, f'df_매도검증_{s_모델}_{s_일자}.pkl'))
+            df_매도검증.to_csv(os.path.join(self.folder_매도검증, f'df_매도검증_{s_모델}_{s_일자}.csv'),
+                           index=False, encoding='cp949')
+
+            # log 기록
+            self.make_log(f'매도검증 완료({s_일자}, {s_모델})')
 
     def 백테스팅_수익검증(self, s_모델):
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매도검증)
+                    if f'df_매도검증_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_수익검증)
+                    if f'df_수익검증_{s_모델}_' in 파일명 and f'.pkl' in 파일명]
+        li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+
+            # # 결과 저장
+            # pd.to_pickle(df_수익검증, os.path.join(self.folder_수익검증, f'df_수익검증_{s_모델}_{s_일자}.pkl'))
+            # df_수익검증.to_csv(os.path.join(self.folder_수익검증, f'df_수익검증_{s_모델}_{s_일자}.csv'),
+            #                index=False, encoding='cp949')
+
+            # # log 기록
+            # self.make_log(f'수익검증 완료({s_일자}, {s_모델})')
+
+            pass
         pass
 
     ###################################################################################################################
@@ -286,4 +437,4 @@ if __name__ == "__main__":
     a.백테스팅_데이터준비(s_모델='rf')
     a.백테스팅_매수검증(s_모델='rf')
     a.백테스팅_매도검증(s_모델='rf')
-    a.백테스팅_수익검증(s_모델='rf')
+    # a.백테스팅_수익검증(s_모델='rf')
