@@ -154,7 +154,7 @@ class Analyzer:
             # log 기록
             self.make_log(f'종목별 상승예측 완료({s_일자}, {len(dic_df_상승예측):,}개 종목, {s_모델})')
 
-    def 종목분석_수익검증(self, s_모델):
+    def 종목분석_수익검증(self, s_모델, b_카톡=False):
         """ 상승여부 예측한 결과를 바탕으로 종목선정 조건에 따른 결과 확인 (예측 엑셀, 리포트 저장) """
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_종목상승예측)
@@ -191,39 +191,40 @@ class Analyzer:
             # log 기록
             self.make_log(f'종목별 수익검증 완료({s_일자}, {s_모델})')
 
-            # # 감시대상 종목 정보 생성
-            # li_감시대상_파일명 = [파일명 for 파일명 in os.listdir(self.folder_감시대상)
-            #                if f'df_감시대상_{s_모델}_' in 파일명 and '.pkl' in 파일명]
-            # s_시작일자 = min([re.findall(r'\d{8}', 파일명)[0] for 파일명 in li_파일명])
-            # li_감시대상_파일명 = [파일명 for 파일명 in li_감시대상_파일명 if re.findall(r'\d{8}', 파일명)[0] <= s_일자]
-            # li_감시대상_파일명 = [파일명 for 파일명 in li_감시대상_파일명 if re.findall(r'\d{8}', 파일명)[0] >= s_시작일자]
-            # df_감시대상 = pd.DataFrame()
-            # df_감시대상['일자'] = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in li_감시대상_파일명]
-            # df_감시대상['종목수'] = [len(pd.read_pickle(os.path.join(self.folder_감시대상, 파일명)))
-            #                   for 파일명 in li_감시대상_파일명]
-            #
-            # # 리포트 생성
-            # folder_리포트 = self.folder_종목수익검증
-            # s_파일명_리포트 = f'수익검증_리포트_{s_모델}_{s_일자}.png'
-            # self.make_리포트_종목(df_감시대상=df_감시대상, df_수익검증=df_수익검증)
-            # plt.savefig(os.path.join(folder_리포트, s_파일명_리포트))
-            # plt.close()
-            #
-            # # 리포트 복사 to 서버
-            # import UT_배치worker
-            # w = UT_배치worker.Worker()
-            # folder_서버 = 'kakao/수익검증_종목'
-            # w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
-            #
-            # # 카톡 보내기
-            # import API_kakao
-            # k = API_kakao.KakaoAPI()
-            # result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 종목분석검증 완료',
-            #                         s_button_title=f'수익검증 리포트 - {s_일자}',
-            #                         s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
-            #
-            # # log 기록
-            # self.make_log(f'수익검증 리포트 생성 완료({s_일자}, {s_모델})')
+            # 감시대상 종목 정보 생성
+            li_감시대상_파일명 = [파일명 for 파일명 in os.listdir(self.folder_감시대상)
+                           if f'df_감시대상_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+            s_시작일자 = min([re.findall(r'\d{8}', 파일명)[0] for 파일명 in li_파일명])
+            li_감시대상_파일명 = [파일명 for 파일명 in li_감시대상_파일명 if re.findall(r'\d{8}', 파일명)[0] <= s_일자]
+            li_감시대상_파일명 = [파일명 for 파일명 in li_감시대상_파일명 if re.findall(r'\d{8}', 파일명)[0] >= s_시작일자]
+            df_감시대상 = pd.DataFrame()
+            df_감시대상['일자'] = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in li_감시대상_파일명]
+            df_감시대상['종목수'] = [len(pd.read_pickle(os.path.join(self.folder_감시대상, 파일명)))
+                              for 파일명 in li_감시대상_파일명]
+
+            # 리포트 생성
+            folder_리포트 = self.folder_종목수익검증
+            s_파일명_리포트 = f'수익검증_리포트_{s_모델}_{s_일자}.png'
+            self.make_리포트_종목(df_감시대상=df_감시대상, df_수익검증=df_수익검증)
+            plt.savefig(os.path.join(folder_리포트, s_파일명_리포트))
+            plt.close()
+
+            # 리포트 복사 to 서버
+            import UT_배치worker
+            w = UT_배치worker.Worker()
+            folder_서버 = 'kakao/수익검증_종목'
+            w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
+
+            # 카톡 보내기
+            if b_카톡:
+                import API_kakao
+                k = API_kakao.KakaoAPI()
+                result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 종목분석검증 완료',
+                                        s_button_title=f'[종목] 수익검증 리포트 - {s_일자}',
+                                        s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
+
+            # log 기록
+            self.make_log(f'종목모델 수익검증 리포트 생성 완료({s_일자}, {s_모델})')
 
     def 공통분석_데이터셋(self, s_모델):
         """ 종목분석 수익검증 결과를 바탕으로 공통 분석을 위한 데이터셋 df 생성 후 저장 """
@@ -348,7 +349,7 @@ class Analyzer:
             # log 기록
             self.make_log(f'공통모델 성능평가 완료({s_일자}, {s_모델})')
 
-    def 공통분석_수익검증(self, s_모델):
+    def 공통분석_수익검증(self, s_모델, b_카톡=False):
         """ 공통모델 사용하여 예측한 결과를 바탕으로 수익관점 결과 확인 (엑셀, 리포트 저장) """
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_공통성능평가)
@@ -413,14 +414,15 @@ class Analyzer:
             w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
 
             # 카톡 보내기
-            import API_kakao
-            k = API_kakao.KakaoAPI()
-            result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 공통분석검증 완료',
-                                    s_button_title=f'수익검증 리포트 - {s_일자}',
-                                    s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
+            if b_카톡:
+                import API_kakao
+                k = API_kakao.KakaoAPI()
+                result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 공통분석검증 완료',
+                                        s_button_title=f'[공통] 수익검증 리포트 - {s_일자}',
+                                        s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
 
             # log 기록
-            self.make_log(f'수익검증 리포트 생성 완료({s_일자}, {s_모델})')
+            self.make_log(f'공통모델 수익검증 리포트 생성 완료({s_일자}, {s_모델})')
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
@@ -691,8 +693,8 @@ if __name__ == "__main__":
     a = Analyzer()
 
     a.종목분석_상승예측(s_모델='rf')
-    a.종목분석_수익검증(s_모델='rf')
+    a.종목분석_수익검증(s_모델='rf', b_카톡=False)
     a.공통분석_데이터셋(s_모델='rf')
     a.공통분석_모델생성(s_모델='rf')
     a.공통분석_성능평가(s_모델='rf')
-    a.공통분석_수익검증(s_모델='rf')
+    a.공통분석_수익검증(s_모델='rf', b_카톡=True)
