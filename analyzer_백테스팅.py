@@ -388,7 +388,7 @@ class Analyzer:
             # log 기록
             self.make_log(f'매도검증 완료({s_일자}, {s_모델})')
 
-    def 백테스팅_수익검증(self, s_모델):
+    def 백테스팅_수익검증(self, s_모델, b_카톡=False):
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매도검증)
                     if f'df_매도검증_{s_모델}_' in 파일명 and '.pkl' in 파일명]
@@ -454,11 +454,12 @@ class Analyzer:
             w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
 
             # 카톡 보내기
-            import API_kakao
-            k = API_kakao.KakaoAPI()
-            result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 백테스팅 완료',
-                                    s_button_title=f'수익검증 리포트 - {s_일자}',
-                                    s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
+            if b_카톡:
+                import API_kakao
+                k = API_kakao.KakaoAPI()
+                result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 백테스팅 완료',
+                                        s_button_title=f'[백테] 수익검증 리포트 - {s_일자}',
+                                        s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
 
             # log 기록
             self.make_log(f'수익검증 리포트 생성 완료({s_일자}, {s_모델})')
@@ -665,4 +666,4 @@ if __name__ == "__main__":
     a.백테스팅_데이터준비(s_모델='rf')
     a.백테스팅_매수검증(s_모델='rf')
     a.백테스팅_매도검증(s_모델='rf')
-    a.백테스팅_수익검증(s_모델='rf')
+    a.백테스팅_수익검증(s_모델='rf', b_카톡=True)
