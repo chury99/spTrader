@@ -11,6 +11,7 @@ import analyzer_알고리즘 as Logic
 
 # 그래프 한글 설정
 from matplotlib import font_manager, rc, rcParams
+
 font_name = font_manager.FontProperties(fname="c:/Windows/Fonts/malgun.ttf").get_name()
 rc('font', family=font_name)
 rcParams['axes.unicode_minus'] = False
@@ -34,6 +35,7 @@ class Analyzer:
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
         self.folder_감시대상 = dic_폴더정보['분석1종목|50_종목_감시대상']
         self.folder_종목모델 = dic_폴더정보['분석1종목|60_종목_모델_감시대상']
+        self.folder_수익검증_종목 = dic_폴더정보['분석2공통|20_종목_수익검증']
         self.folder_공통모델 = dic_폴더정보['분석2공통|40_공통_모델']
         self.folder_수익검증_공통 = dic_폴더정보['분석2공통|60_공통_수익검증']
         self.folder_데이터준비 = dic_폴더정보['백테스팅|10_데이터준비']
@@ -271,8 +273,8 @@ class Analyzer:
             df_매수검증['공통신호'] = (df_매수검증['공통확률(%)'] >= 55) * 1
             df_매수검증['매수신호'] = df_매수검증['종목신호'] * df_매수검증['공통신호']
 
-            # 매수신호 골라내기
-            df_매수 = df_매수검증[df_매수검증['매수신호'] == 1]
+            # 매수신호 골라내기 (종목신호 전체)
+            df_매수 = df_매수검증[df_매수검증['종목신호'] == 1]
             li_시간_매수 = list(df_매수['시간'].unique())
 
             # 매도 검증
@@ -288,6 +290,9 @@ class Analyzer:
                 s_종목명 = df_매수_시간['종목명'].values[0]
                 s_종목케이스 = df_매수_시간['종목케이스'].values[0]
                 s_대기봉수, s_학습일수, s_rf_트리, s_rf_깊이 = s_종목케이스.split('_')
+                n_종목신호 = df_매수_시간['종목신호'].values[0]
+                n_공통신호 = df_매수_시간['공통신호'].values[0]
+                n_매수신호 = df_매수_시간['매수신호'].values[0]
 
                 # 분봉 데이터 불러오기
                 dt_시작 = pd.Timestamp(f'{s_일자} {s_시간}')
@@ -324,7 +329,7 @@ class Analyzer:
                     if n_비율_고가 >= n_손익비율_익절:
                         s_시간_매도 = s_검증시간
                         n_단가_매도 = int(n_단가_기준 * (1 + n_손익비율_익절 / 100))
-                        li_매도검증 = [s_일자, s_종목코드, s_종목명, s_대기봉수, n_단가_기준,
+                        li_매도검증 = [s_일자, s_종목코드, s_종목명, s_대기봉수, n_종목신호, n_공통신호, n_매수신호, n_단가_기준,
                                    s_시간_매수, n_단가_매수, s_시간_매도, n_단가_매도]
                         li_li_매도검증.append(li_매도검증)
                         break
@@ -334,7 +339,7 @@ class Analyzer:
                     if n_비율_저가 <= n_손익비율_손절:
                         s_시간_매도 = s_검증시간
                         n_단가_매도 = int(n_단가_기준 * (1 + n_손익비율_손절 / 100))
-                        li_매도검증 = [s_일자, s_종목코드, s_종목명, s_대기봉수, n_단가_기준,
+                        li_매도검증 = [s_일자, s_종목코드, s_종목명, s_대기봉수, n_종목신호, n_공통신호, n_매수신호, n_단가_기준,
                                    s_시간_매수, n_단가_매수, s_시간_매도, n_단가_매도]
                         li_li_매도검증.append(li_매도검증)
                         break
@@ -343,7 +348,7 @@ class Analyzer:
                     if s_검증시간 == df_분봉['시간'].values[-1]:
                         s_시간_매도 = s_검증시간
                         n_단가_매도 = n_종가
-                        li_매도검증 = [s_일자, s_종목코드, s_종목명, s_대기봉수, n_단가_기준,
+                        li_매도검증 = [s_일자, s_종목코드, s_종목명, s_대기봉수, n_종목신호, n_공통신호, n_매수신호, n_단가_기준,
                                    s_시간_매수, n_단가_매수, s_시간_매도, n_단가_매도]
                         li_li_매도검증.append(li_매도검증)
 
@@ -351,12 +356,13 @@ class Analyzer:
                     if s_검증시간 == '15:15:00':
                         s_시간_매도 = s_검증시간
                         n_단가_매도 = n_종가
-                        li_매도검증 = [s_일자, s_종목코드, s_종목명, s_대기봉수, n_단가_기준,
+                        li_매도검증 = [s_일자, s_종목코드, s_종목명, s_대기봉수, n_종목신호, n_공통신호, n_매수신호, n_단가_기준,
                                    s_시간_매수, n_단가_매수, s_시간_매도, n_단가_매도]
                         li_li_매도검증.append(li_매도검증)
 
                 # 매도검증 df 생성
-                li_컬럼명 = ['일자', '종목코드', '종목명', '대기봉수', '단가_기준', '시간_매수', '단가_매수', '시간_매도', '단가_매도']
+                li_컬럼명 = ['일자', '종목코드', '종목명', '대기봉수', '종목신호', '공통신호', '매수신호', '단가_기준',
+                          '시간_매수', '단가_매수', '시간_매도', '단가_매도']
                 df_매도검증_시간 = pd.DataFrame(li_li_매도검증, columns=li_컬럼명)
                 li_df_매도검증.append(df_매도검증_시간)
 
@@ -437,15 +443,22 @@ class Analyzer:
             df_감시대상['종목수'] = [len(pd.read_pickle(os.path.join(self.folder_감시대상, 파일명)))
                               for 파일명 in li_감시대상_파일명]
 
-            # 공통모델 수익검증 데이터 불러오기
+            # 수익검증 데이터 불러오기
+            df_수익검증_종목 = pd.read_pickle(os.path.join(self.folder_수익검증_종목, f'df_수익검증_{s_모델}_{s_일자}.pkl'))
             df_수익검증_공통 = pd.read_pickle(os.path.join(self.folder_수익검증_공통, f'df_공통수익검증_{s_모델}_{s_일자}.pkl'))
 
             # 리포트 생성
             folder_리포트 = self.folder_수익검증
             s_파일명_리포트 = f'수익검증_리포트_{s_모델}_{s_일자}.png'
-            self.make_리포트_백테스팅(df_감시대상=df_감시대상, df_수익검증_공통=df_수익검증_공통, df_수익검증_백테=df_수익검증)
-            plt.savefig(os.path.join(folder_리포트, s_파일명_리포트))
-            plt.close()
+            # noinspection PyBroadException
+            try:
+                self.make_리포트_백테스팅(df_감시대상=df_감시대상,
+                                   df_수익검증_분석_종목=df_수익검증_종목, df_수익검증_분석_공통=df_수익검증_공통,
+                                   df_수익검증_백테=df_수익검증)
+                plt.savefig(os.path.join(folder_리포트, s_파일명_리포트))
+                plt.close()
+            except:
+                continue
 
             # 리포트 복사 to 서버
             import UT_배치worker
@@ -485,89 +498,188 @@ class Analyzer:
                 file.write(f'{s_log}\n')
 
     @staticmethod
-    def make_리포트_백테스팅(df_감시대상, df_수익검증_공통, df_수익검증_백테):
+    def make_리포트_백테스팅(df_감시대상, df_수익검증_분석_종목, df_수익검증_분석_공통, df_수익검증_백테):
         """ 수익검증 데이터를 기반으로 daily 리포트 생성 및 png 파일로 저장 """
-        # 데이터 추가 생성 - 공통 분석
-        df_수익검증_공통 = df_수익검증_공통[(df_수익검증_공통['공통확률(%)'].isna())
-                                | (df_수익검증_공통['공통확률(%)'] >= 55)].copy()
+        # ### 수익검증 - 분석 - 종목 ### #
+        # 데이터 추가 생성
+        df_수익검증_분석_종목 = df_수익검증_분석_종목[(df_수익검증_분석_종목['상승확률(%)'].isna())
+                                      | (df_수익검증_분석_종목['상승확률(%)'] >= 50)].copy()
+        for s_일자 in df_감시대상['일자'].unique():
+            if s_일자 not in df_수익검증_분석_종목['일자'].unique():
+                df = df_수익검증_분석_종목.drop(df_수익검증_분석_종목.index).copy()
+                df.loc[0] = None
+                df['일자'] = s_일자
+                df.index = pd.to_datetime(df['일자'])
+                df_수익검증_분석_종목 = pd.concat([df_수익검증_분석_종목, df], axis=0).sort_index(ascending=True)
+        df_수익검증_분석_종목['년월'] = df_수익검증_분석_종목['일자'].apply(lambda x: f'{x[2:4]}-{x[4:6]}')
+        sri_년월 = df_수익검증_분석_종목.groupby('년월')['년월'].first()
+        df_수익검증_분석_종목['년월일'] = df_수익검증_분석_종목['일자']
+        sri_년월일 = df_수익검증_분석_종목.groupby('년월일')['년월일'].first()
+        # 월별 데이터 생성
+        li_월별테이블_분석_종목 = list()
+        li_월별테이블_분석_종목.append(sri_년월)
+        li_월별테이블_분석_종목.append(df_수익검증_분석_종목.groupby('년월')['상승예측'].sum())
+        li_월별테이블_분석_종목.append(df_수익검증_분석_종목.groupby('년월')['정답'].sum())
+        df_월별테이블_분석_종목 = pd.concat(li_월별테이블_분석_종목, axis=1)
+        df_월별테이블_분석_종목['성공률'] = df_월별테이블_분석_종목['정답'] / df_월별테이블_분석_종목['상승예측'] * 100
+        df_월별테이블_분석_종목['기대수익'] = df_월별테이블_분석_종목['정답'] * 2.5 \
+                                 - (df_월별테이블_분석_종목['상승예측'] - df_월별테이블_분석_종목['정답']) * 3.5
+        for 컬럼명 in ['상승예측', '정답', '성공률']:
+            df_월별테이블_분석_종목[컬럼명] = df_월별테이블_분석_종목[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
+        df_월별테이블_분석_종목['기대수익'] = df_월별테이블_분석_종목['기대수익'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
+        df_월별테이블_T_분석_종목 = df_월별테이블_분석_종목[-8:].T
+        df_월별테이블_T_분석_종목.index = ['년월', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
+        # 일별 데이터 생성
+        li_일별테이블_분석_종목 = list()
+        li_일별테이블_분석_종목.append(sri_년월일)
+        li_일별테이블_분석_종목.append(df_수익검증_분석_종목.groupby('년월일')['상승예측'].sum())
+        li_일별테이블_분석_종목.append(df_수익검증_분석_종목.groupby('년월일')['정답'].sum())
+        df_일별테이블_분석_종목 = pd.concat(li_일별테이블_분석_종목, axis=1)
+        df_일별테이블_분석_종목['년월일'] = df_일별테이블_분석_종목['년월일'].apply(lambda x: f'{x[4:6]}-{x[6:8]}')
+        df_일별테이블_분석_종목['성공률'] = df_일별테이블_분석_종목['정답'] / df_일별테이블_분석_종목['상승예측'] * 100
+        df_일별테이블_분석_종목['기대수익'] = df_일별테이블_분석_종목['정답'] * 2.5 \
+                                 - (df_일별테이블_분석_종목['상승예측'] - df_일별테이블_분석_종목['정답']) * 3.5
+        for 컬럼명 in ['상승예측', '정답', '성공률']:
+            df_일별테이블_분석_종목[컬럼명] = df_일별테이블_분석_종목[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
+        df_일별테이블_분석_종목['기대수익'] = df_일별테이블_분석_종목['기대수익'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
+        df_일별테이블_T_분석_종목 = df_일별테이블_분석_종목[-10:].T
+        df_일별테이블_T_분석_종목.index = ['월일', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
 
-        # 데이터 추가 생성 - 백테스팅
+        # ### 수익검증 - 분석 - 공통 ### #
+        # 데이터 추가 생성
+        df_수익검증_분석_공통 = df_수익검증_분석_공통[(df_수익검증_분석_공통['공통확률(%)'].isna())
+                                      | (df_수익검증_분석_공통['공통확률(%)'] >= 55)].copy()
+        for s_일자 in df_감시대상['일자'].unique():
+            if s_일자 not in df_수익검증_분석_공통['일자'].unique():
+                df = df_수익검증_분석_공통.drop(df_수익검증_분석_공통.index).copy()
+                df.loc[0] = None
+                df['일자'] = s_일자
+                df.index = pd.to_datetime(df['일자'])
+                df_수익검증_분석_공통 = pd.concat([df_수익검증_분석_공통, df], axis=0).sort_index(ascending=True)
+        df_수익검증_분석_공통['년월'] = df_수익검증_분석_공통['일자'].apply(lambda x: f'{x[2:4]}-{x[4:6]}')
+        sri_년월 = df_수익검증_분석_공통.groupby('년월')['년월'].first()
+        df_수익검증_분석_공통['년월일'] = df_수익검증_분석_공통['일자']
+        sri_년월일 = df_수익검증_분석_공통.groupby('년월일')['년월일'].first()
+        # 월별 데이터 생성
+        li_월별테이블_분석_공통 = list()
+        li_월별테이블_분석_공통.append(sri_년월)
+        li_월별테이블_분석_공통.append(df_수익검증_분석_공통.groupby('년월')['예측'].sum())
+        li_월별테이블_분석_공통.append(df_수익검증_분석_공통.groupby('년월')['정답'].sum())
+        df_월별테이블_분석_공통 = pd.concat(li_월별테이블_분석_공통, axis=1)
+        df_월별테이블_분석_공통['성공률'] = df_월별테이블_분석_공통['정답'] / df_월별테이블_분석_공통['예측'] * 100
+        df_월별테이블_분석_공통['기대수익'] = df_월별테이블_분석_공통['정답'] * 2.5 \
+                                 - (df_월별테이블_분석_공통['예측'] - df_월별테이블_분석_공통['정답']) * 3.5
+        for 컬럼명 in ['예측', '정답', '성공률']:
+            df_월별테이블_분석_공통[컬럼명] = df_월별테이블_분석_공통[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
+        df_월별테이블_분석_공통['기대수익'] = df_월별테이블_분석_공통['기대수익'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
+        df_월별테이블_T_분석_공통 = df_월별테이블_분석_공통[-8:].T
+        df_월별테이블_T_분석_공통.index = ['년월', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
+        # 일별 데이터 생성
+        li_일별테이블_분석_공통 = list()
+        li_일별테이블_분석_공통.append(sri_년월일)
+        li_일별테이블_분석_공통.append(df_수익검증_분석_공통.groupby('년월일')['예측'].sum())
+        li_일별테이블_분석_공통.append(df_수익검증_분석_공통.groupby('년월일')['정답'].sum())
+        df_일별테이블_분석_공통 = pd.concat(li_일별테이블_분석_공통, axis=1)
+        df_일별테이블_분석_공통['년월일'] = df_일별테이블_분석_공통['년월일'].apply(lambda x: f'{x[4:6]}-{x[6:8]}')
+        df_일별테이블_분석_공통['성공률'] = df_일별테이블_분석_공통['정답'] / df_일별테이블_분석_공통['예측'] * 100
+        df_일별테이블_분석_공통['기대수익'] = df_일별테이블_분석_공통['정답'] * 2.5 \
+                                 - (df_일별테이블_분석_공통['예측'] - df_일별테이블_분석_공통['정답']) * 3.5
+        for 컬럼명 in ['예측', '정답', '성공률']:
+            df_일별테이블_분석_공통[컬럼명] = df_일별테이블_분석_공통[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
+        df_일별테이블_분석_공통['기대수익'] = df_일별테이블_분석_공통['기대수익'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
+        df_일별테이블_T_분석_공통 = df_일별테이블_분석_공통[-10:].T
+        df_일별테이블_T_분석_공통.index = ['월일', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
+
+        # ### 수익검증 - 백테 ### #
+        # 데이터 추가 생성
         df_수익검증_백테['상승예측'] = df_수익검증_백테['종목코드'].apply(lambda x: 0 if pd.isna(x) else 1)
         df_수익검증_백테['예측성공'] = df_수익검증_백테['수익률(%)'].apply(lambda x: 1 if x > 0 else 0)
-
-        # 월별 데이터 생성 - 공통 분석
-        df_수익검증_공통['년월'] = df_수익검증_공통['일자'].apply(lambda x: f'{x[2:4]}-{x[4:6]}')
-        sri_년월 = df_수익검증_공통.groupby('년월')['년월'].first()
-        li_월별테이블 = list()
-        li_월별테이블.append(sri_년월)
-        li_월별테이블.append(df_수익검증_공통.groupby('년월')['예측'].sum())
-        li_월별테이블.append(df_수익검증_공통.groupby('년월')['정답'].sum())
-        df_월별테이블 = pd.concat(li_월별테이블, axis=1)
-        df_월별테이블['성공률'] = df_월별테이블['정답'] / df_월별테이블['예측'] * 100
-        df_월별테이블['기대수익'] = df_월별테이블['정답'] * 2.5 - (df_월별테이블['예측'] - df_월별테이블['정답']) * 3.5
-        for 컬럼명 in ['예측', '정답', '성공률']:
-            df_월별테이블[컬럼명] = df_월별테이블[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
-        df_월별테이블['기대수익'] = df_월별테이블['기대수익'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
-        df_월별테이블_T_공통 = df_월별테이블[-8:].T
-        df_월별테이블_T_공통.index = ['년월', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
-
-        # 일별 데이터 생성 - 공통 분석
-        df_수익검증_공통['년월일'] = df_수익검증_공통['일자']
-        sri_년월일 = df_수익검증_공통.groupby('년월일')['년월일'].first()
-        li_일별테이블 = list()
-        li_일별테이블.append(sri_년월일)
-        li_일별테이블.append(df_수익검증_공통.groupby('년월일')['예측'].sum())
-        li_일별테이블.append(df_수익검증_공통.groupby('년월일')['정답'].sum())
-        df_일별테이블 = pd.concat(li_일별테이블, axis=1)
-        df_일별테이블['년월일'] = df_일별테이블['년월일'].apply(lambda x: f'{x[4:6]}-{x[6:8]}')
-        df_일별테이블['성공률'] = df_일별테이블['정답'] / df_일별테이블['예측'] * 100
-        df_일별테이블['기대수익'] = df_일별테이블['정답'] * 2.5 - (df_일별테이블['예측'] - df_일별테이블['정답']) * 3.5
-        for 컬럼명 in ['예측', '정답', '성공률']:
-            df_일별테이블[컬럼명] = df_일별테이블[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
-        df_일별테이블['기대수익'] = df_일별테이블['기대수익'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
-        df_일별테이블_T_공통 = df_일별테이블[-10:].T
-        df_일별테이블_T_공통.index = ['월일', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
-
-        # 월별 데이터 생성 - 공통 백테스팅
         df_수익검증_백테['년월'] = df_수익검증_백테['일자'].apply(lambda x: f'{x[2:4]}-{x[4:6]}')
         sri_년월 = df_수익검증_백테.groupby('년월')['년월'].first()
-        li_월별테이블 = list()
-        li_월별테이블.append(sri_년월)
-        li_월별테이블.append(df_수익검증_백테.groupby('년월')['상승예측'].sum())
-        li_월별테이블.append(df_수익검증_백테.groupby('년월')['예측성공'].sum())
-        li_월별테이블.append(df_수익검증_백테.groupby('년월')['수익률(%)'].sum())
-        df_월별테이블 = pd.concat(li_월별테이블, axis=1)
-        df_월별테이블['성공률'] = df_월별테이블['예측성공'] / df_월별테이블['상승예측'] * 100
-        for 컬럼명 in ['상승예측', '예측성공', '성공률']:
-            df_월별테이블[컬럼명] = df_월별테이블[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
-        df_월별테이블['수익률(%)'] = df_월별테이블['수익률(%)'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
-        df_월별테이블 = df_월별테이블.loc[:, ['년월', '상승예측', '예측성공', '성공률', '수익률(%)']]
-        df_월별테이블_T_백테 = df_월별테이블[-8:].T
-        df_월별테이블_T_백테.index = ['년월', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
-
-        # 일별 데이터 생성 - 백테스팅
         df_수익검증_백테['년월일'] = df_수익검증_백테['일자']
         sri_년월일 = df_수익검증_백테.groupby('년월일')['년월일'].first()
-        li_일별테이블 = list()
-        li_일별테이블.append(sri_년월일)
-        li_일별테이블.append(df_수익검증_백테.groupby('년월일')['상승예측'].sum())
-        li_일별테이블.append(df_수익검증_백테.groupby('년월일')['예측성공'].sum())
-        li_일별테이블.append(df_수익검증_백테.groupby('년월일')['수익률(%)'].sum())
-        df_일별테이블 = pd.concat(li_일별테이블, axis=1)
-        df_일별테이블['년월일'] = df_일별테이블['년월일'].apply(lambda x: f'{x[4:6]}-{x[6:8]}')
-        df_일별테이블['성공률'] = df_일별테이블['예측성공'] / df_일별테이블['상승예측'] * 100
+        # 종목 데이터 생성
+        df_수익검증_백테_종목 = df_수익검증_백테[df_수익검증_백테['종목신호'] == 1].copy()
+        for s_일자 in df_감시대상['일자'].unique():
+            if s_일자 not in df_수익검증_백테_종목['일자'].unique():
+                df = df_수익검증_백테_종목.drop(df_수익검증_백테_종목.index).copy()
+                df.loc[0] = None
+                df['일자'] = s_일자
+                df.index = pd.to_datetime(df['일자'])
+                df_수익검증_백테_종목 = pd.concat([df_수익검증_백테_종목, df], axis=0).sort_index(ascending=True)
+        # 공통 데이터 생성
+        df_수익검증_백테_공통 = df_수익검증_백테[df_수익검증_백테['매수신호'] == 1].copy()
+        for s_일자 in df_감시대상['일자'].unique():
+            if s_일자 not in df_수익검증_백테_공통['일자'].unique():
+                df = df_수익검증_백테_공통.drop(df_수익검증_백테_공통.index).copy()
+                df.loc[0] = None
+                df['일자'] = s_일자
+                df.index = pd.to_datetime(df['일자'])
+                df_수익검증_백테_공통 = pd.concat([df_수익검증_백테_공통, df], axis=0).sort_index(ascending=True)
+        # 월별 데이터 생성 - 종목
+        li_월별테이블_백테_종목 = list()
+        li_월별테이블_백테_종목.append(sri_년월)
+        li_월별테이블_백테_종목.append(df_수익검증_백테_종목.groupby('년월')['상승예측'].sum())
+        li_월별테이블_백테_종목.append(df_수익검증_백테_종목.groupby('년월')['예측성공'].sum())
+        li_월별테이블_백테_종목.append(df_수익검증_백테_종목.groupby('년월')['수익률(%)'].sum())
+        df_월별테이블_백테_종목 = pd.concat(li_월별테이블_백테_종목, axis=1)
+        df_월별테이블_백테_종목['성공률'] = df_월별테이블_백테_종목['예측성공'] / df_월별테이블_백테_종목['상승예측'] * 100
         for 컬럼명 in ['상승예측', '예측성공', '성공률']:
-            df_일별테이블[컬럼명] = df_일별테이블[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
-        df_일별테이블['수익률(%)'] = df_일별테이블['수익률(%)'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
-        df_일별테이블 = df_일별테이블.loc[:, ['년월일', '상승예측', '예측성공', '성공률', '수익률(%)']]
-        df_일별테이블_T_백테 = df_일별테이블[-10:].T
-        df_일별테이블_T_백테.index = ['월일', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
+            df_월별테이블_백테_종목[컬럼명] = df_월별테이블_백테_종목[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
+        df_월별테이블_백테_종목['수익률(%)'] = df_월별테이블_백테_종목['수익률(%)'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
+        df_월별테이블_백테_종목 = df_월별테이블_백테_종목.loc[:, ['년월', '상승예측', '예측성공', '성공률', '수익률(%)']]
+        df_월별테이블_T_백테_종목 = df_월별테이블_백테_종목[-8:].T
+        df_월별테이블_T_백테_종목.index = ['년월', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
+        # 월별 데이터 생성 - 공통
+        li_월별테이블_백테_공통 = list()
+        li_월별테이블_백테_공통.append(sri_년월)
+        li_월별테이블_백테_공통.append(df_수익검증_백테_공통.groupby('년월')['상승예측'].sum())
+        li_월별테이블_백테_공통.append(df_수익검증_백테_공통.groupby('년월')['예측성공'].sum())
+        li_월별테이블_백테_공통.append(df_수익검증_백테_공통.groupby('년월')['수익률(%)'].sum())
+        df_월별테이블_백테_공통 = pd.concat(li_월별테이블_백테_공통, axis=1)
+        df_월별테이블_백테_공통['성공률'] = df_월별테이블_백테_공통['예측성공'] / df_월별테이블_백테_공통['상승예측'] * 100
+        for 컬럼명 in ['상승예측', '예측성공', '성공률']:
+            df_월별테이블_백테_공통[컬럼명] = df_월별테이블_백테_공통[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
+        df_월별테이블_백테_공통['수익률(%)'] = df_월별테이블_백테_공통['수익률(%)'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
+        df_월별테이블_백테_공통 = df_월별테이블_백테_공통.loc[:, ['년월', '상승예측', '예측성공', '성공률', '수익률(%)']]
+        df_월별테이블_T_백테_공통 = df_월별테이블_백테_공통[-8:].T
+        df_월별테이블_T_백테_공통.index = ['년월', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
+        # 일별 데이터 생성 - 백테스팅 - 종목
+        li_일별테이블_백테_종목 = list()
+        li_일별테이블_백테_종목.append(sri_년월일)
+        li_일별테이블_백테_종목.append(df_수익검증_백테_종목.groupby('년월일')['상승예측'].sum())
+        li_일별테이블_백테_종목.append(df_수익검증_백테_종목.groupby('년월일')['예측성공'].sum())
+        li_일별테이블_백테_종목.append(df_수익검증_백테_종목.groupby('년월일')['수익률(%)'].sum())
+        df_일별테이블_백테_종목 = pd.concat(li_일별테이블_백테_종목, axis=1)
+        df_일별테이블_백테_종목['년월일'] = df_일별테이블_백테_종목['년월일'].apply(lambda x: f'{x[4:6]}-{x[6:8]}')
+        df_일별테이블_백테_종목['성공률'] = df_일별테이블_백테_종목['예측성공'] / df_일별테이블_백테_종목['상승예측'] * 100
+        for 컬럼명 in ['상승예측', '예측성공', '성공률']:
+            df_일별테이블_백테_종목[컬럼명] = df_일별테이블_백테_종목[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
+        df_일별테이블_백테_종목['수익률(%)'] = df_일별테이블_백테_종목['수익률(%)'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
+        df_일별테이블_백테_종목 = df_일별테이블_백테_종목.loc[:, ['년월일', '상승예측', '예측성공', '성공률', '수익률(%)']]
+        df_일별테이블_T_백테_종목 = df_일별테이블_백테_종목[-10:].T
+        df_일별테이블_T_백테_종목.index = ['월일', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
+        # 일별 데이터 생성 - 백테스팅 - 공통
+        li_일별테이블_백테_공통 = list()
+        li_일별테이블_백테_공통.append(sri_년월일)
+        li_일별테이블_백테_공통.append(df_수익검증_백테_공통.groupby('년월일')['상승예측'].sum())
+        li_일별테이블_백테_공통.append(df_수익검증_백테_공통.groupby('년월일')['예측성공'].sum())
+        li_일별테이블_백테_공통.append(df_수익검증_백테_공통.groupby('년월일')['수익률(%)'].sum())
+        df_일별테이블_백테_공통 = pd.concat(li_일별테이블_백테_공통, axis=1)
+        df_일별테이블_백테_공통['년월일'] = df_일별테이블_백테_공통['년월일'].apply(lambda x: f'{x[4:6]}-{x[6:8]}')
+        df_일별테이블_백테_공통['성공률'] = df_일별테이블_백테_공통['예측성공'] / df_일별테이블_백테_공통['상승예측'] * 100
+        for 컬럼명 in ['상승예측', '예측성공', '성공률']:
+            df_일별테이블_백테_공통[컬럼명] = df_일별테이블_백테_공통[컬럼명].apply(lambda x: x if pd.isna(x) else f'{x:.0f}')
+        df_일별테이블_백테_공통['수익률(%)'] = df_일별테이블_백테_공통['수익률(%)'].apply(lambda x: x if pd.isna(x) else f'{x:.1f}')
+        df_일별테이블_백테_공통 = df_일별테이블_백테_공통.loc[:, ['년월일', '상승예측', '예측성공', '성공률', '수익률(%)']]
+        df_일별테이블_T_백테_공통 = df_일별테이블_백테_공통[-10:].T
+        df_일별테이블_T_백테_공통.index = ['월일', '예측(건)', '성공(건)', '성공률(%)', '기대수익(%)']
 
         # 그래프 설정
-        plt.figure(figsize=[16, 12])
+        plt.figure(figsize=[16, 20])
 
         # 일별 감시대상 종목수
-        plt.subplot(4, 2, 1)
+        plt.subplot(6, 2, 1)
         plt.title('[ 감시대상 종목수 ]')
         ary_x, ary_y = df_감시대상['일자'].values, df_감시대상['종목수'].values.astype(int)
         li_색깔 = ['C1' if 종목수 > 15 else 'C0' for 종목수 in ary_y]
@@ -576,9 +688,10 @@ class Analyzer:
         plt.grid(linestyle='--', alpha=0.5)
 
         # 일별 상승예측건수
-        plt.subplot(4, 2, 2)
+        plt.subplot(6, 2, 2)
         plt.title(f'[ 상승예측 건수 - 백테스팅 (종목50%/공통55%) ]')
-        sri_상승예측건수 = df_수익검증_백테.groupby('년월일')['상승예측'].sum()
+        sri_상승예측건수 = df_수익검증_백테_공통.groupby('년월일')['상승예측'].sum()
+        sri_상승예측건수 = sri_상승예측건수.apply(lambda x: 0 if pd.isna(x) else x)
         ary_x, ary_y = sri_상승예측건수.index.values, sri_상승예측건수.values.astype(int)
         li_색깔 = ['C3' if 예측건수 > 10 else 'C0' for 예측건수 in ary_y]
         plt.bar(ary_x, ary_y, color=li_색깔)
@@ -587,9 +700,9 @@ class Analyzer:
         plt.grid(linestyle='--', alpha=0.5)
 
         # 일별 예측성공률
-        plt.subplot(4, 2, 4)
+        plt.subplot(6, 2, 4)
         plt.title(f'[ 예측 성공률 - 백테스팅 (%, 종목50%/공통55%) ]')
-        sri_예측성공건수 = df_수익검증_백테.groupby('년월일')['예측성공'].sum()
+        sri_예측성공건수 = df_수익검증_백테_공통.groupby('년월일')['예측성공'].sum()
         sri_예측성공률 = sri_예측성공건수 / sri_상승예측건수 * 100
         sri_예측성공률 = sri_예측성공률.apply(lambda x: 0 if pd.isna(x) else x)
         ary_x, ary_y = sri_예측성공률.index.values, sri_예측성공률.values
@@ -602,7 +715,7 @@ class Analyzer:
         plt.axhline(70, color='C1')
 
         # 누적 예측성공률
-        plt.subplot(4, 2, 3)
+        plt.subplot(6, 2, 3)
         plt.title(f'[ 예측 성공률 - 백테스팅 (%, 누적, 종목50%/공통55%) ]')
         sri_예측성공률_누적 = sri_예측성공건수.cumsum() / sri_상승예측건수.cumsum() * 100
         sri_예측성공률_누적 = sri_예측성공률_누적.apply(lambda x: 0 if pd.isna(x) else x)
@@ -614,10 +727,54 @@ class Analyzer:
         plt.axhline(100, color='C0', alpha=0)
         plt.axhline(70, color='C1')
 
+        # 월별 성공률 - 분석 (종목모델)
+        plt.subplot(6, 2, 5)
+        plt.title(f'[ 월별 성공률 - 분석 - 종목 (종목50%) ]')
+        df = df_월별테이블_T_분석_종목
+        plt.axis('tight')
+        plt.axis('off')
+        테이블 = plt.table(cellText=df.values, rowLabels=df.index, loc='center', cellLoc='center')
+        테이블.auto_set_font_size(False)
+        테이블.set_fontsize(12)
+        테이블.scale(1.0, 2.4)
+
+        # 일별 성공률 - 분석 (종목모델)
+        plt.subplot(6, 2, 6)
+        plt.title(f'[ 일별 성공률 - 분석 - 종목 (종목50%) ]')
+        df = df_일별테이블_T_분석_종목
+        plt.axis('tight')
+        plt.axis('off')
+        테이블 = plt.table(cellText=df.values, rowLabels=df.index, loc='center', cellLoc='center')
+        테이블.auto_set_font_size(False)
+        테이블.set_fontsize(12)
+        테이블.scale(1.0, 2.4)
+
+        # 월별 성공률 - 백테스팅 (종목)
+        plt.subplot(6, 2, 7)
+        plt.title(f'[ 월별 성공률 - 백테스팅 - 종목 (종목50%) ]')
+        df = df_월별테이블_T_백테_종목
+        plt.axis('tight')
+        plt.axis('off')
+        테이블 = plt.table(cellText=df.values, rowLabels=df.index, loc='center', cellLoc='center')
+        테이블.auto_set_font_size(False)
+        테이블.set_fontsize(12)
+        테이블.scale(1.0, 2.4)
+
+        # 일별 성공률 - 백테스팅 (종목)
+        plt.subplot(6, 2, 8)
+        plt.title(f'[ 일별 성공률 - 백테스팅 - 종목 (종목50%) ]')
+        df = df_일별테이블_T_백테_종목
+        plt.axis('tight')
+        plt.axis('off')
+        테이블 = plt.table(cellText=df.values, rowLabels=df.index, loc='center', cellLoc='center')
+        테이블.auto_set_font_size(False)
+        테이블.set_fontsize(12)
+        테이블.scale(1.0, 2.4)
+
         # 월별 성공률 - 분석 (공통모델)
-        plt.subplot(4, 2, 5)
-        plt.title(f'[ 월별 성공률 - 분석 (종목50%/공통55%) ]')
-        df = df_월별테이블_T_공통
+        plt.subplot(6, 2, 9)
+        plt.title(f'[ 월별 성공률 - 분석 - 공통 (종목50%/공통55%) ]')
+        df = df_월별테이블_T_분석_공통
         plt.axis('tight')
         plt.axis('off')
         테이블 = plt.table(cellText=df.values, rowLabels=df.index, loc='center', cellLoc='center')
@@ -626,9 +783,9 @@ class Analyzer:
         테이블.scale(1.0, 2.4)
 
         # 일별 성공률 - 분석 (공통모델)
-        plt.subplot(4, 2, 6)
-        plt.title(f'[ 일별 성공률 - 분석 (종목50%/공통55%) ]')
-        df = df_일별테이블_T_공통
+        plt.subplot(6, 2, 10)
+        plt.title(f'[ 일별 성공률 - 분석 - 공통 (종목50%/공통55%) ]')
+        df = df_일별테이블_T_분석_공통
         plt.axis('tight')
         plt.axis('off')
         테이블 = plt.table(cellText=df.values, rowLabels=df.index, loc='center', cellLoc='center')
@@ -636,10 +793,10 @@ class Analyzer:
         테이블.set_fontsize(12)
         테이블.scale(1.0, 2.4)
 
-        # 월별 성공률 - 백테스팅
-        plt.subplot(4, 2, 7)
-        plt.title(f'[ 월별 성공률 - 백테스팅 (종목50%/공통55%) ]')
-        df = df_월별테이블_T_백테
+        # 월별 성공률 - 백테스팅 (공통)
+        plt.subplot(6, 2, 11)
+        plt.title(f'[ 월별 성공률 - 백테스팅 - 공통 (종목50%/공통55%) ]')
+        df = df_월별테이블_T_백테_공통
         plt.axis('tight')
         plt.axis('off')
         테이블 = plt.table(cellText=df.values, rowLabels=df.index, loc='center', cellLoc='center')
@@ -647,10 +804,10 @@ class Analyzer:
         테이블.set_fontsize(12)
         테이블.scale(1.0, 2.4)
 
-        # 일별 성공률 - 백테스팅
-        plt.subplot(4, 2, 8)
-        plt.title(f'[ 일별 성공률 - 백테스팅 (종목50%/공통55%) ]')
-        df = df_일별테이블_T_백테
+        # 일별 성공률 - 백테스팅 (공통)
+        plt.subplot(6, 2, 12)
+        plt.title(f'[ 일별 성공률 - 백테스팅 - 공통 (종목50%/공통55%) ]')
+        df = df_일별테이블_T_백테_공통
         plt.axis('tight')
         plt.axis('off')
         테이블 = plt.table(cellText=df.values, rowLabels=df.index, loc='center', cellLoc='center')
