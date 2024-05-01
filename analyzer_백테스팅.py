@@ -429,6 +429,16 @@ class Analyzer:
             # 동일 시간 걸러내기
             df_수익검증 = df_수익검증.groupby(df_수익검증.index).first()
 
+            # 운영 종료시간 걸러내기
+            df_수익검증['종료시간'] = df_수익검증['대기봉수'].apply(lambda x:
+                                                    pd.Timestamp('15:10:00') - pd.Timedelta(minutes=int(x) * 10))
+            df_수익검증['종료시간'] = df_수익검증['종료시간'].apply(lambda x: x.strftime('%H:%M:%S'))
+            ary_운영중 = df_수익검증['시간_매수'].values <= df_수익검증['종료시간'].values
+            df_수익검증['운영중'] = ary_운영중.astype(int)
+            df_수익검증 = df_수익검증[df_수익검증['운영중'] == 1]
+            li_컬럼명 = [컬럼명 for 컬럼명 in df_수익검증.columns if 컬럼명 not in ['종료시간', '운영중']]
+            df_수익검증 = df_수익검증.loc[:, li_컬럼명]
+
             # 매도 전 매수 걸러내기 (매수신호 없는 날은 None)
             gr_df_수익검증 = df_수익검증.groupby('일자')
             li_df_수익검증 = list()
@@ -845,4 +855,4 @@ if __name__ == "__main__":
     a.백테스팅_데이터준비(s_모델='rf')
     a.백테스팅_매수검증(s_모델='rf')
     a.백테스팅_매도검증(s_모델='rf')
-    a.백테스팅_수익검증(s_모델='rf', b_카톡=False)
+    a.백테스팅_수익검증(s_모델='rf', b_카톡=True)
