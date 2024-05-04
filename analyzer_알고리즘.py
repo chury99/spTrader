@@ -48,7 +48,7 @@ def trd_load_전일종가(s_일자, li_데이터종목):
         except KeyError:
             df_일봉_전월 = pd.DataFrame()
         df_일봉 = pd.concat([df_일봉_전월, df_일봉_당월], axis=0).sort_values('일자', ascending=True)
-        df_일봉 = df_일봉[-30:]
+        df_일봉 = df_일봉.dropna(subset='전일종가')[-30:]
         df_일봉['전일종가'] = df_일봉['전일종가'].astype(int)
         dic_전일종가_일별 = df_일봉.set_index('일자').to_dict()['전일종가']
         dic_전일종가_일별['마지막'] = int(df_일봉['종가'].values[-1])
