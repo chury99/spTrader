@@ -385,7 +385,7 @@ class Analyzer:
                 continue
 
             # 데이터셋 및 모델 불러오기 (전일 모델로 당일 데이터 검증)
-            df_데이터셋 = pd.read_pickle(os.path.join(self.folder_공통데이터셋, f'df_데이터셋_{s_모델}_{s_일자}.pkl'))
+            df_데이터셋 = pd.read_pickle(os.path.join(self.folder_공통데이터셋, f'df_데이터셋_전체_{s_모델}_{s_일자}.pkl'))
             obj_공통모델_전일 = pd.read_pickle(os.path.join(self.folder_공통모델, f'obj_공통모델_{s_모델}_{s_일자_전일}.pkl'))
             df_데이터셋_당일 = df_데이터셋[df_데이터셋['일자'] == s_일자]
 
@@ -469,7 +469,10 @@ class Analyzer:
                               for 파일명 in li_감시대상_파일명]
 
             # 종목모델 수익검증 결과 불러오기
-            df_수익검증_종목 = pd.read_pickle(os.path.join(self.folder_종목수익검증, f'df_수익검증_rf_{s_일자}.pkl'))
+            try:
+                df_수익검증_종목 = pd.read_pickle(os.path.join(self.folder_종목수익검증, f'df_수익검증_rf_{s_일자}.pkl'))
+            except FileNotFoundError:
+                continue
 
             # 리포트 생성
             folder_리포트 = self.folder_공통수익검증
