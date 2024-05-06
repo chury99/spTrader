@@ -67,7 +67,7 @@ def trd_make_이동평균_분봉(df_분봉, dic_전일종가):
                 '전일종가', '전일대비(%)',
                 '종가ma5', '종가ma10', '종가ma20', '종가ma60', '종가ma120',
                 '거래량ma5', '거래량ma20', '거래량ma60', '거래량ma120']
-    li_컬럼확인 = [1 if 컬럼 in li_생성컬럼명 else 0 for 컬럼 in df_분봉.columns]
+    li_컬럼확인 = [1 if 컬럼 in df_분봉.columns else 0 for 컬럼 in li_생성컬럼명]
     if sum(li_컬럼확인) == len(li_컬럼확인):
         df_분봉['일자시간'] = df_분봉['일자'] + ' ' + df_분봉['시간']
         df_분봉['일자시간'] = pd.to_datetime(df_분봉['일자시간'], format='%Y%m%d %H:%M:%S')
@@ -83,7 +83,6 @@ def trd_make_이동평균_분봉(df_분봉, dic_전일종가):
     df_정리 = df_정리.set_index(keys='일자시간').sort_index(ascending=True)
 
     # 전일종가 생성
-    df_정리.loc[-1, '일자'] = '20240427'
     df_정리['전일종가'] = df_정리['일자'].apply(lambda x: dic_전일종가[x] if x in dic_전일종가.keys() else dic_전일종가['마지막'])
 
     # 전일대비(%) 생성
