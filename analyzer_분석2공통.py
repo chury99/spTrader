@@ -232,32 +232,98 @@ class Analyzer:
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_종목수익검증)
                     if f'df_수익검증_{s_모델}_' in 파일명 and '.pkl' in 파일명]
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_공통데이터셋)
-                    if f'df_데이터셋_{s_모델}_' in 파일명 and f'.pkl' in 파일명]
+                    if f'df_데이터셋_전체_{s_모델}_' in 파일명 and f'.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+
+        # 일자 선정 보완 (이전 데이터 수집용)
+        s_최소일자_수익검증 = min(li_일자_전체)
+        df_수익검증 = pd.read_pickle(os.path.join(self.folder_종목수익검증, f'df_수익검증_{s_모델}_{s_최소일자_수익검증}.pkl'))
+        li_전체일자_대상 = list(pd.concat([df_수익검증['일자'], pd.Series(li_일자_전체)]).drop_duplicates().sort_values())
+
+        if len(li_일자_완료) == 0:
+            li_전체일자_완료 = list()
+        else:
+            s_최소일자_데이터셋 = min(li_일자_완료)
+            df_데이터셋 = pd.read_pickle(
+                os.path.join(self.folder_공통데이터셋, f'df_데이터셋_전체_{s_모델}_{s_최소일자_데이터셋}.pkl'))
+            li_전체일자_완료 = list(pd.concat([df_데이터셋['일자'], pd.Series(li_일자_완료)]).drop_duplicates().sort_values())
+
+        li_일자_대상 = [s_일자 for s_일자 in li_전체일자_대상 if s_일자 not in li_전체일자_완료]
 
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
+            # 전일 일자 확인
+            try:
+                s_일자_전일 = max([일자 for 일자 in li_전체일자_대상 if 일자 < s_일자])
+            except ValueError:
+                continue
+
             # 수익검증 파일 불러오기
-            df_수익검증 = pd.read_pickle(os.path.join(self.folder_종목수익검증, f'df_수익검증_rf_{s_일자}.pkl'))
+            try:
+                df_수익검증 = pd.read_pickle(os.path.join(self.folder_종목수익검증, f'df_수익검증_rf_{s_일자}.pkl'))
+            except FileNotFoundError:
+                li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_종목수익검증)
+                          if f'df_수익검증_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+                s_파일명 = min(li_파일명)
+                df_수익검증 = pd.read_pickle(os.path.join(self.folder_종목수익검증, s_파일명))
+            df_수익검증_일별 = df_수익검증[df_수익검증['일자'] == s_일자].copy()
 
-            # 비율 데이터 추가 (가격은 전일종가 기준, 거래량은 해당분봉 거래량 기준)
-            for s_컬럼명 in ['시가', '고가', '저가', '종가', '종가ma5', '종가ma10', '종가ma20', '종가ma60', '종가ma120']:
-                df_수익검증[f'{s_컬럼명}(%)'] = (df_수익검증[s_컬럼명] / df_수익검증['전일종가'] * 100) - 100
+            # 10분봉 불러오기
+            dic_df_10분봉_당일 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_10분봉_{s_일자}.pkl'))
+            dic_df_10분봉_전일 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_10분봉_{s_일자_전일}.pkl'))
 
-            for s_컬럼명 in ['거래량ma5', '거래량ma20', '거래량ma60', '거래량ma120']:
-                df_수익검증[f'{s_컬럼명}(%)'] = df_수익검증[s_컬럼명] / df_수익검증['거래량'] * 100
+            # 일별 데이터셋 생성
+            li_df_데이터셋 = list()
+            for ary_수익검증 in df_수익검증_일별.values:
+                [s_검증일자, s_종목코드, s_종목명, s_시간, n_시가, n_고가, n_저가, n_종가, n_거래량, n_전일종가, n_전일대비,
+                 n_종가ma5, n_종가ma10, n_종가ma20, n_종가ma60, n_종가ma120,
+                 n_거래량ma5, n_거래량ma20, n_거래량ma60, n_거래량ma120,
+                 n_상승확률, n_상승예측, n_정답, n_케이스, n_예측성공, n_확률스펙] = ary_수익검증
 
-            df_수익검증['확률스펙(%)'] = df_수익검증['확률스펙']
-            df_수익검증['스펙대비(%)'] = df_수익검증['상승확률(%)'] - df_수익검증['확률스펙']
+                # 10분봉 확인 (이전 봉, tr 동일)
+                li_df_10분봉 = [dic_df_10분봉_당일[s_종목코드], dic_df_10분봉_전일[s_종목코드]]
+                df_10분봉 = pd.concat(li_df_10분봉, axis=0).drop_duplicates().sort_index(ascending=True)
+                dt_시점 = pd.Timestamp(f'{s_검증일자} {s_시간}')
+                df_10분봉_tr = df_10분봉[df_10분봉.index < dt_시점].sort_index(ascending=False)
 
-            # % 데이터만 남기기
-            li_컬럼명 = list(df_수익검증.columns[:4]) + [컬럼명 for 컬럼명 in df_수익검증.columns if '(%)' in 컬럼명] + ['정답']
-            df_데이터셋 = df_수익검증.loc[:, li_컬럼명]
+                # 데이터 변환
+                dic_전일종가 = df_10분봉.set_index('일자').to_dict()['전일종가']
+                df_10분봉_ma = Logic.trd_make_이동평균_분봉(df_분봉=df_10분봉_tr, dic_전일종가=dic_전일종가)
+                df_데이터셋_공통 = Logic.trd_make_추가데이터_공통모델_rf(df=df_10분봉_ma,
+                                                          n_상승확률_종목=n_상승확률, n_확률스펙=n_확률스펙)
+                df_데이터셋_공통['정답'] = int(n_정답)
+                li_df_데이터셋.append(df_데이터셋_공통)
+
+            if len(li_df_데이터셋) == 0:
+                df_데이터셋_일별 = pd.DataFrame()
+            else:
+                df_데이터셋_일별 = pd.concat(li_df_데이터셋, axis=0).drop_duplicates().sort_index(ascending=True)
+
+            # 전체 데이터셋 생성 (일별 데이터셋 합치기)
+            li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_공통데이터셋)
+                      if f'df_데이터셋_전체_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+            if len(li_파일명) == 0:
+                df_데이터셋_전체_기존 = pd.DataFrame()
+            else:
+                s_파일명_기존 = max(li_파일명)
+                df_데이터셋_전체_기존 = pd.read_pickle(os.path.join(self.folder_공통데이터셋, s_파일명_기존))
+            df_데이터셋_전체 = pd.concat([df_데이터셋_전체_기존, df_데이터셋_일별], axis=0).drop_duplicates()
+            df_데이터셋_전체 = df_데이터셋_전체.sort_index(ascending=True)
+
+            # 전체 데이터 기간 제한 (rotator 동일 기간)
+            with open('config.json', mode='rt', encoding='utf-8') as file:
+                dic_config = json.load(file)
+            n_보관기간_analyzer = int(dic_config['파일보관기간(일)_analyzer'])
+            dt_기준일자 = pd.Timestamp(s_일자) - pd.DateOffset(days=n_보관기간_analyzer + 1)
+            df_데이터셋_전체 = df_데이터셋_전체[df_데이터셋_전체.index >= dt_기준일자]
 
             # 데이터셋 저장
-            pd.to_pickle(df_데이터셋, os.path.join(self.folder_공통데이터셋, f'df_데이터셋_{s_모델}_{s_일자}.pkl'))
-            df_데이터셋.to_csv(os.path.join(self.folder_공통데이터셋, f'df_데이터셋_{s_모델}_{s_일자}.csv'),
-                           index=False, encoding='cp949')
+            pd.to_pickle(df_데이터셋_일별, os.path.join(self.folder_공통데이터셋, f'df_데이터셋_일별_{s_모델}_{s_일자}.pkl'))
+            df_데이터셋_일별.to_csv(os.path.join(self.folder_공통데이터셋, f'df_데이터셋_일별_{s_모델}_{s_일자}.csv'),
+                              index=False, encoding='cp949')
+            pd.to_pickle(df_데이터셋_전체, os.path.join(self.folder_공통데이터셋, f'df_데이터셋_전체_{s_모델}_{s_일자}.pkl'))
+            df_데이터셋_전체.to_csv(os.path.join(self.folder_공통데이터셋, f'df_데이터셋_전체_{s_모델}_{s_일자}.csv'),
+                              index=False, encoding='cp949')
 
             # log 기록
             self.make_log(f'데이터셋 준비 완료({s_일자}, {s_모델})')
