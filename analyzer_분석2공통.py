@@ -226,7 +226,7 @@ class Analyzer:
             # log 기록
             self.make_log(f'종목모델 수익검증 리포트 생성 완료({s_일자}, {s_모델})')
 
-    def 공통분석_데이터셋(self, s_모델):
+    def 공통분석_데이터셋(self, s_모델, b_이전데이터수집=False):
         """ 종목분석 수익검증 결과를 바탕으로 공통 분석을 위한 데이터셋 df 생성 후 저장 """
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_종목수익검증)
@@ -236,25 +236,31 @@ class Analyzer:
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
         # 일자 선정 보완 (이전 데이터 수집용)
-        s_최소일자_수익검증 = min(li_일자_전체)
-        df_수익검증 = pd.read_pickle(os.path.join(self.folder_종목수익검증, f'df_수익검증_{s_모델}_{s_최소일자_수익검증}.pkl'))
-        li_전체일자_대상 = list(pd.concat([df_수익검증['일자'], pd.Series(li_일자_전체)]).drop_duplicates().sort_values())
+        if b_이전데이터수집:
+            s_최소일자_수익검증 = min(li_일자_전체)
+            df_수익검증 = pd.read_pickle(
+                os.path.join(self.folder_종목수익검증, f'df_수익검증_{s_모델}_{s_최소일자_수익검증}.pkl'))
+            li_전체일자_대상 = list(
+                pd.concat([df_수익검증['일자'], pd.Series(li_일자_전체)]).drop_duplicates().sort_values())
 
-        if len(li_일자_완료) == 0:
-            li_전체일자_완료 = list()
-        else:
-            s_최소일자_데이터셋 = min(li_일자_완료)
-            df_데이터셋 = pd.read_pickle(
-                os.path.join(self.folder_공통데이터셋, f'df_데이터셋_전체_{s_모델}_{s_최소일자_데이터셋}.pkl'))
-            li_전체일자_완료 = list(pd.concat([df_데이터셋['일자'], pd.Series(li_일자_완료)]).drop_duplicates().sort_values())
+            if len(li_일자_완료) == 0:
+                li_전체일자_완료 = list()
+            else:
+                s_최소일자_데이터셋 = min(li_일자_완료)
+                df_데이터셋 = pd.read_pickle(
+                    os.path.join(self.folder_공통데이터셋, f'df_데이터셋_전체_{s_모델}_{s_최소일자_데이터셋}.pkl'))
+                li_전체일자_완료 = list(
+                    pd.concat([df_데이터셋['일자'], pd.Series(li_일자_완료)]).drop_duplicates().sort_values())
 
-        li_일자_대상 = [s_일자 for s_일자 in li_전체일자_대상 if s_일자 not in li_전체일자_완료]
+            li_일자_전체 = li_전체일자_대상
+            li_일자_완료 = li_전체일자_완료
+            li_일자_대상 = [s_일자 for s_일자 in li_전체일자_대상 if s_일자 not in li_전체일자_완료]
 
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
             # 전일 일자 확인
             try:
-                s_일자_전일 = max([일자 for 일자 in li_전체일자_대상 if 일자 < s_일자])
+                s_일자_전일 = max([일자 for 일자 in li_일자_전체 if 일자 < s_일자])
             except ValueError:
                 continue
 
@@ -760,7 +766,7 @@ if __name__ == "__main__":
 
     a.종목분석_상승예측(s_모델='rf')
     a.종목분석_수익검증(s_모델='rf', b_카톡=False)
-    a.공통분석_데이터셋(s_모델='rf')
+    a.공통분석_데이터셋(s_모델='rf', b_이전데이터수집=True)
     a.공통분석_모델생성(s_모델='rf')
     a.공통분석_성능평가(s_모델='rf')
     a.공통분석_수익검증(s_모델='rf', b_카톡=True)
