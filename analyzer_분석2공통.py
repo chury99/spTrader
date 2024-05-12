@@ -174,7 +174,7 @@ class Analyzer:
             li_df_수익검증 = list()
             for s_파일명 in li_파일명:
                 df_상승예측_일별 = pd.read_pickle(os.path.join(self.folder_종목상승예측, s_파일명))
-                df_상승예측_일별['상승예측'] = (df_상승예측_일별['상승확률(%)'] >= 50) * 1
+                # df_상승예측_일별['상승예측'] = (df_상승예측_일별['상승확률(%)'] >= 50) * 1
                 df_수익검증_일별 = df_상승예측_일별[df_상승예측_일별['상승예측'] == 1].drop_duplicates()
                 if len(df_수익검증_일별) == 0:
                     df_수익검증_일별.loc[0] = None
