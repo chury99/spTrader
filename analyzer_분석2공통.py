@@ -271,7 +271,7 @@ class Analyzer:
                           if f'df_수익검증_{s_모델}_' in 파일명 and '.pkl' in 파일명]
                 s_파일명 = min(li_파일명)
                 df_수익검증 = pd.read_pickle(os.path.join(self.folder_종목수익검증, s_파일명))
-            df_수익검증_일별 = df_수익검증[df_수익검증['일자'] == s_일자].copy()
+            df_수익검증_일별 = df_수익검증[df_수익검증['일자'] == s_일자].copy().dropna()
 
             # 10분봉 불러오기
             dic_df_10분봉_당일 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_10분봉_{s_일자}.pkl'))
