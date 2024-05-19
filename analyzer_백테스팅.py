@@ -460,15 +460,23 @@ class Analyzer:
                         df_수익검증_신호처리['일자시간'] = pd.to_datetime(df_수익검증_신호처리['일자'])
                         df_수익검증_신호처리 = df_수익검증_신호처리.set_index('일자시간')
                         li_df_수익검증.append(df_수익검증_신호처리)
-            df_수익검증 = pd.concat(li_df_수익검증, axis=0).drop_duplicates()
+            if len(li_df_수익검증) == 0:
+                li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_수익검증)
+                          if f'df_수익검증_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+                s_전일파일 = max(li_파일명)
+                df_수익검증 = pd.read_pickle(os.path.join(self.folder_수익검증, s_전일파일))
+                df_수익검증 = df_수익검증.drop(df_수익검증.index)
+                df_수익검증.loc[0] = None
+            else:
+                df_수익검증 = pd.concat(li_df_수익검증, axis=0).drop_duplicates()
 
             # 결과 저장
             pd.to_pickle(df_수익검증_전체, os.path.join(self.folder_수익검증, f'df_수익검증_전체_{s_모델}_{s_일자}.pkl'))
             pd.to_pickle(df_수익검증, os.path.join(self.folder_수익검증, f'df_수익검증_{s_모델}_{s_일자}.pkl'))
-            df_수익검증.to_csv(os.path.join(self.folder_수익검증, f'df_수익검증_{s_모델}_{s_일자}.csv'),
-                           index=False, encoding='cp949')
             df_수익검증_전체.to_csv(os.path.join(self.folder_수익검증, f'df_수익검증_전체_{s_모델}_{s_일자}.csv'),
                               index=False, encoding='cp949')
+            df_수익검증.to_csv(os.path.join(self.folder_수익검증, f'df_수익검증_{s_모델}_{s_일자}.csv'),
+                           index=False, encoding='cp949')
 
             # log 기록
             self.make_log(f'수익검증 완료({s_일자}, {s_모델})')
@@ -488,12 +496,15 @@ class Analyzer:
             df_수익검증_종목 = pd.read_pickle(os.path.join(self.folder_수익검증_종목, f'df_수익검증_{s_모델}_{s_일자}.pkl'))
             df_수익검증_공통 = pd.read_pickle(os.path.join(self.folder_수익검증_공통, f'df_공통수익검증_{s_모델}_{s_일자}.pkl'))
 
-            # 리포트 생성
+            # 리포트 생성 (None 으로만 구성된 df 존재 시 예외처리)
             folder_리포트 = self.folder_수익검증
             s_파일명_리포트 = f'수익검증_리포트_{s_모델}_{s_일자}.png'
-            self.make_리포트_백테스팅(df_감시대상=df_감시대상,
-                               df_수익검증_분석_종목=df_수익검증_종목, df_수익검증_분석_공통=df_수익검증_공통,
-                               df_수익검증_백테_종목=df_수익검증_전체, df_수익검증_백테_공통=df_수익검증)
+            try:
+                self.make_리포트_백테스팅(df_감시대상=df_감시대상,
+                                   df_수익검증_분석_종목=df_수익검증_종목, df_수익검증_분석_공통=df_수익검증_공통,
+                                   df_수익검증_백테_종목=df_수익검증_전체, df_수익검증_백테_공통=df_수익검증)
+            except TypeError:
+                continue
             plt.savefig(os.path.join(folder_리포트, s_파일명_리포트))
             plt.close()
 
