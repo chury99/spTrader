@@ -197,7 +197,9 @@ def trd_make_추가데이터_종목모델_rf(df):
     for n in range(3):
         n_이전봉 = n + 1
         for s_컬럼명 in li_대상컬럼:
-            df_추가[f'{s_컬럼명}_{n_이전봉}'] = df_추가[s_컬럼명].shift(n_이전봉)
+            # df_추가[f'{s_컬럼명}_{n_이전봉}'] = df_추가[s_컬럼명].shift(n_이전봉)
+            df_추가 = pd.concat([df_추가, df_추가[s_컬럼명].shift(n_이전봉)], axis=1)
+            df_추가.columns = list(df_추가.columns)[:-1] + [f'{s_컬럼명}_{n_이전봉}']
 
     # 시간 구간 생성
     df_추가['타임존_A'] = (df_추가['시간'] >= '09:00:00') & (df_추가['시간'] < '10:30:00')
