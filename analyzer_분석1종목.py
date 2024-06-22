@@ -66,14 +66,14 @@ class Analyzer:
         """ 전체 종목 분석해서 변동성이 큰 종목 선정 후 pkl, csv 저장 \n
             # 선정기준 : 10분봉 기준 3%이상 상승이 하루에 2회 이상 존재 """
         # 파일명 정의
-        s_파일명_금번 = 'df_변동성종목_당일'
+        s_파일명_생성 = 'df_변동성종목_당일'
 
         # 분석대상 일자 선정
         dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(days=self.n_보관기간_analyzer)
         s_기준일자 = dt_기준일자.strftime('%Y%m%d')
         li_일자_전체 = [일자 for 일자 in self.li_일자_전체 if 일자 > s_기준일자]
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_변동성종목)
-                    if s_파일명_금번 in 파일명 and '.pkl' in 파일명]
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
         # 일자별 분석 진행
@@ -108,8 +108,8 @@ class Analyzer:
             # df 저장
             df_변동성종목 = pd.DataFrame(li_변동성종목, columns=['종목코드', '종목명', '상승갯수'])
             df_변동성종목 = df_변동성종목.sort_values('상승갯수', ascending=False).reset_index(drop=True)
-            df_변동성종목.to_pickle(os.path.join(self.folder_변동성종목, f'{s_파일명_금번}_{s_일자}.pkl'))
-            df_변동성종목.to_csv(os.path.join(self.folder_변동성종목, f'{s_파일명_금번}_{s_일자}.csv'),
+            df_변동성종목.to_pickle(os.path.join(self.folder_변동성종목, f'{s_파일명_생성}_{s_일자}.pkl'))
+            df_변동성종목.to_csv(os.path.join(self.folder_변동성종목, f'{s_파일명_생성}_{s_일자}.csv'),
                            index=False, encoding='cp949')
 
             # log 기록
@@ -118,14 +118,14 @@ class Analyzer:
     def 분석_데이터셋(self):
         """ 변동성 종목 대상 기준으로 모델 생성을 위한 데이터 정리 후 ary set을 dic 형태로 저장 """
         # 파일명 정의
-        s_파일명_이전 = 'df_변동성종목_당일'
-        s_파일명_금번 = 'dic_df_데이터셋'
+        s_파일명_기준 = 'df_변동성종목_당일'
+        s_파일명_생성 = 'dic_df_데이터셋'
 
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_변동성종목)
-                    if s_파일명_이전 in 파일명 and '.pkl' in 파일명]
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_데이터셋)
-                    if s_파일명_금번 in 파일명 and '.pkl' in 파일명]
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
         # 일자별 분석 진행
@@ -158,7 +158,7 @@ class Analyzer:
                 dic_df_데이터셋[s_종목코드] = df_데이터셋
 
             # 데이터셋 저장
-            pd.to_pickle(dic_df_데이터셋, os.path.join(self.folder_데이터셋, f'{s_파일명_금번}_{s_일자}.pkl'))
+            pd.to_pickle(dic_df_데이터셋, os.path.join(self.folder_데이터셋, f'{s_파일명_생성}_{s_일자}.pkl'))
 
             # log 기록
             self.make_log(f'데이터셋 준비 완료({s_일자})')
@@ -166,14 +166,14 @@ class Analyzer:
     def 분석_모델생성(self):
         """ 변동성 종목 대상 기준으로 종목별 모델 생성 후 저장 """
         # 파일명 정의
-        s_파일명_이전 = 'dic_df_데이터셋'
-        s_파일명_금번 = 'dic_종목모델'
+        s_파일명_기준 = 'dic_df_데이터셋'
+        s_파일명_생성 = 'dic_종목모델'
 
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_데이터셋)
-                    if s_파일명_이전 in 파일명 and '.pkl' in 파일명]
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_모델)
-                    if s_파일명_금번 in 파일명 and '.pkl' in 파일명]
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
         # 일자별 분석 진행
@@ -224,7 +224,10 @@ class Analyzer:
                 continue
 
             # 전일 모델 불러오기
-            dic_모델_전일 = pd.read_pickle(os.path.join(self.folder_모델, f'{s_파일명_금번}_{s_일자_전일}.pkl'))
+            try:
+                dic_모델_전일 = pd.read_pickle(os.path.join(self.folder_모델, f'{s_파일명_생성}_{s_일자_전일}.pkl'))
+            except FileNotFoundError:
+                dic_모델_전일 = dict()
 
             # 전일 모델에 미존재 하는 종목코드 찾기
             li_대상종목_전일 = [종목코드 for 종목코드 in li_대상종목 if 종목코드 not in dic_모델_전일.keys()]
@@ -257,24 +260,24 @@ class Analyzer:
                 dic_모델_전일[s_종목코드] = dic_모델_케이스_전일
 
             # 모델 저장 (전일 모델)
-            pd.to_pickle(dic_모델_전일, os.path.join(self.folder_모델, f'{s_파일명_금번}_{s_일자_전일}.pkl'))
+            pd.to_pickle(dic_모델_전일, os.path.join(self.folder_모델, f'{s_파일명_생성}_{s_일자_전일}.pkl'))
             self.make_log(f'종목모델 생성 완료(전일-{s_일자_전일}, {len(li_대상종목_전일):,}개 종목)')
 
             # 모델 저장 (당일 모델)
-            pd.to_pickle(dic_모델, os.path.join(self.folder_모델, f'{s_파일명_금번}_{s_일자}.pkl'))
+            pd.to_pickle(dic_모델, os.path.join(self.folder_모델, f'{s_파일명_생성}_{s_일자}.pkl'))
             self.make_log(f'종목모델 생성 완료(당일-{s_일자}, {len(li_대상종목):,}개 종목)')
 
     def 분석_성능평가(self):
         """ 전일 생성된 모델 기반으로 금일 데이터로 예측 결과 확인하여 평가결과 저장 """
         # 파일명 정의
-        s_파일명_이전 = 'dic_종목모델'
-        s_파일명_금번 = 'dic_df_평가_성공여부'
+        s_파일명_기준 = 'dic_종목모델'
+        s_파일명_생성 = 'dic_df_평가_성공여부'
 
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_모델)
-                    if s_파일명_이전 in 파일명 and '.pkl' in 파일명]
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_성능평가)
-                    if s_파일명_금번 in 파일명 and '.pkl' in 파일명]
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
         # 일자별 분석 진행
@@ -359,7 +362,7 @@ class Analyzer:
 
             # 평가 결과 저장
             pd.to_pickle(dic_df_평가_케이스, os.path.join(self.folder_성능평가, f'dic_df_평가_케이스_{s_일자}.pkl'))
-            pd.to_pickle(dic_df_평가_성공여부, os.path.join(self.folder_성능평가, f'{s_파일명_금번}_{s_일자}.pkl'))
+            pd.to_pickle(dic_df_평가_성공여부, os.path.join(self.folder_성능평가, f'{s_파일명_생성}_{s_일자}.pkl'))
 
             # log 기록
             self.make_log(f'성능평가 완료({s_일자}, {len(dic_df_평가_성공여부):,}개 종목)')
@@ -367,14 +370,14 @@ class Analyzer:
     def 선정_감시대상(self):
         """ 모델평가 결과를 바탕으로 trader에서 실시간 감시할 종목 선정 후 저장 """
         # 파일명 정의
-        s_파일명_이전 = 'dic_df_평가_성공여부'
-        s_파일명_금번 = 'df_감시대상'
+        s_파일명_기준 = 'dic_df_평가_성공여부'
+        s_파일명_생성 = 'df_감시대상'
 
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_성능평가)
-                    if s_파일명_이전 in 파일명 and '.pkl' in 파일명]
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_감시대상)
-                    if s_파일명_금번 in 파일명 and '.pkl' in 파일명]
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
         # 일자별 분석 진행
@@ -399,8 +402,8 @@ class Analyzer:
             df_감시대상 = df_감시대상.reset_index(drop=True)
 
             # 평가 결과 저장
-            df_감시대상.to_pickle(os.path.join(self.folder_감시대상, f'{s_파일명_금번}_{s_일자}.pkl'))
-            df_감시대상.to_csv(os.path.join(self.folder_감시대상, f'{s_파일명_금번}_{s_일자}.csv'),
+            df_감시대상.to_pickle(os.path.join(self.folder_감시대상, f'{s_파일명_생성}_{s_일자}.pkl'))
+            df_감시대상.to_csv(os.path.join(self.folder_감시대상, f'{s_파일명_생성}_{s_일자}.csv'),
                            index=False, encoding='cp949')
 
             # log 기록
@@ -409,14 +412,14 @@ class Analyzer:
     def 모델_감시대상(self):
         """ 생성된 모델 중 감시대상에 해당하는 종목, 케이스만 골라서 별도 파일로 저장 (이후 동작 시 속도 향상 목적) """
         # 파일명 정의
-        s_파일명_이전 = 'df_감시대상'
-        s_파일명_금번 = 'dic_종목모델_감시대상'
+        s_파일명_기준 = 'df_감시대상'
+        s_파일명_생성 = 'dic_종목모델_감시대상'
 
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_감시대상)
-                    if s_파일명_이전 in 파일명 and '.pkl' in 파일명]
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_감시대상모델)
-                    if s_파일명_금번 in 파일명 and '.pkl' in 파일명]
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
         # 일자별 분석 진행
@@ -441,7 +444,7 @@ class Analyzer:
                     dic_모델_감시대상[s_종목코드] = {s_케이스: obj_모델}
 
             # 모델 저장
-            pd.to_pickle(dic_모델_감시대상, os.path.join(self.folder_감시대상모델, f'{s_파일명_금번}_{s_일자}.pkl'))
+            pd.to_pickle(dic_모델_감시대상, os.path.join(self.folder_감시대상모델, f'{s_파일명_생성}_{s_일자}.pkl'))
 
             # log 기록
             self.make_log(f'감시대상 모델 별도 저장 완료({s_일자}, {len(dic_모델_감시대상):,}개 종목)')
