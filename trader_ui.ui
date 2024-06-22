@@ -10,6 +10,12 @@
     <height>561</height>
    </rect>
   </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
   <property name="windowTitle">
    <string>Short Punch Trader</string>
   </property>
@@ -18,7 +24,7 @@
     <normaloff>trader_ui_ShortPunch.png</normaloff>trader_ui_ShortPunch.png</iconset>
   </property>
   <property name="styleSheet">
-   <string notr="true">background-color: rgb(52, 50, 48);
+   <string notr="true">background-color: rgb(48, 48, 48);
 color: rgb(230, 230, 230);</string>
   </property>
   <widget class="QWidget" name="centralwidget">
@@ -92,8 +98,7 @@ color: rgb(230, 230, 230);</string>
       </font>
      </property>
      <property name="styleSheet">
-      <string notr="true">
-</string>
+      <string notr="true"/>
      </property>
      <property name="text">
       <string>[ 계좌번호 ]</string>
@@ -140,6 +145,12 @@ color: rgb(230, 230, 230);</string>
       <height>251</height>
      </rect>
     </property>
+    <property name="sizePolicy">
+     <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+      <horstretch>0</horstretch>
+      <verstretch>0</verstretch>
+     </sizepolicy>
+    </property>
     <property name="font">
      <font>
       <family>맑은 고딕</family>
@@ -177,6 +188,12 @@ color: rgb(230, 230, 230);</string>
      <property name="sortingEnabled">
       <bool>true</bool>
      </property>
+     <attribute name="horizontalHeaderCascadingSectionResizes">
+      <bool>false</bool>
+     </attribute>
+     <attribute name="verticalHeaderCascadingSectionResizes">
+      <bool>false</bool>
+     </attribute>
     </widget>
    </widget>
    <widget class="QGroupBox" name="gb_info_setting">
@@ -395,6 +412,12 @@ color: rgb(230, 230, 230);</string>
       <width>461</width>
       <height>251</height>
      </rect>
+    </property>
+    <property name="sizePolicy">
+     <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+      <horstretch>0</horstretch>
+      <verstretch>0</verstretch>
+     </sizepolicy>
     </property>
     <property name="font">
      <font>
