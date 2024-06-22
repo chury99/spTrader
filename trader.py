@@ -163,30 +163,40 @@ class Trader(QMainWindow, form_class):
 
     def setui_거래이력(self):
         """ 체결잔고 csv 파일 읽어와서 ui에 표시 """
-        # 체결잔고 읽어오기
-        # df_체결잔고 = pd.read_csv(os.path.join(self.folder_체결잔고, f'체결잔고_{self.s_오늘}.csv'), encoding='cp949')
-        df_체결잔고 = pd.read_csv(os.path.join(self.folder_체결잔고, f'체결잔고_{"20230605"}.csv'), encoding='cp949')   ##### 테스트용 임시코드
+        # 체결잔고 읽어오기 (없으면 이전 파일에서 양식 가져오기)
+        # s_일자 = self.s_오늘
+        s_일자 = '20240415'       ####### 테스트용 임시 코드
+        try:
+            df_체결잔고 = pd.read_csv(os.path.join(self.folder_체결잔고, f'체결잔고_{s_일자}.csv'), encoding='cp949')
+        except FileNotFoundError:
+            s_파일명_최근 = max([파일명 for 파일명 in os.listdir(self.folder_체결잔고) if '체결잔고' in 파일명])
+            df_체결잔고 = pd.read_csv(os.path.join(self.folder_체결잔고, s_파일명_최근), encoding='cp949')
+            df_체결잔고 = df_체결잔고[0:0]
 
         # df 정리 (전체 컬럼 str으로 변환 필요)
         df_거래이력 = pd.DataFrame()
-        df_거래이력['구분'] = df_체결잔고['구분']
         df_거래이력['시간'] = df_체결잔고['시간']
         df_거래이력['계좌번호'] = df_체결잔고['계좌번호'].apply(lambda x: str(x))
         df_거래이력['종목코드'] = df_체결잔고['종목코드']
         df_거래이력['종목명'] = df_체결잔고['종목명'].apply(lambda x: x.strip())
+        df_거래이력['주문구분'] = df_체결잔고['주문구분']
         df_거래이력['주문상태'] = df_체결잔고['주문상태']
         df_거래이력['주문수량'] = df_체결잔고['주문수량'].apply(lambda x: f'{float(x):,.0f}')
         df_거래이력['주문가격'] = df_체결잔고['주문가격'].apply(lambda x: f'{float(x):,.0f}')
         df_거래이력['미체결수량'] = df_체결잔고['미체결수량'].apply(lambda x: f'{float(x):,.0f}')
         df_거래이력['체결누계금액'] = df_체결잔고['체결누계금액'].apply(lambda x: f'{float(x):,.0f}')
-        df_거래이력['매도수구분'] = df_체결잔고['매도수구분']
         df_거래이력['주문체결시간'] = df_체결잔고['주문체결시간']
         df_거래이력['체결가'] = df_체결잔고['체결가'].apply(lambda x: f'{float(x):,.0f}')
         df_거래이력['체결량'] = df_체결잔고['체결량'].apply(lambda x: f'{float(x):,.0f}')
         df_거래이력['현재가'] = df_체결잔고['현재가'].apply(lambda x: f'{abs(float(x)):,.0f}')
+        df_거래이력['일자'] = f'{s_일자[4:6]}-{s_일자[6:8]}'
 
+        li_컬럼명 = ['일자'] + [컬럼명 for 컬럼명 in df_거래이력.columns if 컬럼명 not in ['일자']]
+        df_거래이력 = df_거래이력.loc[:, li_컬럼명]
+
+        # 계좌 걸러내기
         # df_거래이력 = df_거래이력[df_거래이력['계좌번호'] == self.s_계좌번호]
-        df_거래이력 = df_거래이력[df_거래이력['계좌번호'] == '5292685210']      ####### 임시 테스트용 코드
+        df_거래이력 = df_거래이력[df_거래이력['계좌번호'] == '5397778810']      ####### 임시 테스트용 코드
         ary_거래이력 = df_거래이력.values
 
         # 테이블 모델 생성
@@ -195,7 +205,8 @@ class Trader(QMainWindow, form_class):
 
         for n_row, ary_row in enumerate(ary_거래이력):
             for n_col, s_항목 in enumerate(ary_row):
-                obj_정렬 = Qt.AlignRight if n_col in [0] else Qt.AlignCenter
+                # obj_정렬 = Qt.AlignRight if n_col in [0] else Qt.AlignCenter
+                obj_정렬 = Qt.AlignRight if n_col in [] else Qt.AlignCenter
                 obj_항목 = QStandardItem(str(s_항목))
                 obj_항목.setTextAlignment(obj_정렬)
                 model_거래이력.setItem(n_row, n_col, obj_항목)
