@@ -62,7 +62,7 @@ class LauncherTrader:
             # 종료시각 경과 시 종료
             if dt_현재시각 > self.dt_종료시각:
                 # log 기록
-                self.make_log(f'실행시간 종료 (종료시각 {self.dt_종료시각.strftime("%h:%m:%s")} - 서버접속 종료 요청')
+                self.make_log(f'실행시간 종료 (종료시각 {self.dt_종료시각.strftime("%H:%M:%S")}) - 서버접속 종료 요청')
 
                 # 시간 지연 시 종료 요청
                 ret = subprocess.run(f'taskkill /f /t /pid {s_pid}', shell=True)
