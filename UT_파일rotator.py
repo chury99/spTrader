@@ -79,11 +79,15 @@ class Rotator:
         li_패스_삭제대상 = [os.path.join(s_폴더, 파일) for 파일 in li_파일_삭제대상]
 
         # 대상 파일 삭제
+        li_파일사이즈 = []
         for s_패스 in li_패스_삭제대상:
+            li_파일사이즈.append(os.path.getsize(s_패스))
             os.system(f'del {s_패스}')
+        n_파일사이즈_KB = sum(li_파일사이즈)/1024
 
         # log 기록
-        self.make_log(f'파일 삭제 완료({self.n_보관기간_log}일 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
+        self.make_log(f'파일 삭제 완료({self.n_보관기간_log}일 경과, {s_기준일자} 기준,'
+                      f' {len(li_패스_삭제대상):,}개 파일, {n_파일사이즈_KB:,.0f}KB)')
 
     def 파일관리_analyzer(self):
         """ analyzer에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
@@ -106,11 +110,15 @@ class Rotator:
             [li_패스_삭제대상.append(os.path.join(s_폴더, 파일)) for 파일 in li_파일_삭제대상]
 
         # 대상 파일 삭제
+        li_파일사이즈 = []
         for s_패스 in li_패스_삭제대상:
+            li_파일사이즈.append(os.path.getsize(s_패스))
             os.system(f'del {s_패스}')
+        n_파일사이즈_MB = sum(li_파일사이즈) / 1024 ** 2
 
         # log 기록
-        self.make_log(f'파일 삭제 완료({self.n_보관기간_analyzer}일 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
+        self.make_log(f'파일 삭제 완료({self.n_보관기간_analyzer}일 경과, {s_기준일자} 기준,'
+                      f' {len(li_패스_삭제대상):,}개 파일, {n_파일사이즈_MB:,.0f}MB)')
 
     def 파일관리_collector(self):
         """ collector에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
@@ -133,11 +141,15 @@ class Rotator:
             [li_패스_삭제대상.append(os.path.join(s_폴더, 파일)) for 파일 in li_파일_삭제대상]
 
         # 대상 파일 삭제
+        li_파일사이즈 = []
         for s_패스 in li_패스_삭제대상:
+            li_파일사이즈.append(os.path.getsize(s_패스))
             os.system(f'del {s_패스}')
+        n_파일사이즈_KB = sum(li_파일사이즈) / 1024
 
         # log 기록
-        self.make_log(f'파일 삭제 완료({self.n_보관기간_collector}일 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
+        self.make_log(f'파일 삭제 완료({self.n_보관기간_collector}일 경과, {s_기준일자} 기준,'
+                      f' {len(li_패스_삭제대상):,}개 파일, {n_파일사이즈_KB:,.0f}KB)')
 
     def 파일관리_trader(self):
         """ trader에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
@@ -160,11 +172,15 @@ class Rotator:
             [li_패스_삭제대상.append(os.path.join(s_폴더, 파일)) for 파일 in li_파일_삭제대상]
 
         # 대상 파일 삭제
+        li_파일사이즈 = []
         for s_패스 in li_패스_삭제대상:
+            li_파일사이즈.append(os.path.getsize(s_패스))
             os.system(f'del {s_패스}')
+        n_파일사이즈_KB = sum(li_파일사이즈) / 1024
 
         # log 기록
-        self.make_log(f'파일 삭제 완료({self.n_보관기간_trader}일 경과, {s_기준일자} 기준, {len(li_패스_삭제대상):,}개 파일)')
+        self.make_log(f'파일 삭제 완료({self.n_보관기간_trader}일 경과, {s_기준일자} 기준,'
+                      f' {len(li_패스_삭제대상):,}개 파일, {n_파일사이즈_KB:,.0f}KB)')
 
     def 잔여공간확인(self):
         """ folder_work 폴더가 위치한 드라이브의 잔여 공간 확인하여 출력 """
