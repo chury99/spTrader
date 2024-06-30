@@ -20,6 +20,10 @@ class LauncherTrader:
         self.path_파이썬32 = dic_config['path_파이썬32']
         self.path_파이썬64 = dic_config['path_파이썬64']
 
+        # # 에러 출력 설정
+        # sys.stderr = open(os.path.join(dic_config['folder_log'],
+        #                                f'{dic_config["로그이름_trader"]}_에러_{self.s_오늘}.log'), 'a')
+
         # 폴더 정의
         import UT_폴더manager
         dic_폴더정보 = UT_폴더manager.dic_폴더정보
@@ -42,8 +46,12 @@ class LauncherTrader:
         path_모니터링 = os.path.join(self.folder_run, '모니터링_trader.pkl')
 
         # 프로세스 실행
-        프로세스 = subprocess.Popen([self.path_파이썬32, path_실행], shell=True)
-        s_pid = 프로세스.pid
+        트레이더 = subprocess.Popen([self.path_파이썬32, path_실행], shell=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        s_pid = 트레이더.pid
+        stdout_트레이더, stderr_트레이더 = 트레이더.communicate()
+        stdout_트레이더 = stdout_트레이더.decode('utf-8')
+        stderr_트레이더 = stderr_트레이더.decode('utf-8')
         time.sleep(30)
 
         # 모니터링 진행
@@ -52,11 +60,19 @@ class LauncherTrader:
             dt_현재시각 = pd.Timestamp('now')
 
             # 정상종료 되었으면 종료
-            ret = 프로세스.poll()
+            ret = 트레이더.poll()
             s_실행상태 = '정상종료' if ret == 0 else '실행중' if ret is None else '비정상종료'
             if s_실행상태 == '정상종료':
                 # log 기록
                 self.make_log('서버접속 정상 종료')
+                break
+
+            # 트레이더 에러 발생 시 종료
+            if stderr_트레이더 is not None:
+                stdout_트레이더, stderr_트레이더 = 트레이더.communicate()
+                stderr_트레이더 = stderr_트레이더.decode('utf-8')
+                self.make_log(f'trader 에러 발생\n'
+                              f'{stderr_트레이더}')
                 break
 
             # 종료시각 경과 시 종료
@@ -65,18 +81,29 @@ class LauncherTrader:
                 self.make_log(f'실행시간 종료 (종료시각 {self.dt_종료시각.strftime("%H:%M:%S")}) - 서버접속 종료 요청')
 
                 # 시간 지연 시 종료 요청
-                ret = subprocess.run(f'taskkill /f /t /pid {s_pid}', shell=True)
+                ret = subprocess.run(f'taskkill /f /t /pid {s_pid}', shell=True,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 s_종료요청 = '성공' if ret.returncode == 0 else '실패'
+                if s_종료요청 == '성공':
+                    self.make_log(f'요청 결과 - {s_종료요청}')
+                else:
+                    self.make_log(f'요청 결과 - {s_종료요청} - {ret.args}\n'
+                                  f'\t stdout - {ret.stdout}\n'
+                                  f'\t stderr - {ret.stderr}')
                 time.sleep(1)
 
-                # 프로세스 재실행 (종료요청 성공 시)
+                # 런처 종료
                 if s_종료요청 == '성공':
-                    # log 기록
-                    self.make_log(f'서버접속 종료')
                     break
-                else:
-                    # log 기록
-                    self.make_log(f'접속종료 실패')
+
+                # # 프로세스 재실행 (종료요청 성공 시)
+                # if s_종료요청 == '성공':
+                #     # log 기록
+                #     self.make_log(f'서버접속 종료')
+                #     break
+                # else:
+                #     # log 기록
+                #     self.make_log(f'접속종료 실패')
 
             # 모니터링 파일 확인
             try:
@@ -92,20 +119,37 @@ class LauncherTrader:
                 self.make_log(f'서버응답 지연({self.n_재구동대기시간_초}초) - 강제종료 요청')
 
                 # 시간 지연 시 종료 요청
-                ret = subprocess.run(f'taskkill /f /t /pid {s_pid}', shell=True)
+                ret = subprocess.run(f'taskkill /f /t /pid {s_pid}', shell=True,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 s_종료요청 = '성공' if ret.returncode == 0 else '실패'
+                if s_종료요청 == '성공':
+                    self.make_log(f'요청 결과 - {s_종료요청}')
+                else:
+                    self.make_log(f'요청 결과 - {s_종료요청} - {ret.args}\n'
+                                  f'\t stdout - {ret.stdout}\n'
+                                  f'\t stderr - {ret.stderr}')
                 time.sleep(1)
 
-                # 프로세스 재실행 (종료요청 성공 시)
-                if s_종료요청 == '성공':
-                    # log 기록
-                    self.make_log(f'서버 재접속 요청')
-                    프로세스 = subprocess.Popen([self.path_파이썬32, path_실행], shell=True)
-                    s_pid = 프로세스.pid
-                    time.sleep(30)
-                else:
-                    # log 기록
-                    self.make_log(f'강제종료 실패')
+                # 프로세스 재실행 (종료요청 성공 여부 무관)
+                self.make_log(f'서버 재접속 요청 (에러 메세지 없음)')
+                트레이더 = subprocess.Popen([self.path_파이썬32, path_실행], shell=True,
+                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                s_pid = 트레이더.pid
+                stdout_트레이더, stderr_트레이더 = 트레이더.communicate()
+                stdout_트레이더 = stdout_트레이더.decode('utf-8')
+                stderr_트레이더 = stderr_트레이더.decode('utf-8')
+                time.sleep(30)
+
+                # # 프로세스 재실행 (종료요청 성공 시)
+                # if s_종료요청 == '성공':
+                #     # log 기록
+                #     self.make_log(f'서버 재접속 요청')
+                #     프로세스 = subprocess.Popen([self.path_파이썬32, path_실행], shell=True)
+                #     s_pid = 프로세스.pid
+                #     time.sleep(30)
+                # else:
+                #     # log 기록
+                #     self.make_log(f'강제종료 실패')
             else:
                 time.sleep(1)
 
