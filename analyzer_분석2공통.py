@@ -144,7 +144,7 @@ class Analyzer:
             # 상승예측 없을 시 빈 df로 설정
             if len(df_상승예측) == 0:
                 li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_종목상승예측)
-                          if f'df_상승예측_{s_모델}_' in 파일명 and '.pkl' in 파일명]
+                          if f'df_상승예측' in 파일명 and '.pkl' in 파일명]
                 s_참고파일 = max(li_파일명)
                 df_상승예측 = pd.read_pickle(os.path.join(self.folder_종목상승예측, s_참고파일))
                 df_상승예측 = df_상승예측.drop(df_상승예측.index)
