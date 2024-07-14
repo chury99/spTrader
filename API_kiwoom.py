@@ -305,10 +305,10 @@ class KiwoomAPI(QAxWidget):
                    '상한가': 305, '하한가': 306}
 
         # dic 초기화 (신규일때만)
-        if s_등록형태 == '신규':
-            self.dic_실시간_현재가 = dict()
-            self.dic_실시간_체결 = dict()
-            self.dic_실시간_호가잔량 = dict()
+        # if s_등록형태 == '신규':
+        #     self.dic_실시간_현재가 = dict()
+        #     self.dic_실시간_체결 = dict()
+        #     self.dic_실시간_호가잔량 = dict()
 
         # 요일, 시간 확인하여 장중일 때만 실시간 등록 요청
         dt_현재 = pd.Timestamp('now')
@@ -318,7 +318,7 @@ class KiwoomAPI(QAxWidget):
                 and (dt_현재 >= pd.Timestamp('09:00:00')) and (dt_현재 <= pd.Timestamp('15:30:00'))):
             # 실시간 데이터 감시 요청 (장중일 시)
             s_fid = f"{dic_fid['종목코드']};{dic_fid['현재가']};{dic_fid['호가시간']};" \
-                    f"{dic_fid['매도호가총잔량']};{dic_fid['매도호가총잔량']}"
+                    f"{dic_fid['매도호가총잔량']};{dic_fid['매수호가총잔량']}"
             self.set_real_reg('1001', s_종목코드, s_fid, dic_등록형태[s_등록형태])
 
     def set_실시간_종목해제(self, s_종목코드):
@@ -610,7 +610,10 @@ class KiwoomAPI(QAxWidget):
         dic_에러코드 = {0: '성공', 100: '사용자 정보교환 실패', 101: '서버접속 실패', 102: '버전처리 실패'}
 
         # 접속 결과 생성
-        self.s_접속결과 = dic_에러코드[n_에러코드]
+        try:
+            self.s_접속결과 = dic_에러코드[n_에러코드]
+        except KeyError:
+            self.s_접속결과 = '알수 없는 에러'
 
         # 접속 서버 확인
         self.s_접속서버 = self.get_접속서버()
@@ -738,6 +741,11 @@ class KiwoomAPI(QAxWidget):
         #     except PermissionError:
         #         pass
 
+        # dic 정의
+        self.dic_실시간_현재가 = dict() if not hasattr(self, 'dic_실시간_현재가') else self.dic_실시간_현재가
+        self.dic_실시간_체결 = dict() if not hasattr(self, 'dic_실시간_체결') else self.dic_실시간_체결
+        self.dic_실시간_호가잔량 = dict() if not hasattr(self, 'dic_실시간_호가잔량') else self.dic_실시간_호가잔량
+
         # 주식체결 데이터 수집 (누적)
         if s_실시간타입 == "주식체결":
             s_체결시간 = self._get_comm_real_data(s_종목코드, 20)
@@ -758,9 +766,9 @@ class KiwoomAPI(QAxWidget):
                 pass
 
             # 화면 출력
-            li_데이터 = [s_종목코드, n_현재가]
-            s_텍스트 = f'실시간 | {s_실시간타입} | {li_데이터}'
-            print(s_텍스트)
+            li_데이터 = [s_종목코드, s_체결시간, n_현재가]
+            s_텍스트 = f'실시간 | 주식시세 | {li_데이터}'
+            # print(s_텍스트)
             try:
                 with open(os.path.join(self.folder_실시간, f'실시간_주식시세_{self.s_오늘}.txt'), 'at') as file:
                     file.write(f'{s_텍스트}\n')
