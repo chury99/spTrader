@@ -6,7 +6,7 @@ import re
 
 from tqdm import tqdm
 
-import analyzer_알고리즘 as Logic
+import analyzer_rf알고리즘 as Logic
 
 # 그래프 한글 설정
 import matplotlib.pyplot as plt
