@@ -28,10 +28,10 @@ class LauncherAnalyzer:
         # log 기록
         self.make_log(f'### 구동 시작 ###')
 
-    def analyzer_분석1종목(self):
+    def analyzer_rf분석1종목(self):
         """ 10분봉 데이터를 분석하여 종목별 모델 생성 및 감시대상 선정 """
         # 파일 지정
-        path_실행 = os.path.join(os.getcwd(), 'analyzer_분석1종목.py')
+        path_실행 = os.path.join(os.getcwd(), 'analyzer_rf분석1종목.py')
 
         # log 기록
         self.make_log(f'10분봉 데이터 분석 실행')
@@ -48,10 +48,10 @@ class LauncherAnalyzer:
         # log 기록
         self.make_log(f'10분봉 데이터 분석 완료 - {s_실행결과}')
 
-    def analyzer_분석2공통(self):
+    def analyzer_rf분석2공통(self):
         """ 종목별 분석 결과를 바탕으로 통합 모델 생성 """
         # 파일 지정
-        path_실행 = os.path.join(os.getcwd(), 'analyzer_분석2공통.py')
+        path_실행 = os.path.join(os.getcwd(), 'analyzer_rf분석2공통.py')
 
         # log 기록
         self.make_log(f'공통 모델 생성 실행')
@@ -68,10 +68,10 @@ class LauncherAnalyzer:
         # log 기록
         self.make_log(f'공통 모델 생성 완료 - {s_실행결과}')
 
-    def analyzer_백테스팅(self):
+    def analyzer_rf백테스팅(self):
         """ 분석 결과 생성된 모델을 신규 데이터에 적용하여 수익 확인 """
         # 파일 지정
-        path_실행 = os.path.join(os.getcwd(), 'analyzer_백테스팅.py')
+        path_실행 = os.path.join(os.getcwd(), 'analyzer_rf백테스팅.py')
 
         # log 기록
         self.make_log(f'분석 모델 백테스팅 실행')
@@ -132,7 +132,7 @@ class LauncherAnalyzer:
 if __name__ == "__main__":
     l = LauncherAnalyzer()
 
-    l.analyzer_분석1종목()
-    l.analyzer_분석2공통()
-    l.analyzer_백테스팅()
+    l.analyzer_rf분석1종목()
+    l.analyzer_rf분석2공통()
+    l.analyzer_rf백테스팅()
     l.UT_파일rotator()
