@@ -7,7 +7,7 @@ import re
 import pandas.errors
 from tqdm import tqdm
 
-import analyzer_알고리즘 as Logic
+import analyzer_rf알고리즘 as Logic
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
