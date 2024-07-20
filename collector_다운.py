@@ -22,7 +22,9 @@ class Collector:
         import UT_폴더manager
         dic_폴더정보 = UT_폴더manager.dic_폴더정보
         self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
+        self.folder_분석대상 = dic_폴더정보['데이터|분석대상']
         os.makedirs(self.folder_정보수집, exist_ok=True)
+        os.makedirs(self.folder_분석대상, exist_ok=True)
 
         # 키움 api 연결
         import API_kiwoom
@@ -94,6 +96,11 @@ class Collector:
 
             # csv 파일 저장
             df_정보.to_csv(os.path.join(self.folder_정보수집, f'조건검색_{s_항목명}.csv'), index=False, encoding='cp949')
+
+            # 분석대상종목 추가 저장
+            if s_항목명 == '분석대상종목':
+                df_정보.to_csv(os.path.join(self.folder_분석대상, f'분석대상종목_{self.s_오늘}.csv'),
+                             index=False, encoding='cp949')
 
             # log 기록
             self.make_log(f'조건검색 저장 - [{s_항목명}] {len(df_정보):,}개 종목')
