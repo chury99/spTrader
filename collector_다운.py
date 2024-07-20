@@ -22,8 +22,10 @@ class Collector:
         import UT_폴더manager
         dic_폴더정보 = UT_폴더manager.dic_폴더정보
         self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
+        self.folder_전체종목 = dic_폴더정보['데이터|전체종목']
         self.folder_분석대상 = dic_폴더정보['데이터|분석대상']
         os.makedirs(self.folder_정보수집, exist_ok=True)
+        os.makedirs(self.folder_전체종목, exist_ok=True)
         os.makedirs(self.folder_분석대상, exist_ok=True)
 
         # 키움 api 연결
@@ -67,6 +69,9 @@ class Collector:
         # 파일 저장
         df_전체종목.to_pickle(os.path.join(self.folder_정보수집, 'df_전체종목.pkl'))
         df_전체종목.to_csv(os.path.join(self.folder_정보수집, '전체종목.csv'), index=False, encoding='cp949')
+
+        # 일자별 추가 저장
+        df_전체종목.to_csv(os.path.join(self.folder_전체종목, f'전체종목_{self.s_오늘}.csv'), index=False, encoding='cp949')
 
         # log 기록
         self.make_log(f'전체종목 저장 완료 - 총 {len(df_전체종목):,}종목 (코스피 {len(li_코스피):,}, 코스닥 {len(li_코스닥):,})')
