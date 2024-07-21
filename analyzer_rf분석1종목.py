@@ -26,7 +26,7 @@ class Analyzer:
         import UT_폴더manager
         dic_폴더정보 = UT_폴더manager.dic_폴더정보
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
-        self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
+        self.folder_분석대상 = dic_폴더정보['데이터|분석대상']
         self.folder_변동성종목 = dic_폴더정보['분석1종목|10_변동성종목']
         self.folder_데이터셋 = dic_폴더정보['분석1종목|20_종목_데이터셋']
         self.folder_모델 = dic_폴더정보['분석1종목|30_종목_모델']
@@ -41,11 +41,6 @@ class Analyzer:
         os.makedirs(self.folder_감시대상모델, exist_ok=True)
 
         # 변수 설정
-        dic_조건검색 = pd.read_pickle(os.path.join(self.folder_정보수집, 'dic_조건검색.pkl'))
-        df_분석대상종목 = dic_조건검색['분석대상종목']
-        self.li_종목_분석대상 = list(df_분석대상종목['종목코드'].sort_values())
-        self.dic_코드2종목명 = df_분석대상종목.set_index('종목코드').to_dict()['종목명']
-
         self.li_일자_전체 = sorted([re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
                                if 'dic_코드별_10분봉_' in 파일명 and '.pkl' in 파일명])
         self.n_보관기간_analyzer = int(dic_config['파일보관기간(일)_analyzer'])
@@ -85,7 +80,9 @@ class Analyzer:
             li_변동성종목 = list()
             for s_종목코드 in tqdm(dic_10분봉.keys(), desc=f'변동성종목선정|{s_일자}'):
                 # 분석대상 종목에 포함 여부 확인
-                if s_종목코드 not in self.li_종목_분석대상:
+                dic_조건검색 = pd.read_pickle(os.path.join(self.folder_분석대상, f'dic_조건검색_{s_일자}.pkl'))
+                df_분석대상종목 = dic_조건검색['분석대상종목']
+                if s_종목코드 not in df_분석대상종목['종목코드'].values:
                     continue
 
                 # 10분봉 39개 존재 여부 확인
@@ -101,7 +98,7 @@ class Analyzer:
                 # 3% 이상 상승 갯수 확인
                 li_상승여부 = [1 if n_상승률 >= 3 else 0 for n_상승률 in df_10분봉['상승률(%)']]
                 if sum(li_상승여부) >= 2:
-                    s_종목명 = self.dic_코드2종목명[s_종목코드]
+                    s_종목명 = df_10분봉['종목명'].values[0]
                     n_상승갯수 = sum(li_상승여부)
                     li_변동성종목.append([s_종목코드, s_종목명, n_상승갯수])
 
