@@ -23,9 +23,10 @@ class Collector:
         # 폴더 정의
         import UT_폴더manager
         dic_폴더정보 = UT_폴더manager.dic_폴더정보
+        self.folder_전체종목 = dic_폴더정보['데이터|전체종목']
+        self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
         self.folder_ohlcv = dic_폴더정보['데이터|ohlcv']
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
-        self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
         os.makedirs(self.folder_ohlcv, exist_ok=True)
         os.makedirs(self.folder_캐시변환, exist_ok=True)
 
@@ -40,7 +41,7 @@ class Collector:
     def 진행확인(self):
         """ 전체 진행할 항목 중 얼만큼 진행되었는지 확인 후 잔여 항목 선정 (전체종목 pkl, 일봉/분봉 ohlcv 임시저장 pkl 활용) """
         # 전체 항목 확인 (df_전체종목.pkl 확인)
-        df_전체종목 = pd.read_pickle(os.path.join(self.folder_정보수집, 'df_전체종목.pkl'))
+        df_전체종목 = pd.read_pickle(os.path.join(self.folder_전체종목, f'df_전체종목_{self.s_오늘}.pkl'))
         li_종목코드_전체 = list(df_전체종목['종목코드'].values)
 
         # 제외 항목 확인 (데이터 길이 0 인 종목코드)
