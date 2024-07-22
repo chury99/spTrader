@@ -25,10 +25,11 @@ class Collector:
         dic_폴더정보 = UT_폴더manager.dic_폴더정보
         self.folder_ohlcv = dic_폴더정보['데이터|ohlcv']
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
+        self.folder_전체종목 = dic_폴더정보['데이터|전체종목']
         self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
 
         # 전체 항목 확인 (df_전체종목.pkl 확인)
-        df_전체종목 = pd.read_pickle(os.path.join(self.folder_정보수집, 'df_전체종목.pkl'))
+        df_전체종목 = pd.read_pickle(os.path.join(self.folder_전체종목, f'df_전체종목_{self.s_오늘}.pkl'))
         self.li_종목코드_전체 = list(df_전체종목['종목코드'].values)
 
         # 제외 항목 확인 - 일봉 (데이터 길이 0 인 종목코드)
