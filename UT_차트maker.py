@@ -67,7 +67,8 @@ def make_이동평균(df_ohlcv):
 
     # df_이동평균 인덱스 설정
     df_이동평균 = df_ohlcv.copy()
-    if '시간' in df_이동평균.columns:
+    s_구분 = '분봉' if '시간' in df_ohlcv.columns else '일봉'
+    if s_구분 == '분봉':
         df_이동평균['일자시간'] = df_이동평균['일자'] + ' ' + df_이동평균['시간']
         df_이동평균['일자시간'] = pd.to_datetime(df_이동평균['일자시간'], format='%Y%m%d %H:%M:%S')
         df_이동평균 = df_이동평균.set_index(keys='일자시간').sort_index(ascending=True)
