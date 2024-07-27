@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 
 from scipy import stats
-from tqdm import tqdm
 
 
 def find_지지저항(df_ohlcv, n_윈도우=60):
@@ -27,17 +26,32 @@ def find_지지저항(df_ohlcv, n_윈도우=60):
 
     # 중복값 제거 (1% 이내 => 거래량 큰 값 선택)
     df_지지저항 = df_지지저항.sort_values('고가')
-    df_지지저항['고가temp'] = df_지지저항['고가'].values
-    df_지지저항['거래량temp'] = df_지지저항['거래량'].values
-    li_df_고가그룹 = list()
-    while len(df_지지저항) > 0:
-        n_고가기준 = df_지지저항['고가'].values[0] * 1.01
-        li_df_고가그룹.append(df_지지저항[df_지지저항['고가'] < n_고가기준])
-        df_지지저항 = df_지지저항[df_지지저항['고가'] >= n_고가기준]
-    li_df_지지저항 = list()
-    for df_고가그룹 in li_df_고가그룹:
-        n_거래량max = df_고가그룹['거래량'].values.max()
-        li_df_지지저항.append(df_고가그룹[df_고가그룹['거래량'] == n_거래량max])
-    df_지지저항 = pd.concat(li_df_지지저항, axis=0)
+    df_지지저항['고가비율(%)'] = (df_지지저항['고가'] / df_지지저항['고가'].shift(1) - 1) * 100
+    df_지지저항['잔존'] = df_지지저항['고가비율(%)'] > 1
+
+    # 1% 이내 값 없을 때까지 계속 반복 확인 (단, 첫번째 row 값은 None 이라 False 값 하나 일때 마무리)
+    while sum(df_지지저항['잔존'] == False) > 1:
+        # 그룹별 분리 (1% 범위)
+        li_df_고가그룹 = list()
+        while len(df_지지저항) > 0:
+            n_고가기준 = df_지지저항['고가'].values[0] * 1.01
+            li_df_고가그룹.append(df_지지저항[df_지지저항['고가'] < n_고가기준])
+            df_지지저항 = df_지지저항[df_지지저항['고가'] >= n_고가기준]
+
+        # 그룹별 거래량 max 확인
+        li_df_지지저항 = list()
+        for df_고가그룹 in li_df_고가그룹:
+            n_거래량max = df_고가그룹['거래량'].values.max()
+            li_df_지지저항.append(df_고가그룹[df_고가그룹['거래량'] == n_거래량max])
+
+        # df_지지저항 생성
+        try:
+            df_지지저항 = pd.concat(li_df_지지저항, axis=0)
+        except ValueError:
+            df_지지저항 = pd.DataFrame()
+
+        # 고가 비율 확인
+        df_지지저항['고가비율(%)'] = (df_지지저항['고가'] / df_지지저항['고가'].shift(1) - 1) * 100
+        df_지지저항['잔존'] = df_지지저항['고가비율(%)'] > 1
 
     return df_지지저항
