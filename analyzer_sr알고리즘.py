@@ -42,7 +42,9 @@ def find_지지저항(df_ohlcv, n_윈도우=60):
         li_df_지지저항 = list()
         for df_고가그룹 in li_df_고가그룹:
             n_거래량max = df_고가그룹['거래량'].values.max()
-            li_df_지지저항.append(df_고가그룹[df_고가그룹['거래량'] == n_거래량max])
+            df_거래량max = df_고가그룹[df_고가그룹['거래량'] == n_거래량max]
+            df_거래량max = df_거래량max[-1:] if len(df_거래량max) > 1 else df_거래량max
+            li_df_지지저항.append(df_거래량max)
 
         # df_지지저항 생성
         try:
