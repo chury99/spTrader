@@ -24,6 +24,7 @@ class LauncherCollector:
         import UT_폴더manager
         dic_폴더정보 = UT_폴더manager.dic_폴더정보
         self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
+        self.folder_분석대상 = dic_폴더정보['데이터|분석대상']
 
         # 카카오 API 연결
         sys.path.append(dic_config['folder_kakao'])
@@ -33,6 +34,79 @@ class LauncherCollector:
 
         # log 기록
         self.make_log(f'### 구동 시작 ###')
+
+    def collector_다운_retry(self):
+        """ 키움 서버에서 필요 정보 다운로드 후 저장 (응답 없을 시 종료 후 재시도) """
+        # 파일 지정
+        path_실행 = os.path.join(os.getcwd(), 'collector_다운.py')
+
+        # log 기록
+        self.make_log(f'서버 데이터 다운로드 실행 (retry 버전)')
+
+        # 시작시각 확인
+        dt_시작시각 = pd.Timestamp('now')
+
+        # 프로세스 실행
+        n_구동대기시간_초 = 30
+        프로세스 = subprocess.Popen([self.path_파이썬32, path_실행], shell=True, stderr=subprocess.PIPE)
+        s_pid = 프로세스.pid
+        time.sleep(n_구동대기시간_초)
+
+        # 모니터링 진행
+        while True:
+            # 정상종료 되었으면 종료 (에러 발생 시 stderr 기록)
+            ret = 프로세스.poll()
+            s_실행상태 = '정상종료' if ret == 0 else '실행중' if ret is None else '비정상종료'
+
+            if s_실행상태 == '정상종료':
+                self.make_log('서버접속 정상 종료')
+                break
+
+            if s_실행상태 == '비정상종료':
+                stdout_프로세스, stderr_프로세스 = 프로세스.communicate()
+                stderr_프로세스 = stderr_프로세스.decode('cp949')
+                if stderr_프로세스 == '':
+                    self.make_log(f'collector 에러 발생 -> 에러코드 미수신)')
+                else:
+                    self.make_log(f'collector 에러 발생\n'
+                                  f'{stderr_프로세스}')
+                break
+
+            # 시간 지연 시 재구동 (결과 파일 확인)
+            path_결과파일 = os.path.join(self.folder_분석대상, f'dic_조건검색_{self.s_오늘}.pkl')
+            try:
+                n_수정시각 = os.path.getmtime(path_결과파일)
+            except FileNotFoundError:
+                n_수정시각 = 0
+
+            if n_수정시각 == 0:
+                self.make_log(f'collector 구동 지연 ({n_구동대기시간_초}초) - 강제종료 요청')
+
+                # 프로세스 종료
+                ret = subprocess.run(f'taskkill /f /t /pid {s_pid}', shell=True,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                s_요청결과 = '성공' if ret.returncode == 0 else '실패'
+                if s_요청결과 == '성공':
+                    self.make_log(f'요청 결과 - {s_요청결과}')
+                else:
+                    self.make_log(f'요청 결과 - {s_요청결과} - {ret.args}\n'
+                                  f'\t stdout - {ret.stdout}\n'
+                                  f'\t stderr - {ret.stderr}')
+
+                # 프로세스 재실행
+                self.make_log(f'서버 재접속 요청')
+                프로세스 = subprocess.Popen([self.path_파이썬32, path_실행], shell=True, stderr=subprocess.PIPE)
+                s_pid = 프로세스.pid
+                time.sleep(n_구동대기시간_초)
+
+            # 시작 후 3분 경과 시 결과에 상관 없이 종료
+            dt_현재시각 = pd.Timestamp('now')
+            if dt_현재시각 - dt_시작시각 > pd.Timedelta(minutes=3):
+                self.make_log(f'타임아웃(3분)')
+                break
+
+        # log 기록
+        self.make_log(f'데이터 다운로드 종료')
 
     def collector_다운(self):
         """ 키움 서버에서 필요 정보 다운로드 후 저장 """
@@ -59,7 +133,7 @@ class LauncherCollector:
             self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
 
         # log 기록
-        self.make_log(f'데이터 다운로드 완료 - {s_실행결과}')
+        self.make_log(f'데이터 다운로드 종료 - {s_실행결과}')
 
     def collector_수집(self):
         """ ohlcv 수집 시 임시 pkl 파일 감시하여 응답 없을 시 종료 후 재구동 """
@@ -201,6 +275,11 @@ class LauncherCollector:
 if __name__ == "__main__":
     l = LauncherCollector()
 
-    l.collector_다운()
-    l.collector_수집()
-    l.collector_변환()
+    # 오전과 오후 나눠서 별도 모듈 실행
+    dt_현재 = pd.Timestamp('now')
+    if dt_현재 < pd.Timestamp('12:00:00'):
+        l.collector_다운_retry()
+    else:
+        l.collector_다운()
+        l.collector_수집()
+        l.collector_변환()
