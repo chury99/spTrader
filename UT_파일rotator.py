@@ -8,7 +8,7 @@ import shutil
 
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
-# noinspection PyShadowingNames
+# noinspection PyShadowingNames,PyUnusedLocal
 class Rotator:
     def __init__(self):
         # config 읽어 오기
@@ -21,46 +21,24 @@ class Rotator:
 
         # 폴더 정의
         import UT_폴더manager
-        dic_폴더정보 = UT_폴더manager.dic_폴더정보
-        self.folder_work = dic_폴더정보['work']
+        self.folder_work = UT_폴더manager.dic_폴더정보['work']
 
+        # dic_folder 생성
         self.dic_folder = dict()
-        self.dic_folder['log'] = dic_config['folder_log']
-
-        self.dic_folder['analyzer'] = {'분석1_변동성종목': dic_폴더정보['분석1종목|10_변동성종목'],
-                                       '분석1_종목_데이터셋': dic_폴더정보['분석1종목|20_종목_데이터셋'],
-                                       '분석1_종목_모델': dic_폴더정보['분석1종목|30_종목_모델'],
-                                       '분석1_종목_성능평가': dic_폴더정보['분석1종목|40_종목_성능평가'],
-                                       '분석1_종목_감시대상': dic_폴더정보['분석1종목|50_종목_감시대상'],
-                                       '분석1_종목_모델_감시대상': dic_폴더정보['분석1종목|60_종목_모델_감시대상'],
-                                       '분석2_종목_상승예측': dic_폴더정보['분석2공통|10_종목_상승예측'],
-                                       '분석2_종목_수익검증': dic_폴더정보['분석2공통|20_종목_수익검증'],
-                                       '분석2_공통_데이터셋': dic_폴더정보['분석2공통|30_공통_데이터셋'],
-                                       '분석2_공통_모델': dic_폴더정보['분석2공통|40_공통_모델'],
-                                       '분석2_공통_성능평가': dic_폴더정보['분석2공통|50_공통_성능평가'],
-                                       '분석2_공통_수익검증': dic_폴더정보['분석2공통|60_공통_수익검증'],
-                                       '백테스팅_데이터준비': dic_폴더정보['백테스팅|10_데이터준비'],
-                                       '백테스팅_매수검증': dic_폴더정보['백테스팅|20_매수검증'],
-                                       '백테스팅_매도검증': dic_폴더정보['백테스팅|30_매도검증'],
-                                       '백테스팅_수익검증': dic_폴더정보['백테스팅|40_수익검증']}
-
-        self.dic_folder['collector'] = {'ohlcv': dic_폴더정보['데이터|ohlcv'],
-                                        '캐시변환': dic_폴더정보['데이터|캐시변환'],
-                                        '정보수집': dic_폴더정보['데이터|정보수집'],
-                                        '전체종목': dic_폴더정보['데이터|전체종목'],
-                                        '분석대상': dic_폴더정보['데이터|분석대상']
-                                        }
-
-        self.dic_folder['trader'] = {'run': dic_폴더정보['run'],
-                                     '메세지': dic_폴더정보['이력|메세지'],
-                                     '실시간': dic_폴더정보['이력|실시간'],
-                                     '체결잔고': dic_폴더정보['이력|체결잔고']}
+        self.dic_folder['log'] = [dic_config['folder_log']]
 
         # 변수 설정
-        self.n_보관기간_log = int(dic_config['파일보관기간(일)_log'])
-        self.n_보관기간_analyzer = int(dic_config['파일보관기간(일)_analyzer'])
-        self.n_보관기간_collector = int(dic_config['파일보관기간(일)_collector'])
-        self.n_보관기간_trader = int(dic_config['파일보관기간(일)_trader'])
+        self.dic_보관기간 = dict()
+        self.dic_보관기간['log'] = int(dic_config['파일보관기간(일)_log'])
+        self.dic_보관기간['analyzer'] = int(dic_config['파일보관기간(일)_analyzer'])
+        self.dic_보관기간['collector'] = int(dic_config['파일보관기간(일)_collector'])
+        self.dic_보관기간['trader'] = int(dic_config['파일보관기간(일)_trader'])
+
+        self.dic_파일용량단위 = dict()
+        self.dic_파일용량단위['log'] = 'KB'
+        self.dic_파일용량단위['analyzer'] = 'MB'
+        self.dic_파일용량단위['collector'] = 'KB'
+        self.dic_파일용량단위['trader'] = 'KB'
 
         # 카카오 API 폴더 연결
         sys.path.append(dic_config['folder_kakao'])
@@ -68,122 +46,110 @@ class Rotator:
         # log 기록
         self.make_log(f'### 파일 보관기간 관리 시작 ###')
 
-    def 파일관리_log(self):
-        """ 로그파일 확인하여 보관기간 지난 파일 삭제 """
-        # 기준 일자 정의
-        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(days=self.n_보관기간_log)
-        s_기준일자 = dt_기준일자.strftime('%Y%m%d')
+    def 폴더정보탐색(self):
+        """ 폴더 구조 파악 해서 self.dic_folder 등록 """
+        # dic_folder 불러오기
+        dic_folder = self.dic_folder
 
-        # 삭제대상 파일 찾기
-        s_폴더 = self.dic_folder['log']
-        li_파일_전체 = os.listdir(s_폴더)
-        li_파일_일자존재 = [파일 for 파일 in li_파일_전체 if re.findall(r'\d{8}', 파일)]
-        li_파일_삭제대상 = [파일 for 파일 in li_파일_일자존재 if re.findall(r'\d{8}', 파일)[0] < s_기준일자]
-        li_패스_삭제대상 = [os.path.join(s_폴더, 파일) for 파일 in li_파일_삭제대상]
+        # 메인 폴더 구조 생성
+        li_폴더분류 = [폴더 for 폴더 in os.listdir(self.folder_work)
+                   if os.path.isdir(os.path.join(self.folder_work, 폴더))]
 
-        # 대상 파일 삭제
-        li_파일사이즈 = []
-        for s_패스 in li_패스_삭제대상:
-            li_파일사이즈.append(os.path.getsize(s_패스))
-            os.system(f'del {s_패스}')
-        n_파일사이즈_KB = sum(li_파일사이즈)/1024
+        # 하위 폴더 구성
+        for s_폴더분류 in li_폴더분류:
+            li_path_상위폴더 = [os.path.join(self.folder_work, s_폴더분류)]
+            dic_folder[s_폴더분류] = li_path_상위폴더
+            while len(li_path_상위폴더) > 0:
+                li_path_다음폴더 = list()
+                for path_상위폴더 in li_path_상위폴더:
+                    li_path_하위폴더 = [os.path.join(path_상위폴더, 폴더) for 폴더 in os.listdir(path_상위폴더)
+                                    if os.path.isdir(os.path.join(path_상위폴더, 폴더))]
+                    dic_folder[s_폴더분류] = dic_folder[s_폴더분류] + li_path_하위폴더
+                    li_path_다음폴더 = li_path_다음폴더 + li_path_하위폴더
+                li_path_상위폴더 = li_path_다음폴더
 
-        # log 기록
-        self.make_log(f'파일 삭제 완료({self.n_보관기간_log}일 경과, {s_기준일자} 기준,'
-                      f' {len(li_패스_삭제대상):,}개 파일, {n_파일사이즈_KB:,.0f}KB)')
+        # 모듈별 폴더 통합
+        dic_folder_모듈별 = dict()
+        for s_폴더분류 in dic_folder.keys():
+            s_모듈분류 = s_폴더분류.split('_')[0]
+            try:
+                dic_folder_모듈별[s_모듈분류] = dic_folder_모듈별[s_모듈분류] + dic_folder[s_폴더분류]
+            except KeyError:
+                dic_folder_모듈별[s_모듈분류] = dic_folder[s_폴더분류]
 
-    def 파일관리_analyzer(self):
-        """ analyzer에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
-        # 기준 일자 정의
-        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(days=self.n_보관기간_analyzer)
-        s_기준일자 = dt_기준일자.strftime('%Y%m%d')
+        # 데이터 수집 폴더 제외 (ohlcv, 캐시변환)
+        li_제외 = ['ohlcv', '캐시변환']
+        dic_folder_수집제외 = dict()
+        # li_전체폴더 = [폴더 for li_폴더 in dic_folder_모듈별.values() for 폴더 in li_폴더]
+        # li_전체폴더_제외반영 = list()
+        for s_모듈 in dic_folder_모듈별.keys():
+            dic_folder_수집제외[s_모듈] = list()
+            for path_폴더 in dic_folder_모듈별[s_모듈]:
+                li_판정 = ['제외' for s_제외 in li_제외 if s_제외 in path_폴더]
+                if len(li_판정) == 0:
+                    # li_전체폴더_제외반영.append(path_폴더)
+                    dic_folder_수집제외[s_모듈].append(path_폴더)
 
-        # 삭제대상 파일 찾기
-        dic_폴더 = self.dic_folder['analyzer']
-        li_패스_삭제대상 = list()
-        for s_폴더명 in dic_폴더.keys():
-            # 예외 폴더 정의
-            if s_폴더명 in []:
-                continue
-            # 대상 폴더 처리
-            s_폴더 = dic_폴더[s_폴더명]
-            li_파일_전체 = os.listdir(s_폴더)
-            li_파일_일자존재 = [파일 for 파일 in li_파일_전체 if re.findall(r'\d{8}', 파일)]
-            li_파일_삭제대상 = [파일 for 파일 in li_파일_일자존재 if re.findall(r'\d{8}', 파일)[0] < s_기준일자]
-            [li_패스_삭제대상.append(os.path.join(s_폴더, 파일)) for 파일 in li_파일_삭제대상]
+        # 날짜 포함된 폴더 제외 (폴더 통째로 삭제 예정)
+        dic_folder_날짜제외 = dict()
+        # li_전체폴더_날짜제외 = list()
+        for s_모듈 in dic_folder_수집제외.keys():
+            dic_folder_날짜제외[s_모듈] = list()
+            for path_폴더 in dic_folder_수집제외[s_모듈]:
+                li_날짜 = re.findall(r'\d{8}', path_폴더)
+                if len(li_날짜) == 0:
+                    # li_전체폴더_제외반영.append(path_폴더)
+                    dic_folder_날짜제외[s_모듈].append(path_폴더)
 
-        # 대상 파일 삭제
-        li_파일사이즈 = []
-        for s_패스 in li_패스_삭제대상:
-            li_파일사이즈.append(os.path.getsize(s_패스))
-            os.system(f'del {s_패스}')
-        n_파일사이즈_MB = sum(li_파일사이즈) / 1024 ** 2
+        # 결과를 self.dic_folder 설정
+        self.dic_folder = dic_folder_날짜제외
 
-        # log 기록
-        self.make_log(f'파일 삭제 완료({self.n_보관기간_analyzer}일 경과, {s_기준일자} 기준,'
-                      f' {len(li_패스_삭제대상):,}개 파일, {n_파일사이즈_MB:,.0f}MB)')
+    def 보관파일관리(self):
+        """ 등록된 폴더 정보에 따라 보관기간 경과된 파일 삭제 """
+        # 모듈별 폴더 탐색
+        for s_모듈 in self.dic_folder.keys():
+            # 기준 일자 정의
+            n_보관기간 = self.dic_보관기간[s_모듈]
+            dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(days=n_보관기간)
+            s_기준일자 = dt_기준일자.strftime('%Y%m%d')
 
-    def 파일관리_collector(self):
-        """ collector에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
-        # 기준 일자 정의
-        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(days=self.n_보관기간_collector)
-        s_기준일자 = dt_기준일자.strftime('%Y%m%d')
+            # 삭제대상 파일 찾기
+            li_path_삭제대상 = list()
+            for path_폴더 in self.dic_folder[s_모듈]:
+                li_파일_전체 = os.listdir(path_폴더)
+                li_파일_일자존재 = [파일 for 파일 in li_파일_전체 if re.findall(r'\d{8}', 파일)]
+                li_파일_삭제대상 = [파일 for 파일 in li_파일_일자존재 if re.findall(r'\d{8}', 파일)[0] < s_기준일자]
+                [li_path_삭제대상.append(os.path.join(path_폴더, 파일)) for 파일 in li_파일_삭제대상]
 
-        # 삭제대상 파일 찾기
-        dic_폴더 = self.dic_folder['collector']
-        li_패스_삭제대상 = list()
-        for s_폴더명 in dic_폴더.keys():
-            # 예외 폴더 정의
-            if s_폴더명 in ['ohlcv', '캐시변환']:
-                continue
-            # 대상 폴더 처리
-            s_폴더 = dic_폴더[s_폴더명]
-            li_파일_전체 = os.listdir(s_폴더)
-            li_파일_일자존재 = [파일 for 파일 in li_파일_전체 if re.findall(r'\d{8}', 파일)]
-            li_파일_삭제대상 = [파일 for 파일 in li_파일_일자존재 if re.findall(r'\d{8}', 파일)[0] < s_기준일자]
-            [li_패스_삭제대상.append(os.path.join(s_폴더, 파일)) for 파일 in li_파일_삭제대상]
+            # 대상 파일 삭제
+            li_파일사이즈 = []
+            for path_삭제대상 in li_path_삭제대상:
+                # 대상이 파일일 때 삭제 용량 합산
+                if os.path.isfile(path_삭제대상):
+                    li_파일사이즈.append(os.path.getsize(path_삭제대상))
+                    os.system(f'del {path_삭제대상}')
 
-        # 대상 파일 삭제
-        li_파일사이즈 = []
-        for s_패스 in li_패스_삭제대상:
-            li_파일사이즈.append(os.path.getsize(s_패스))
-            os.system(f'del {s_패스}')
-        n_파일사이즈_KB = sum(li_파일사이즈) / 1024
+                # 대상이 폴더일 때 삭제 용량 합산
+                if os.path.isdir(path_삭제대상):
+                    for path1, li_path2, li_파일명 in os.walk(path_삭제대상):
+                        for s_파일명 in li_파일명:
+                            path_파일 = os.path.join(path1, s_파일명)
+                            li_파일사이즈.append(os.path.getsize(path_파일))
+                    os.system(f'rmdir /s /q {path_삭제대상}')
 
-        # log 기록
-        self.make_log(f'파일 삭제 완료({self.n_보관기간_collector}일 경과, {s_기준일자} 기준,'
-                      f' {len(li_패스_삭제대상):,}개 파일, {n_파일사이즈_KB:,.0f}KB)')
+            # 파일사이즈 생성
+            s_단위 = self.dic_파일용량단위[s_모듈]
+            n_파일사이즈 = sum(li_파일사이즈)
+            n_파일사이즈_단위 = [n_파일사이즈 if s_단위 == 'B'
+                            else n_파일사이즈 / 1024 if s_단위 == 'KB'
+                            else n_파일사이즈 / 1024 ** 2 if s_단위 == 'MB'
+                            else n_파일사이즈 / 1024 ** 3 if s_단위 == 'GB'
+                            else None][0]
+            s_파일사이즈 = f'{n_파일사이즈_단위:,.1f}{s_단위}' if s_단위 == 'GB' else f'{n_파일사이즈_단위:,.0f}{s_단위}'
 
-    def 파일관리_trader(self):
-        """ trader에서 생성되는 파일 확인하여 보관기간 지난 파일 삭제 """
-        # 기준 일자 정의
-        dt_기준일자 = pd.Timestamp(self.s_오늘) - pd.DateOffset(days=self.n_보관기간_trader)
-        s_기준일자 = dt_기준일자.strftime('%Y%m%d')
-
-        # 삭제대상 파일 찾기
-        dic_폴더 = self.dic_folder['trader']
-        li_패스_삭제대상 = list()
-        for s_폴더명 in dic_폴더.keys():
-            # 예외 폴더 정의
-            if s_폴더명 in ['run']:
-                continue
-            # 대상 폴더 처리
-            s_폴더 = dic_폴더[s_폴더명]
-            li_파일_전체 = os.listdir(s_폴더)
-            li_파일_일자존재 = [파일 for 파일 in li_파일_전체 if re.findall(r'\d{8}', 파일)]
-            li_파일_삭제대상 = [파일 for 파일 in li_파일_일자존재 if re.findall(r'\d{8}', 파일)[0] < s_기준일자]
-            [li_패스_삭제대상.append(os.path.join(s_폴더, 파일)) for 파일 in li_파일_삭제대상]
-
-        # 대상 파일 삭제
-        li_파일사이즈 = []
-        for s_패스 in li_패스_삭제대상:
-            li_파일사이즈.append(os.path.getsize(s_패스))
-            os.system(f'del {s_패스}')
-        n_파일사이즈_KB = sum(li_파일사이즈) / 1024
-
-        # log 기록
-        self.make_log(f'파일 삭제 완료({self.n_보관기간_trader}일 경과, {s_기준일자} 기준,'
-                      f' {len(li_패스_삭제대상):,}개 파일, {n_파일사이즈_KB:,.0f}KB)')
+            # log 기록
+            self.make_log(f'{s_모듈} 파일 삭제 완료({n_보관기간}일 경과, {s_기준일자} 기준,'
+                          f' {len(li_path_삭제대상):,}개 파일, {s_파일사이즈})')
 
     def 잔여공간확인(self):
         """ folder_work 폴더가 위치한 드라이브의 잔여 공간 확인하여 출력 """
@@ -231,8 +197,6 @@ class Rotator:
 if __name__ == "__main__":
     r = Rotator()
 
-    r.파일관리_log()
-    r.파일관리_analyzer()
-    r.파일관리_collector()
-    r.파일관리_trader()
+    r.폴더정보탐색()
+    r.보관파일관리()
     r.잔여공간확인()
