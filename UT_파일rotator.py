@@ -34,12 +34,6 @@ class Rotator:
         self.dic_보관기간['collector'] = int(dic_config['파일보관기간(일)_collector'])
         self.dic_보관기간['trader'] = int(dic_config['파일보관기간(일)_trader'])
 
-        self.dic_파일용량단위 = dict()
-        self.dic_파일용량단위['log'] = 'KB'
-        self.dic_파일용량단위['analyzer'] = 'MB'
-        self.dic_파일용량단위['collector'] = 'KB'
-        self.dic_파일용량단위['trader'] = 'KB'
-
         # 카카오 API 폴더 연결
         sys.path.append(dic_config['folder_kakao'])
 
@@ -80,25 +74,20 @@ class Rotator:
         # 데이터 수집 폴더 제외 (ohlcv, 캐시변환)
         li_제외 = ['ohlcv', '캐시변환']
         dic_folder_수집제외 = dict()
-        # li_전체폴더 = [폴더 for li_폴더 in dic_folder_모듈별.values() for 폴더 in li_폴더]
-        # li_전체폴더_제외반영 = list()
         for s_모듈 in dic_folder_모듈별.keys():
             dic_folder_수집제외[s_모듈] = list()
             for path_폴더 in dic_folder_모듈별[s_모듈]:
                 li_판정 = ['제외' for s_제외 in li_제외 if s_제외 in path_폴더]
                 if len(li_판정) == 0:
-                    # li_전체폴더_제외반영.append(path_폴더)
                     dic_folder_수집제외[s_모듈].append(path_폴더)
 
         # 날짜 포함된 폴더 제외 (폴더 통째로 삭제 예정)
         dic_folder_날짜제외 = dict()
-        # li_전체폴더_날짜제외 = list()
         for s_모듈 in dic_folder_수집제외.keys():
             dic_folder_날짜제외[s_모듈] = list()
             for path_폴더 in dic_folder_수집제외[s_모듈]:
                 li_날짜 = re.findall(r'\d{8}', path_폴더)
                 if len(li_날짜) == 0:
-                    # li_전체폴더_제외반영.append(path_폴더)
                     dic_folder_날짜제외[s_모듈].append(path_폴더)
 
         # 결과를 self.dic_folder 설정
@@ -137,15 +126,9 @@ class Rotator:
                             li_파일사이즈.append(os.path.getsize(path_파일))
                     os.system(f'rmdir /s /q {path_삭제대상}')
 
-            # 파일사이즈 생성
-            s_단위 = self.dic_파일용량단위[s_모듈]
+            # 파일사이즈 변환 및 단위 생성
             n_파일사이즈 = sum(li_파일사이즈)
-            n_파일사이즈_단위 = [n_파일사이즈 if s_단위 == 'B'
-                            else n_파일사이즈 / 1024 if s_단위 == 'KB'
-                            else n_파일사이즈 / 1024 ** 2 if s_단위 == 'MB'
-                            else n_파일사이즈 / 1024 ** 3 if s_단위 == 'GB'
-                            else None][0]
-            s_파일사이즈 = f'{n_파일사이즈_단위:,.1f}{s_단위}' if s_단위 == 'GB' else f'{n_파일사이즈_단위:,.0f}{s_단위}'
+            s_파일사이즈 = self.convert_파일사이즈(n_파일사이즈=n_파일사이즈)
 
             # log 기록
             self.make_log(f'{s_모듈} 파일 삭제 완료({n_보관기간}일 경과, {s_기준일자} 기준,'
@@ -191,6 +174,23 @@ class Rotator:
         if '파일' in li_출력:
             with open(self.path_log, mode='at', encoding='cp949') as file:
                 file.write(f'{s_log}\n')
+
+    @staticmethod
+    def convert_파일사이즈(n_파일사이즈):
+        """ byte 단위로 입력된 파일 용량을 단위 변환 후 str 형식으로 리턴 """
+        # 기준정보
+        li_단위 = ['B', 'KB', 'MB', 'GB', 'TB']
+        n_단위 = 0
+
+        # 단위 변환
+        while n_파일사이즈 > 1024:
+            n_파일사이즈 = n_파일사이즈 / 1024
+            n_단위 = n_단위 + 1
+
+        s_단위 = li_단위[n_단위]
+        s_파일사이즈 = f'{n_파일사이즈:.1f}{s_단위}' if s_단위 in ['GB', 'TB'] else f'{n_파일사이즈:.0f}{s_단위}'
+
+        return s_파일사이즈
 
 
 #######################################################################################################################
