@@ -341,8 +341,11 @@ class Analyzer:
                             break
 
                 # 종목별 df 생성
-                df_매도신호_종목 = pd.concat(li_df_매도신호_종목, axis=0)
-                li_df_매도신호.append(df_매도신호_종목)
+                try:
+                    df_매도신호_종목 = pd.concat(li_df_매도신호_종목, axis=0)
+                    li_df_매도신호.append(df_매도신호_종목)
+                except ValueError:
+                    continue
 
                 # 차트 생성
                 import UT_차트maker as chart
@@ -433,7 +436,13 @@ class Analyzer:
                 fig.savefig(os.path.join(folder_그래프, f'종목선정_{s_종목코드}_{s_일자}.png'))
 
             # df_종목선정 생성
-            df_종목선정 = pd.concat(li_df_종목선정, axis=0)
+            if len(li_df_종목선정) > 0:
+                df_종목선정 = pd.concat(li_df_종목선정, axis=0)
+            else:
+                s_최근일자 = max(re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매도신호)
+                       if s_파일명_기준 in 파일명 and '.pkl' in 파일명)
+                df_종목선정 = pd.read_pickle(os.path.join(self.folder_종목선정, f'{s_파일명_생성}_{s_최근일자}.pkl'))
+                df_종목선정 = df_종목선정[:0]
 
             # 누적 수익률 산출
             df_종목선정 = df_종목선정.loc[:, '일자': '수익률(%)']
