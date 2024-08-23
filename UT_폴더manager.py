@@ -76,6 +76,7 @@ dic_폴더정보['sr종목선정|10_일봉변동'] = os.path.join(folder_종목�
 dic_폴더정보['sr종목선정|20_지지저항'] = os.path.join(folder_종목선정, '20_지지저항')
 dic_폴더정보['sr종목선정|30_매수신호'] = os.path.join(folder_종목선정, '30_매수신호')
 dic_폴더정보['sr종목선정|40_매도신호'] = os.path.join(folder_종목선정, '40_매도신호')
+dic_폴더정보['sr종목선정|50_종목선정'] = os.path.join(folder_종목선정, '50_종목선정')
 
 # 백테스팅 폴더 정의
 folder_백테스팅 = os.path.join(folder_SRline, '백테스팅')
