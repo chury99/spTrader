@@ -4,9 +4,7 @@ import pandas as pd
 import json
 import re
 
-from scipy import stats
 from tqdm import tqdm
-import pandas.errors
 
 import analyzer_sr알고리즘 as Logic
 
@@ -32,10 +30,12 @@ class Analyzer:
         self.folder_지지저항 = dic_폴더정보['sr종목선정|20_지지저항']
         self.folder_매수신호 = dic_폴더정보['sr종목선정|30_매수신호']
         self.folder_매도신호 = dic_폴더정보['sr종목선정|40_매도신호']
+        self.folder_종목선정 = dic_폴더정보['sr종목선정|50_종목선정']
         os.makedirs(self.folder_일봉변동, exist_ok=True)
         os.makedirs(self.folder_지지저항, exist_ok=True)
         os.makedirs(self.folder_매수신호, exist_ok=True)
         os.makedirs(self.folder_매도신호, exist_ok=True)
+        os.makedirs(self.folder_종목선정, exist_ok=True)
 
         # 변수 설정
         self.n_보관기간_analyzer = int(dic_config['파일보관기간(일)_analyzer'])
@@ -56,7 +56,6 @@ class Analyzer:
         li_일자_전체 = sorted([re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
                            if 'dic_코드별_분봉_' in 파일명 and '.pkl' in 파일명])
         li_일자_전체 = [일자 for 일자 in li_일자_전체 if 일자 > s_기준일자]
-        # li_일자_전체 = li_일자_전체[-5:]  ############## 테스트용 임시코드
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_일봉변동)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
@@ -182,7 +181,6 @@ class Analyzer:
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_지지저항)
                     if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
-        li_일자_전체 = li_일자_전체[-3:]        ### 테스트용 임시코드
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매수신호)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
@@ -273,7 +271,6 @@ class Analyzer:
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매수신호)
                     if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
-        li_일자_전체 = li_일자_전체[-3:]        ### 테스트용 임시코드
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매도신호)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
@@ -320,7 +317,6 @@ class Analyzer:
 
                         # 기준 데이터 정의
                         df_1분봉_시점 = df_1분봉[df_1분봉['시간'] == s_시간]
-                        n_시가 = df_1분봉_시점['시가'].values[0]
                         n_고가 = df_1분봉_시점['고가'].values[0]
                         n_저가 = df_1분봉_시점['저가'].values[0]
 
@@ -355,11 +351,11 @@ class Analyzer:
                     fig.axes[0].axhline(n_지지저항)
 
                 # 매수매도 표시 (매수는 ^, 매도는 v)
-                df_그래프 = df_매도신호_종목.copy()
-                df_그래프['매수일시'] = df_그래프['일자'].apply(lambda x: f'{x[:4]}-{x[4:6]}-{x[6:]}') + ' ' + df_그래프['매수시간']
-                df_그래프['매도일시'] = df_그래프['일자'].apply(lambda x: f'{x[:4]}-{x[4:6]}-{x[6:]}') + ' ' + df_그래프['매도시간']
-                fig.axes[0].scatter(df_그래프['매수일시'], df_그래프['매수단가'], color='black', marker='^')
-                fig.axes[0].scatter(df_그래프['매도일시'], df_그래프['매도단가'], color='black', marker='v')
+                df_차트 = df_매도신호_종목.copy()
+                df_차트['매수일시'] = df_차트['일자'].apply(lambda x: f'{x[:4]}-{x[4:6]}-{x[6:]}') + ' ' + df_차트['매수시간']
+                df_차트['매도일시'] = df_차트['일자'].apply(lambda x: f'{x[:4]}-{x[4:6]}-{x[6:]}') + ' ' + df_차트['매도시간']
+                fig.axes[0].scatter(df_차트['매수일시'], df_차트['매수단가'], color='black', marker='^')
+                fig.axes[0].scatter(df_차트['매도일시'], df_차트['매도단가'], color='black', marker='v')
 
                 # 차트 저장
                 folder_그래프 = os.path.join(self.folder_매도신호, '그래프', f'매도신호_{s_일자}')
@@ -376,6 +372,81 @@ class Analyzer:
 
             # log 기록
             self.make_log(f'매도신호 분석 완료({s_일자}, {len(df_매도신호):,}건)')
+
+    def 분석_종목선정(self):
+        """ 매도신호 기준으로 적합성 검증 후 대상 종목 pkl, csv 저장 """
+        # 파일명 정의
+        s_파일명_기준 = 'df_매도신호'
+        s_파일명_생성 = 'df_종목선정'
+
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매도신호)
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_종목선정)
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
+        li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 데이터 불러오기
+            df_매도신호_전체 = pd.read_pickle(os.path.join(self.folder_매도신호, f'{s_파일명_기준}_{s_일자}.pkl'))
+            dic_1분봉 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_분봉_{s_일자}.pkl'))
+            df_지지저항 = pd.read_pickle(os.path.join(self.folder_지지저항, f'df_지지저항_{s_일자}.pkl'))
+
+            # 종목별 확인
+            li_df_종목선정 = list()
+            for s_종목코드 in tqdm(df_매도신호_전체['종목코드'].unique(), desc=f'종목별 종목선정 분석|{s_일자}'):
+                # 데이터 정리
+                df_매도신호 = df_매도신호_전체[df_매도신호_전체['종목코드'] == s_종목코드].sort_values('매수시간')
+                df_1분봉 = dic_1분봉[s_종목코드].copy().sort_values(['일자', '시간']).reset_index(drop=True)
+                li_지지저항 = list(df_지지저항[df_지지저항['종목코드'] == s_종목코드]['고가'].values)
+
+                # 평가 지표 산출
+                n_전체매매 = len(df_매도신호)
+                n_수익건수 = len(df_매도신호[df_매도신호['수익률(%)'] > 0.3])
+                n_손실건수 = n_전체매매 - n_수익건수
+                n_수익률_퍼센트 = n_수익건수 / n_전체매매 * 100
+
+                # 종목 선정 (미충족 시 이후 skip)
+                if n_수익률_퍼센트 < 90:
+                    continue
+
+                # 선정된 종목 추가
+                li_df_종목선정.append(df_매도신호)
+
+                # 차트 생성
+                import UT_차트maker as chart
+                fig = chart.make_차트(df_ohlcv=df_1분봉)
+                for n_지지저항 in li_지지저항:
+                    fig.axes[0].axhline(n_지지저항)
+
+                # 매수매도 표시 (매수는 ^, 매도는 v)
+                df_차트 = df_매도신호.copy()
+                df_차트['매수일시'] = df_차트['일자'].apply(lambda x: f'{x[:4]}-{x[4:6]}-{x[6:]}') + ' ' + df_차트['매수시간']
+                df_차트['매도일시'] = df_차트['일자'].apply(lambda x: f'{x[:4]}-{x[4:6]}-{x[6:]}') + ' ' + df_차트['매도시간']
+                fig.axes[0].scatter(df_차트['매수일시'], df_차트['매수단가'], color='black', marker='^')
+                fig.axes[0].scatter(df_차트['매도일시'], df_차트['매도단가'], color='black', marker='v')
+
+                # 차트 저장
+                folder_그래프 = os.path.join(self.folder_종목선정, '그래프', f'종목선정_{s_일자}')
+                os.makedirs(folder_그래프, exist_ok=True)
+                fig.savefig(os.path.join(folder_그래프, f'종목선정_{s_종목코드}_{s_일자}.png'))
+
+            # df_종목선정 생성
+            df_종목선정 = pd.concat(li_df_종목선정, axis=0)
+
+            # 누적 수익률 산출
+            df_종목선정 = df_종목선정.loc[:, '일자': '수익률(%)']
+            df_종목선정 = df_종목선정.sort_values('매수시간')
+            df_종목선정['누적수익(%)'] = (1 + df_종목선정['수익률(%)'] / 100).cumprod() * 100
+
+            # df 저장
+            df_종목선정.to_pickle(os.path.join(self.folder_종목선정, f'{s_파일명_생성}_{s_일자}.pkl'))
+            df_종목선정.to_csv(os.path.join(self.folder_종목선정, f'{s_파일명_생성}_{s_일자}.csv'),
+                           index=False, encoding='cp949')
+
+            # log 기록
+            self.make_log(f'종목선정 분석 완료({s_일자}, {len(df_종목선정["종목코드"].unique()):,}종목 선정)')
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
@@ -405,3 +476,4 @@ if __name__ == "__main__":
     a.분석_지지저항()
     a.분석_매수신호()
     a.분석_매도신호()
+    a.분석_종목선정()
