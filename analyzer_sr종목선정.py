@@ -12,7 +12,7 @@ import analyzer_sr알고리즘 as Logic
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
 # noinspection PyShadowingNames
 class Analyzer:
-    def __init__(self):
+    def __init__(self, n_분석일수=None):
         # config 읽어 오기
         with open('config.json', mode='rt', encoding='utf-8') as file:
             dic_config = json.load(file)
@@ -39,6 +39,7 @@ class Analyzer:
 
         # 변수 설정
         self.n_보관기간_analyzer = int(dic_config['파일보관기간(일)_analyzer'])
+        self.n_분석일수 = n_분석일수
 
         # log 기록
         self.make_log(f'### 종목 선정 시작 ###')
@@ -56,6 +57,7 @@ class Analyzer:
         li_일자_전체 = sorted([re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
                            if 'dic_코드별_분봉_' in 파일명 and '.pkl' in 파일명])
         li_일자_전체 = [일자 for 일자 in li_일자_전체 if 일자 > s_기준일자]
+        li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_일봉변동)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
@@ -112,6 +114,7 @@ class Analyzer:
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_일봉변동)
                     if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
+        li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_지지저항)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
@@ -181,6 +184,7 @@ class Analyzer:
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_지지저항)
                     if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
+        li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매수신호)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
@@ -271,6 +275,7 @@ class Analyzer:
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매수신호)
                     if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
+        li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매도신호)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
@@ -385,6 +390,7 @@ class Analyzer:
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매도신호)
                     if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
+        li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_종목선정)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
@@ -479,7 +485,7 @@ class Analyzer:
 
 #######################################################################################################################
 if __name__ == "__main__":
-    a = Analyzer()
+    a = Analyzer(n_분석일수=None)
 
     a.분석_일봉변동()
     a.분석_지지저항()
