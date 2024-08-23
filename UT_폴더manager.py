@@ -26,6 +26,8 @@ dic_폴더정보['데이터'] = folder_데이터
 dic_폴더정보['데이터|ohlcv'] = os.path.join(folder_데이터, 'ohlcv')
 dic_폴더정보['데이터|캐시변환'] = os.path.join(folder_데이터, '캐시변환')
 dic_폴더정보['데이터|정보수집'] = os.path.join(folder_데이터, '정보수집')
+dic_폴더정보['데이터|전체종목'] = os.path.join(folder_데이터, '전체종목')
+dic_폴더정보['데이터|분석대상'] = os.path.join(folder_데이터, '분석대상')
 
 #######################################################################################################################
 
@@ -64,5 +66,18 @@ dic_폴더정보['백테스팅|40_수익검증'] = os.path.join(folder_백테스
 #######################################################################################################################
 
 # SRline 분석 폴더 정의
-folder_SRline = os.path.join(folder_work, 'analyzer_SRline ')
-dic_폴더정보['line분석'] = folder_SRline
+folder_SRline = os.path.join(folder_work, 'analyzer_SRline')
+dic_폴더정보['sr분석'] = folder_SRline
+
+# 종목선정 폴더 정의
+folder_종목선정 = os.path.join(folder_SRline, '종목선정')
+dic_폴더정보['sr종목선정'] = folder_종목선정
+dic_폴더정보['sr종목선정|10_일봉변동'] = os.path.join(folder_종목선정, '10_일봉변동')
+dic_폴더정보['sr종목선정|20_지지저항'] = os.path.join(folder_종목선정, '20_지지저항')
+dic_폴더정보['sr종목선정|30_매수신호'] = os.path.join(folder_종목선정, '30_매수신호')
+dic_폴더정보['sr종목선정|40_매도신호'] = os.path.join(folder_종목선정, '40_매도신호')
+
+# 백테스팅 폴더 정의
+folder_백테스팅 = os.path.join(folder_SRline, '백테스팅')
+dic_폴더정보['sr백테스팅'] = folder_백테스팅
+dic_폴더정보['sr백테스팅|10_수익검증'] = os.path.join(folder_백테스팅, '10_수익검증')
