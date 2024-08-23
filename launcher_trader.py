@@ -21,8 +21,8 @@ class LauncherTrader:
         self.path_파이썬64 = dic_config['path_파이썬64']
 
         # 에러 출력 설정
-        sys.stderr = open(os.path.join(dic_config['folder_log'],
-                                       f'{dic_config["로그이름_trader"]}_에러_{self.s_오늘}.log'), 'a')
+        # sys.stderr = open(os.path.join(dic_config['folder_log'],
+        #                                f'{dic_config["로그이름_trader"]}_에러_{self.s_오늘}.log'), 'a')
 
         # 폴더 정의
         import UT_폴더manager
