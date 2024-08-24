@@ -88,6 +88,46 @@ class LauncherAnalyzer:
         # log 기록
         self.make_log(f'분석 모델 백테스팅 완료 - {s_실행결과}')
 
+    def analyzer_sr종목선정(self):
+        """ 지지저항 분석을 통해 종목 선정 """
+        # 파일 지정
+        path_실행 = os.path.join(os.getcwd(), 'analyzer_sr종목선정.py')
+
+        # log 기록
+        self.make_log(f'sr분석 종목선정 실행')
+
+        # 프로세스 실행
+        ret = subprocess.run([self.path_파이썬64, path_실행], shell=True)
+        s_실행결과 = '성공' if ret.returncode == 0 else '실패'
+
+        # 실패 시 카카오 메세지 송부
+        if s_실행결과 == '실패':
+            s_메세지 = f'!!! [{self.s_파일}] 모듈 실행 중 오류 발생 - {sys._getframe(0).f_code.co_name} !!!'
+            self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
+
+        # log 기록
+        self.make_log(f'sr분석 종목선정 완료 - {s_실행결과}')
+
+    def analyzer_sr백테스팅(self):
+        """ 선정된 종목 기준으로 백테스팅 검증 """
+        # 파일 지정
+        path_실행 = os.path.join(os.getcwd(), 'analyzer_sr백테스팅.py')
+
+        # log 기록
+        self.make_log(f'sr분석 백테스팅 실행')
+
+        # 프로세스 실행
+        ret = subprocess.run([self.path_파이썬64, path_실행], shell=True)
+        s_실행결과 = '성공' if ret.returncode == 0 else '실패'
+
+        # 실패 시 카카오 메세지 송부
+        if s_실행결과 == '실패':
+            s_메세지 = f'!!! [{self.s_파일}] 모듈 실행 중 오류 발생 - {sys._getframe(0).f_code.co_name} !!!'
+            self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
+
+        # log 기록
+        self.make_log(f'sr분석 백테스팅 완료 - {s_실행결과}')
+
     def UT_파일rotator(self):
         """ 생성된 파일들의 시점 확인하여 보관기간 지난 파일 삭제 """
         # 파일 지정
@@ -135,4 +175,6 @@ if __name__ == "__main__":
     l.analyzer_rf분석1종목()
     l.analyzer_rf분석2공통()
     l.analyzer_rf백테스팅()
+    l.analyzer_sr종목선정()
+    l.analyzer_sr백테스팅()
     l.UT_파일rotator()
