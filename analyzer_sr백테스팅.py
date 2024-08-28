@@ -8,9 +8,16 @@ from tqdm import tqdm
 
 import analyzer_sr알고리즘 as Logic
 
+# 그래프 한글 설정
+import matplotlib.pyplot as plt
+from matplotlib import font_manager, rc, rcParams
+font_name = font_manager.FontProperties(fname="c:/Windows/Fonts/malgun.ttf").get_name()
+rc('font', family=font_name)
+rcParams['axes.unicode_minus'] = False
+
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
-# noinspection PyShadowingNames
+# noinspection PyShadowingNames,PyUnusedLocal
 class Analyzer:
     def __init__(self, n_분석일수=None):
         # config 읽어 오기
@@ -28,16 +35,22 @@ class Analyzer:
         self.folder_지지저항 = dic_폴더정보['sr종목선정|20_지지저항']
         self.folder_종목선정 = dic_폴더정보['sr종목선정|50_종목선정']
         self.folder_매수매도 = dic_폴더정보['sr백테스팅|10_매수매도']
+        self.folder_결과정리 = dic_폴더정보['sr백테스팅|20_결과정리']
         os.makedirs(self.folder_매수매도, exist_ok=True)
+        os.makedirs(self.folder_결과정리, exist_ok=True)
 
         # 변수 설정
         self.n_보관기간_analyzer = int(dic_config['파일보관기간(일)_analyzer'])
         self.n_분석일수 = n_분석일수
 
+        # 카카오 API 폴더 연결
+        sys.path.append(dic_config['folder_kakao'])
+        self.s_파일 = os.path.basename(sys.argv[0]).replace('.py', '')
+
         # log 기록
         self.make_log(f'### 종목 선정 시작 ###')
 
-    def 검증_매수매도(self):
+    def 검증_매수매도(self, b_차트):
         """ 전일 종목선정 데이터 기준으로 당일 매수매도 분석하여 pkl, csv 저장 """
         # 파일명 정의
         s_파일명_기준 = 'df_종목선정'
@@ -71,8 +84,6 @@ class Analyzer:
             dic_1분봉 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_분봉_{s_일자_당일}.pkl'))
             dic_3분봉_전일 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_3분봉_{s_일자_전일}.pkl'))
             dic_3분봉_당일 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_3분봉_{s_일자_당일}.pkl'))
-            li_시간_1분봉 = list(max(dic_1분봉.values(), key=len)['시간'].unique())
-            li_시간_3분봉 = list(max(dic_3분봉_당일.values(), key=len)['시간'].unique())
 
             # 매수매도 검증
             li_df_매수매도 = list()
@@ -148,8 +159,46 @@ class Analyzer:
                             li_df_매수매도_종목.append(df_매수매도_시점)
                             break
 
+                # 종목별 df_매수매도 생성
                 df_매수매도_종목 = pd.concat(li_df_매수매도_종목, axis=0) if len(li_df_매수매도_종목) > 0 else pd.DataFrame()
+
+                # 매도 전 매수 케이스 제거
+                if len(df_매수매도_종목) > 0:
+                    df_매수매도_종목 = df_매수매도_종목.reset_index(drop=True)
+                    df_매수매도_종목['검증'] = True
+                    while True:
+                        df_매수매도_종목 = df_매수매도_종목[df_매수매도_종목['검증']]
+                        df_매수매도_종목['검증'] = (df_매수매도_종목['매수시간']
+                                            > df_매수매도_종목['매도시간'].shift(1)) | (df_매수매도_종목.index == 0)
+                        if sum(df_매수매도_종목['검증']) == len(df_매수매도_종목):
+                            break
+                # li_df 추가
                 li_df_매수매도.append(df_매수매도_종목)
+
+                # 차트 생성 및 저장
+                if b_차트:
+                    # 차트 생성
+                    import UT_차트maker as chart
+                    fig = chart.make_차트(df_ohlcv=df_3분봉_당일)
+                    for n_지지저항 in li_지지저항:
+                        fig.axes[0].axhline(n_지지저항)
+
+                    # 매수매도 표시 (매수는 ^, 매도는 v)
+                    df_차트 = df_매수매도_종목.copy()
+                    if len(df_차트) > 0:
+                        df_차트['매도시간_3분봉'] = df_차트['매도시간'].apply(lambda x:
+                                                            max(시간 for 시간 in df_3분봉['시간'].unique() if 시간 <= x))
+                        df_차트['매수일시'] = df_차트['일자'].apply(lambda x:
+                                                          f'{x[:4]}-{x[4:6]}-{x[6:]}') + ' ' + df_차트['매수시간']
+                        df_차트['매도일시'] = df_차트['일자'].apply(lambda x:
+                                                          f'{x[:4]}-{x[4:6]}-{x[6:]}') + ' ' + df_차트['매도시간_3분봉']
+                        fig.axes[0].scatter(df_차트['매수일시'], df_차트['매수단가'], color='black', marker='^')
+                        fig.axes[0].scatter(df_차트['매도일시'], df_차트['매도단가'], color='black', marker='v')
+
+                    # 차트 저장
+                    folder_그래프 = os.path.join(self.folder_매수매도, '그래프', f'매수매도_{s_일자}')
+                    os.makedirs(folder_그래프, exist_ok=True)
+                    fig.savefig(os.path.join(folder_그래프, f'매수매도_{s_종목코드}_{s_일자}.png'))
 
             # df_매수매도 생성
             df_매수매도 = pd.concat(li_df_매수매도, axis=0) if len(li_df_매수매도) > 0 else pd.DataFrame()
@@ -179,8 +228,76 @@ class Analyzer:
             # log 기록
             self.make_log(f'매수매도 검증 완료({s_일자}, {len(df_매수매도):,}건 매매)')
 
-    def 검증_결과정리(self):
-        pass
+    def 검증_결과정리(self, b_카톡=False):
+        """ 매수매도 검증 결과를 읽어와 정리 후 pkl, csv 저장 """
+        # 파일명 정의
+        s_파일명_기준 = 'df_매수매도'
+        s_파일명_생성 = 'df_결과정리'
+
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매수매도)
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
+        li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_결과정리)
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
+        li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 전체 매수매도 파일 확인
+            li_파일일자 = [re.findall(r'\d{8}', 파일)[0] for 파일 in os.listdir(self.folder_매수매도)
+                       if s_파일명_기준 in 파일 and '.pkl' in 파일]
+            li_파일일자 = [파일일자 for 파일일자 in li_파일일자 if 파일일자 <= s_일자]
+
+            # 파일별 결과 정리
+            li_df_결과정리 = list()
+            for s_파일일자 in tqdm(li_파일일자, desc=f'결과정리|{s_일자}'):
+                # 파일 열기
+                df_매수매도 = pd.read_pickle(os.path.join(self.folder_매수매도, f'{s_파일명_기준}_{s_파일일자}.pkl'))
+
+                # 결과 정리
+                df_결과정리_일별 = pd.DataFrame({'일자': [s_파일일자]})
+                df_결과정리_일별['전체거래'] = int(len(df_매수매도))
+                df_결과정리_일별['수익거래'] = int(len(df_매수매도[df_매수매도['수익률(%)'] > 0]))
+                df_결과정리_일별['성공률(%)'] = (df_결과정리_일별['수익거래'] / df_결과정리_일별['전체거래']) * 100
+                df_결과정리_일별['수익률(%)'] = df_매수매도['누적수익(%)'].values[-1] - 100 if len(df_매수매도) > 0 else None
+                li_df_결과정리.append(df_결과정리_일별)
+
+            # df_결과정리 생성
+            df_결과정리 = pd.concat(li_df_결과정리, axis=0).sort_values('일자', ascending=False)
+
+            # df 저장
+            df_결과정리.to_pickle(os.path.join(self.folder_결과정리, f'{s_파일명_생성}_{s_일자}.pkl'))
+            df_결과정리.to_csv(os.path.join(self.folder_결과정리, f'{s_파일명_생성}_{s_일자}.csv'),
+                           index=False, encoding='cp949')
+
+            # log 기록
+            self.make_log(f'결과정리 완료({s_일자}, {df_결과정리["전체거래"].values[0]:,}건 매매,'
+                          f' {df_결과정리["수익거래"].values[0]:,}건 성공, 수익률 {df_결과정리["수익률(%)"].values[0]:.0f}%)')
+
+            # 백테스팅 리포트 생성
+            folder_리포트 = os.path.join(self.folder_결과정리, '리포트')
+            os.makedirs(folder_리포트, exist_ok=True)
+            s_파일명_리포트 = f'백테스팅_리포트_{s_일자}.png'
+            fig = self.make_리포트_백테스팅(df_결과정리=df_결과정리)
+            fig.savefig(os.path.join(folder_리포트, s_파일명_리포트))
+
+            # 리포트 복사 to 서버
+            import UT_배치worker
+            w = UT_배치worker.Worker()
+            folder_서버 = 'kakao/sr분석_백테스팅'
+            w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
+
+            # 카톡 보내기
+            if b_카톡:
+                import API_kakao
+                k = API_kakao.KakaoAPI()
+                result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 백테스팅 완료',
+                                        s_button_title=f'[sr분석] 백테스팅 리포트 - {s_일자}',
+                                        s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
+
+            # log 기록
+            self.make_log(f'백테스팅 리포트 생성 완료({s_일자})')
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
@@ -201,10 +318,145 @@ class Analyzer:
             with open(self.path_log, mode='at', encoding='cp949') as file:
                 file.write(f'{s_log}\n')
 
+    # noinspection PyTypeChecker
+    def make_리포트_백테스팅(self, df_결과정리):
+        """ 백테스팅 결과를 기반으로 daily 리포트 생성 후 fig 리턴 """
+        # 데이터 설정
+        df_결과정리 = df_결과정리.sort_values('일자')
+        s_일자 = df_결과정리['일자'].max()
+
+        # 그래프 설정
+        fig = plt.figure(figsize=[16, 12])
+        fig.suptitle(f'백테스팅 리포트 ({s_일자})', fontsize=16)
+        ax_감시대상_일별 = fig.add_subplot(4, 2, 1)
+        ax_상승예측_일별 = fig.add_subplot(4, 2, 2)
+        ax_성공률_누적 = fig.add_subplot(4, 2, 3)
+        ax_성공률_일별 = fig.add_subplot(4, 2, 4)
+        ax_수익률_누적 = fig.add_subplot(4, 2, 5)
+        ax_수익률_일별 = fig.add_subplot(4, 2, 6)
+        ax_상세정보_월별 = fig.add_subplot(4, 2, 7)
+        ax_상세정보_일별 = fig.add_subplot(4, 2, 8)
+
+        # 일별 감시대상 건수
+        li_파일명 = [파일명 for 파일명 in os.listdir(os.path.join(self.folder_종목선정))
+                  if 'df_종목선정' in 파일명 and 'pkl' in 파일명 and 파일명 <= f'df_종목선정_{s_일자}.pkl']
+        df_감시대상 = pd.DataFrame()
+        df_감시대상['일자'] = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in li_파일명]
+        df_감시대상['종목수'] = [len(pd.read_pickle(os.path.join(self.folder_종목선정, 파일명))) for 파일명 in li_파일명]
+        df_감시대상 = df_감시대상.sort_values('일자')
+        ary_x, ary_y = df_감시대상['일자'].values, df_감시대상['종목수'].values.astype(int)
+        li_색깔 = ['C1' if 종목수 > 15 else 'C0' for 종목수 in ary_y]
+
+        ax_감시대상_일별.set_title('[ 감시대상 종목수 (건, 일별) ]')
+        ax_감시대상_일별.bar(ary_x, ary_y, color=li_색깔)
+        ax_감시대상_일별.set_xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        ax_감시대상_일별.grid(linestyle='--', alpha=0.5)
+
+        # 일별 상승예측 건수
+        ary_x, ary_y = df_결과정리['일자'].values, df_결과정리['전체거래'].values.astype(int)
+        li_색깔 = ['C3' if 예측건수 > 10 else 'C0' for 예측건수 in ary_y]
+
+        ax_상승예측_일별.set_title(f'[ 상승예측 종목수 (건, 일별) ]')
+        ax_상승예측_일별.bar(ary_x, ary_y, color=li_색깔)
+        ax_상승예측_일별.set_xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        ax_상승예측_일별.set_yticks(range(0, max(ary_y) + 1, 1))
+        ax_상승예측_일별.grid(linestyle='--', alpha=0.5)
+
+        # 누적 예측 성공률
+        df_결과정리['성공률_누적'] = df_결과정리['수익거래'].cumsum() / df_결과정리['전체거래'].cumsum() * 100
+        ary_x, ary_y = df_결과정리['일자'].values, df_결과정리['성공률_누적'].values
+        
+        ax_성공률_누적.set_title(f'[ 성공률 (%, 누적, 일별) ]')
+        ax_성공률_누적.plot(ary_x, ary_y)
+        ax_성공률_누적.set_xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        ax_성공률_누적.set_yticks(range(0, 101, 20))
+        ax_성공률_누적.grid(linestyle='--', alpha=0.5)
+        ax_성공률_누적.axhline(100, color='C0', alpha=0)
+        ax_성공률_누적.axhline(70, color='C1')
+
+        # 일별 예측 성공률
+        ary_x, ary_y = df_결과정리['일자'].values, df_결과정리['성공률(%)'].values
+        li_색깔 = ['C0' if 성공률 > 70 else 'C3' for 성공률 in ary_y]
+
+        ax_성공률_일별.set_title(f'[ 성공률 (%, 당일, 일별) ]')
+        ax_성공률_일별.bar(ary_x, ary_y, color=li_색깔)
+        ax_성공률_일별.set_xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        ax_성공률_일별.set_yticks(range(0, 101, 20))
+        ax_성공률_일별.grid(linestyle='--', alpha=0.5)
+        ax_성공률_일별.axhline(100, color='C0', alpha=0)
+        ax_성공률_일별.axhline(70, color='C1')
+
+        # 누적 수익률
+        df_결과정리['수익률(%)'] = df_결과정리['수익률(%)'].apply(lambda x: 0 if pd.isna(x) else x)
+        df_결과정리['수익률_누적'] = (1 + df_결과정리['수익률(%)'] / 100).cumprod() * 100
+        ary_x, ary_y = df_결과정리['일자'].values, df_결과정리['수익률_누적'].values
+
+        ax_수익률_누적.set_title(f'[ 수익률 (%, 누적, 일별, 100 기준) ]')
+        ax_수익률_누적.plot(ary_x, ary_y)
+        ax_수익률_누적.set_xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        ax_수익률_누적.set_yticks(range(40, 161, 20))
+        ax_수익률_누적.grid(linestyle='--', alpha=0.5)
+        ax_수익률_누적.axhline(160, color='C0', alpha=0)
+        ax_수익률_누적.axhline(100, color='C1')
+        ax_수익률_누적.axhline(40, color='C0', alpha=0)
+
+        # 일별 수익률
+        ary_x, ary_y = df_결과정리['일자'].values, df_결과정리['수익률(%)'].values
+        li_색깔 = ['C0' if 수익률 > 0 else 'C3' for 수익률 in ary_y]
+
+        ax_수익률_일별.set_title(f'[ 수익률 (%, 당일, 일별, 0 기준) ]')
+        ax_수익률_일별.bar(ary_x, ary_y, color=li_색깔)
+        ax_수익률_일별.set_xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        ax_수익률_일별.set_yticks(range(-10, 11, 2))
+        ax_수익률_일별.grid(linestyle='--', alpha=0.5)
+        ax_수익률_일별.axhline(10, color='C0', alpha=0)
+        ax_수익률_일별.axhline(0, color='C1')
+        ax_수익률_일별.axhline(-10, color='C0', alpha=0)
+
+        # 월별 상세정보
+        df_결과정리['년월'] = df_결과정리['일자'].apply(lambda x: f'{x[2:4]}-{x[4:6]}')
+        df_gr = df_결과정리.groupby('년월')
+        df_테이블_월별 = pd.DataFrame()
+        df_테이블_월별['년월'] = df_gr['년월'].first()
+        df_테이블_월별['매수(건)'] = df_gr['전체거래'].sum()
+        df_테이블_월별['성공(건)'] = df_gr['수익거래'].sum()
+        df_테이블_월별['성공률(%)'] = (df_테이블_월별['성공(건)'] / df_테이블_월별['매수(건)'] * 100).apply(lambda x: f'{x:.0f}')
+        df_테이블_월별['수익률(%)'] = [((1 + df_gr.get_group(년월)['수익률(%)'] / 100).cumprod() * 100).values[-1]
+                               for 년월 in df_gr.groups.keys()]
+        df_테이블_월별['수익률(%)'] = df_테이블_월별['수익률(%)'].apply(lambda x: f'{x:.1f}')
+        df_월별 = df_테이블_월별[-10:].T
+
+        ax_상세정보_월별.set_title(f'[ 상세 정보 (월별) ]')
+        ax_상세정보_월별.axis('tight')
+        ax_상세정보_월별.axis('off')
+        obj_테이블 = ax_상세정보_월별.table(cellText=df_월별.values, rowLabels=df_월별.index, loc='center', cellLoc='center')
+        obj_테이블.auto_set_font_size(False)
+        obj_테이블.set_fontsize(12)
+        obj_테이블.scale(1.0, 2.4)
+
+        # 일별 상세정보
+        df_테이블_일별 = pd.DataFrame()
+        df_테이블_일별['월일'] = df_결과정리['일자'].apply(lambda x: f'{x[4:6]}-{x[6:8]}')
+        df_테이블_일별['매수(건)'] = df_결과정리['전체거래']
+        df_테이블_일별['성공(건)'] = df_결과정리['수익거래']
+        df_테이블_일별['성공률(%)'] = df_결과정리['성공률(%)'].apply(lambda x: f'{x:.0f}')
+        df_테이블_일별['수익률(%)'] = df_결과정리['수익률(%)'].apply(lambda x: f'{x:.1f}')
+        df_일별 = df_테이블_일별[-10:].T
+
+        ax_상세정보_일별.set_title(f'[ 상세 정보 (일별) ]')
+        ax_상세정보_일별.axis('tight')
+        ax_상세정보_일별.axis('off')
+        obj_테이블 = ax_상세정보_일별.table(cellText=df_일별.values, rowLabels=df_일별.index, loc='center', cellLoc='center')
+        obj_테이블.auto_set_font_size(False)
+        obj_테이블.set_fontsize(12)
+        obj_테이블.scale(1.0, 2.4)
+
+        return fig
+
 
 #######################################################################################################################
 if __name__ == "__main__":
     a = Analyzer(n_분석일수=None)
 
-    a.검증_매수매도()
-    a.검증_결과정리()
+    a.검증_매수매도(b_차트=True)
+    a.검증_결과정리(b_카톡=True)
