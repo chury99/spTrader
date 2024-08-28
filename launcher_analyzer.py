@@ -172,9 +172,9 @@ class LauncherAnalyzer:
 if __name__ == "__main__":
     l = LauncherAnalyzer()
 
-    l.analyzer_rf분석1종목()
-    l.analyzer_rf분석2공통()
-    l.analyzer_rf백테스팅()
+    # l.analyzer_rf분석1종목()
+    # l.analyzer_rf분석2공통()
+    # l.analyzer_rf백테스팅()
     l.analyzer_sr종목선정()
     l.analyzer_sr백테스팅()
     l.UT_파일rotator()
