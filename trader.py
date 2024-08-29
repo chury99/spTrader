@@ -47,7 +47,7 @@ class Trader(QMainWindow, form_class):
         self.s_오늘 = pd.Timestamp('now').strftime('%Y%m%d')
         s_로그이름 = dic_config['로그이름_trader']
         self.path_log = os.path.join(dic_config['folder_log'], f'{s_로그이름}_{self.s_오늘}.log')
-        self.path_log_탐색 = os.path.join(dic_config['folder_log'], f'{s_로그이름}_탐색_{self.s_오늘}.log')
+        self.path_log_신호 = os.path.join(dic_config['folder_log'], f'{s_로그이름}_신호_{self.s_오늘}.log')
         self.path_log_주문 = os.path.join(dic_config['folder_log'], f'{s_로그이름}_주문_{self.s_오늘}.log')
         self.path_모니터링 = os.path.join(self.folder_run, '모니터링_trader.pkl')
         self.n_딜레이 = 0.2
@@ -67,7 +67,6 @@ class Trader(QMainWindow, form_class):
         self.n_모니터링파일생성주기 = int(int(dic_config['재구동_대기시간(초)']) / 2)
         self.s_전일 = self.get_전일날짜()
         self.li_호가단위 = self.make_호가단위()
-        # self.s_전일 = '20231023'          ####### 테스트용 임시코드
         self.li_대상종목, self.dic_코드2종목명_대상종목 = self.get_대상종목()
         self.dic_지지저항 = self.get_지지저항()
 
@@ -89,7 +88,7 @@ class Trader(QMainWindow, form_class):
 
         # 타이머 기반 동작 설정 (메인봇 연결)
         self.타이머 = QTimer(self)
-        self.타이머.start(1 * 1000)    # 1/1000초 단위로 숫자 입력
+        self.타이머.start(1 * 1000)  # 1/1000초 단위로 숫자 입력
         self.타이머.timeout.connect(self.run_mainbot)
 
     ###################################################################################################################
@@ -114,8 +113,6 @@ class Trader(QMainWindow, form_class):
         # 매수봇 호출
         if self.flag_종목보유 is False:
             if n_현재_분 % 3 == 0 and n_현재_초 == 1:
-            # if n_현재_분 % 1 == 0 and n_현재_초 == 1:         ######## 테스트용 임시코드
-            # if n_현재_초 % 1 == 0:                             ######## 테스트용 임시코드
                 self.run_매수봇()
 
         # 매도봇 호출
@@ -136,13 +133,13 @@ class Trader(QMainWindow, form_class):
         """ 매수 조건 확인하여 조건 만족 시 매수 주문 실행 """
         # ui 상태 업데이트 및 log 기록
         self.lb_run_buybot.setText('[ 매수봇 ] 동작중')
-        self.make_log(f'매수조건 검색 시작')
-        self.make_log_탐색(f'\n'
+        self.make_log(f'매수신호 탐색 시작')
+        self.make_log_신호(f'\n'
                          f'\t\t ###############\n'
-                         f'\t\t # 매수조건 검색 시작 #\n'
+                         f'\t\t # 매수신호 탐색 시작 #\n'
                          f'\t\t ###############')
 
-        # 대상 종목별 매수조건 탐색
+        # 대상 종목별 매수신호 탐색
         for s_종목코드 in self.li_대상종목:
             # 모니터링 파일 생성 주기 확인 및 업데이트
             n_현재_초 = int(pd.Timestamp('now').strftime('%S'))
@@ -165,19 +162,19 @@ class Trader(QMainWindow, form_class):
             # 지지저항 불러오기
             li_지지저항 = self.dic_지지저항[s_종목코드] if s_종목코드 in self.dic_지지저항.keys() else list()
 
-            # 조건 탐색
+            # 매수신호 탐색
             li_매수신호 = Logic.find_매수신호(df_ohlcv=df_3분봉, li_지지저항=li_지지저항)
-            b_매수주문 = sum(li_매수신호) == len(li_매수신호)
+            b_매수신호 = sum(li_매수신호) == len(li_매수신호)
 
             # log 기록
             s_종목명 = self.dic_코드2종목명_대상종목[s_종목코드]
-            self.make_log_탐색(f'{s_종목명}({s_종목코드})\n'
-                             f'\t 매수신호 [{b_매수주문}] - {li_매수신호}')
+            self.make_log_신호(f'{s_종목명}({s_종목코드})\n'
+                             f'\t 매수신호 [{b_매수신호}] {li_매수신호}')
 
-            # 매수 주문
+            # 매수 주문 (매수신호 모두 True 조건)
             n_현재가 = self.api.dic_실시간_현재가[s_종목코드]
-            # b_매수주문 = True if self.n_주문가능금액 > n_현재가 else False      ###### 테스트용 임시코드
-            if b_매수주문:
+            # b_매수신호 = True if self.n_주문가능금액 > n_현재가 else False      ###### 테스트용 임시코드
+            if b_매수신호:
                 # 매수 주문 요청
                 n_주문단가 = self.find_주문단가(n_현재가=n_현재가, n_호가보정=+3)
                 n_주문수량 = int(self.n_주문가능금액 / n_주문단가)
@@ -199,7 +196,7 @@ class Trader(QMainWindow, form_class):
 
             # 이력 파일 업데이트
             dic_탐색정보 = dict(df_3분봉=df_3분봉, li_매수신호=li_매수신호, n_현재가=n_현재가,
-                            n_주문단가=n_주문단가 if b_매수주문 else None, n_주문수량=n_주문수량 if b_매수주문 else None)
+                            n_주문단가=n_주문단가 if b_매수신호 else None, n_주문수량=n_주문수량 if b_매수신호 else None)
             self.update_매수탐색파일(dic_탐색정보=dic_탐색정보)
 
         # ui 상태 업데이트
@@ -209,15 +206,60 @@ class Trader(QMainWindow, form_class):
         """ 매도 조건 확인하여 조건 만족 시 매도 주문 실행 """
         # ui 상태 업데이트 및 log 기록
         self.lb_run_sellbot.setText('[ 매도봇 ] 동작중')
-        self.make_log(f'### 매도조건 검색 시작 ###')
-        self.make_log_탐색(f'### 매도조건 검색 시작 ###')
+        self.make_log(f'매도신호 탐색 시작')
 
-        self.make_log_탐색(f'매도봇이 조건을 확인한 결과를 남겨야지')
+        # 보유종목 정보 확인
+        s_종목코드 = self.df_계좌잔고_종목별['종목코드'].values[0]
+        s_종목명 = self.df_계좌잔고_종목별['종목명'].values[0]
+        n_매수단가 = self.df_계좌잔고_종목별['매입가'].values[0]
+        n_보유수량 = self.df_계좌잔고_종목별['보유수량'].values[0]
 
-        self.make_log_주문(f'매도봇이 주문했으면 어떤 조건으로 주문 넣었는지 남겨야지')
+        # 지지저항 정보 확인
+        li_지지저항 = self.dic_지지저항[s_종목코드]
+        n_지지선 = max(지지 for 지지 in li_지지저항 if 지지 < n_매수단가) if min(li_지지저항) < n_매수단가 else None
+        n_저항선 = min(저항 for 저항 in li_지지저항 if 저항 > n_매수단가) if max(li_지지저항) > n_매수단가 else None
+
+        # dic_기준정보 생성
+        dic_기준정보 = dict()
+        dic_기준정보['n_매수단가'] = n_매수단가
+        dic_기준정보['n_지지선'] = n_지지선
+        dic_기준정보['n_저항선'] = n_저항선
+
+        # 현재가 확인
+        n_현재가 = self.api.dic_실시간_현재가[s_종목코드]
+
+        # 매도신호 탐색
+        li_매도신호, n_null = Logic.find_매도신호(n_현재가=n_현재가, dic_지지저항=dic_기준정보)
+        b_매도신호 = sum(li_매도신호) > 0
+
+        # log 기록
+        self.make_log_신호(f'{s_종목명}({s_종목코드})\n'
+                         f'\t ### 매도신호 [{b_매도신호}] {li_매도신호}')
+
+        # 매도 주문 (매도신호 중 1개 이상 True 조건)
+        if b_매도신호:
+            # 매도 주문 요청
+            n_주문단가 = self.find_주문단가(n_현재가=n_현재가, n_호가보정=-3)
+            n_주문수량 = int(n_보유수량)
+            self.api.send_주문(s_계좌번호=self.s_계좌번호, s_주문유형='매도', s_종목코드=s_종목코드,
+                             n_주문수량=n_주문수량, n_주문단가=n_주문단가, s_거래구분='지정가IOC')
+            self.make_log_주문(f'#### 매도 주문 ####\n'
+                             f'{s_종목명}({s_종목코드}) - 현재가 {n_현재가:,}\n'
+                             f'[단가 {n_주문단가:,}, 수량 {n_주문수량:,}, 금액 {n_주문단가 * n_주문수량:,}]\n')
+
+            # 계좌정보 업데이트
+            self.df_계좌잔고_전체, self.df_계좌잔고_종목별 = self.api.get_tr_계좌잔고(s_계좌번호=self.s_계좌번호)
+            self.flag_종목보유 = len(self.df_계좌잔고_종목별) > 0
+
+        # 이력 파일 업데이트
+        dic_탐색정보 = dict(s_종목코드=s_종목코드, s_종목명=s_종목명, li_매도신호=li_매도신호, n_현재가=n_현재가,
+                        n_주문단가=n_주문단가 if b_매도신호 else None, n_주문수량=n_주문수량 if b_매도신호 else None)
+        self.update_매도탐색파일(dic_탐색정보=dic_탐색정보)
 
         # ui 상태 업데이트
         self.lb_run_sellbot.setText('[ 매도봇 ] 동작 대기')
+
+    ###################################################################################################################
 
     def get_전일날짜(self):
         """ 캐시변환 폴더에서 전일 날짜 찾아서 s_전일 리턴 """
@@ -231,14 +273,16 @@ class Trader(QMainWindow, form_class):
     @staticmethod
     def make_호가단위():
         """ 호가단위 생성 후 list 리턴 """
-        # 호가단위 기준 (23.01.25 기준, 코스피/코스닥 동일)
-        # 2,000원 미만 : 1원
-        # 2,000원 이상 ~ 5,000원 미만 : 5원
-        # 5,000원 이상 ~ 20,000원 미만 : 10원
-        # 20,000원 이상 ~ 50,000원 미만 : 50원
-        # 50,000원 이상 ~ 200,000원 미만 : 100원
-        # 200,000원 이상 ~ 500,000원 미만 : 500원
-        # 500,000원 이상 : 1,000원
+        '''
+        ### 호가단위 기준 (23.01.25 기준, 코스피/코스닥 동일)
+            2,000원 미만 : 1원
+            2,000원 이상 ~ 5,000원 미만 : 5원
+            5,000원 이상 ~ 20,000원 미만 : 10원
+            20,000원 이상 ~ 50,000원 미만 : 50원
+            50,000원 이상 ~ 200,000원 미만 : 100원
+            200,000원 이상 ~ 500,000원 미만 : 500원
+            500,000원 이상 : 1,000원
+        '''
 
         li_호가단위 = list()
         for n_호가 in range(0, 2 * 1000, 1):
@@ -327,11 +371,44 @@ class Trader(QMainWindow, form_class):
 
         # df 업데이트
         try:
-            df_매수탐색 = pd.read_csv(os.path.join(self.folder_탐색결과, f'매수탐색_{self.s_오늘}.csv'), encoding='cp949')
+            df_매수탐색 = pd.read_csv(os.path.join(self.folder_탐색결과, f'매수신호탐색_{self.s_오늘}.csv'), encoding='cp949')
         except FileNotFoundError:
             df_매수탐색 = pd.DataFrame()
         df_매수탐색 = pd.concat([df_매수탐색, df_매수탐색_종목], axis=0).drop_duplicates()
-        df_매수탐색.to_csv(os.path.join(self.folder_탐색결과, f'매수탐색_{self.s_오늘}.csv'),
+        df_매수탐색.to_csv(os.path.join(self.folder_탐색결과, f'매수신호탐색_{self.s_오늘}.csv'),
+                       index=False, encoding='cp949')
+
+    def update_매도탐색파일(self, dic_탐색정보):
+        """ 매수탐색 결과 수집 후 csv 파일로 저장 """
+        # 변수 지정
+        s_종목코드 = dic_탐색정보['s_종목코드']
+        s_종목명 = dic_탐색정보['s_종목명']
+        li_매도신호 = dic_탐색정보['li_매도신호']
+        n_현재가 = dic_탐색정보['n_현재가']
+        n_주문단가 = dic_탐색정보['n_주문단가']
+        n_주문수량 = dic_탐색정보['n_주문수량']
+
+        # df 생성
+        df_매도탐색_종목 = pd.DataFrame()
+        df_매도탐색_종목['일자'] = self.s_오늘
+        df_매도탐색_종목['종목코드'] = s_종목코드
+        df_매도탐색_종목['종목명'] = s_종목명
+        df_매도탐색_종목['시간'] = pd.Timestamp('now').strftime('%H:%M:%S')
+        df_매도탐색_종목['매도신호'] = sum(li_매도신호) > 0
+        for i in range(len(li_매도신호)):
+            df_매도탐색_종목[f'매도{i + 1}'] = li_매도신호[i]
+        df_매도탐색_종목['현재가'] = n_현재가
+        df_매도탐색_종목['주문단가'] = n_주문단가
+        df_매도탐색_종목['주문수량'] = n_주문수량
+        df_매도탐색_종목['주문금액'] = n_주문단가 * n_주문수량 if n_주문단가 is not None and n_주문수량 is not None else None
+
+        # df 업데이트
+        try:
+            df_매도탐색 = pd.read_csv(os.path.join(self.folder_탐색결과, f'매도신호탐색_{self.s_오늘}.csv'), encoding='cp949')
+        except FileNotFoundError:
+            df_매도탐색 = pd.DataFrame()
+        df_매도탐색 = pd.concat([df_매도탐색, df_매도탐색_종목], axis=0).drop_duplicates()
+        df_매도탐색.to_csv(os.path.join(self.folder_탐색결과, f'매도신호탐색_{self.s_오늘}.csv'),
                        index=False, encoding='cp949')
 
     def setui_초기설정(self):
@@ -359,7 +436,7 @@ class Trader(QMainWindow, form_class):
         # 상태표시줄 업데이트
         s_깜빡이 = '□' if n_초 % 2 == 0 else '■'
         self.statusbar.showMessage(f'    {s_깜빡이} 서버 접속 중  |  {self.s_접속서버} | {self.s_계좌번호}')
-        ###### 향후 매수금액, 매도금액, 수익금, 수익률 표시하면 좋을 듯
+        ###### 향후 보유종목 표시하면 좋을 듯 [보유종목] 종목명(종목코드) | 매수단가 원 | 보유수량 주 | 매수금액 원
 
         # 일자 및 시각 정보 업데이트
         s_날짜_ui = f'{dt_현재.strftime("%y-%m-%d")} ({dic_요일[dt_현재.strftime("%a")]})'
@@ -449,8 +526,8 @@ class Trader(QMainWindow, form_class):
             with open(self.path_log, mode='at', encoding='cp949') as file:
                 file.write(f'{s_log}\n')
 
-    def make_log_탐색(self, s_text):
-        """ 입력 받은 s_text에 시간 붙여서 self.path_log_탐색에 저장 """
+    def make_log_신호(self, s_text):
+        """ 입력 받은 s_text에 시간 붙여서 self.path_log_신호에 저장 """
         # 정보 설정
         s_시각 = pd.Timestamp('now').strftime('%H:%M:%S')
         s_파일 = os.path.basename(sys.argv[0]).replace('.py', '')
@@ -463,7 +540,7 @@ class Trader(QMainWindow, form_class):
         print(s_log)
 
         # log 출력 (log_주문 파일)
-        with open(self.path_log_탐색, mode='at', encoding='cp949') as file:
+        with open(self.path_log_신호, mode='at', encoding='cp949') as file:
             file.write(f'{s_log}\n')
 
         # log 출력 (ui)
@@ -528,6 +605,7 @@ class Trader(QMainWindow, form_class):
 
 
 #######################################################################################################################
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     style_fusion = QStyleFactory.create('Fusion')
