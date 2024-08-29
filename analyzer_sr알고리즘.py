@@ -3,7 +3,17 @@ import sys
 import pandas as pd
 import numpy as np
 
-from scipy import stats
+
+def cal_zscore(data):
+    # 데이터 계산
+    ary_데이터 = np.array(data)
+    n_mean = ary_데이터.mean()
+    n_std = ary_데이터.std()
+
+    # zscore 계산
+    ary_zscore = (ary_데이터 - n_mean) / n_std
+
+    return ary_zscore
 
 
 def find_일봉변동_거래량(df_일봉, n_윈도우, n_z값):
@@ -11,7 +21,7 @@ def find_일봉변동_거래량(df_일봉, n_윈도우, n_z값):
     # 데이터만 골라내기
     df_일봉 = df_일봉.sort_values('일자')
     if len(df_일봉) >= n_윈도우:
-        df_일봉변동 = df_일봉[n_윈도우*-1:].copy()
+        df_일봉변동 = df_일봉[n_윈도우 * -1:].copy()
     else:
         df_일봉변동 = df_일봉[:0].copy()
         return df_일봉변동
@@ -20,7 +30,7 @@ def find_일봉변동_거래량(df_일봉, n_윈도우, n_z값):
     df_일봉변동['방법론'] = '거래량'
 
     # 변동 확인 (z-score 초과, 거래대금 100억 초과)
-    df_일봉변동['z값_거래량'] = stats.zscore(df_일봉변동['거래량'])
+    df_일봉변동['z값_거래량'] = cal_zscore(df_일봉변동['거래량'])
     if df_일봉변동['z값_거래량'].values[-1] > n_z값 and df_일봉변동['거래대금(백만)'].values[-1] > 10000:
         df_일봉변동 = df_일봉변동[-1:]
     else:
@@ -46,7 +56,7 @@ def find_지지저항_거래량(df_ohlcv, n_윈도우):
         df_지지저항 = df_지지저항.set_index(keys='년월일').sort_index(ascending=True)
 
     # 지지저항 값 찾기 (z-score 3 초과)
-    df_지지저항[f'z값_거래량{n_윈도우}'] = df_지지저항['거래량'].rolling(n_윈도우).apply(lambda x: stats.zscore(x)[-1])
+    df_지지저항[f'z값_거래량{n_윈도우}'] = df_지지저항['거래량'].rolling(n_윈도우).apply(lambda x: cal_zscore(x)[-1])
     df_지지저항 = df_지지저항[df_지지저항[f'z값_거래량{n_윈도우}'] > 3]
 
     # 방법론 표시
@@ -69,7 +79,7 @@ def find_지지저항_피크값(df_ohlcv, n_피크선명도):
         df_지지저항['년월일'] = pd.to_datetime(df_지지저항['년월일'], format='%Y%m%d')
         df_지지저항 = df_지지저항.set_index(keys='년월일').sort_index(ascending=True)
 
-    # 지지저항 값 찾기 (고가 기준 peak 확인)
+    # 지지저항 값 찾기 (고가 기준 peak 확인 - 64비트 에서만 동작)
     from scipy.signal import find_peaks
     ary_idx_피크, dic_속성 = find_peaks(df_지지저항['고가'].values, prominence=n_피크선명도)
 
@@ -146,13 +156,13 @@ def find_매수신호(df_ohlcv, li_지지저항, dt_일자시간=None):
     df_분봉 = df_ohlcv[df_ohlcv.index < dt_일자시간].copy()
 
     # df 값 미존재 시 False return
-    if len(df_분봉) < 2:
+    if len(df_분봉) < 2 or len(li_지지저항) == 0:
         return li_false
 
     # 변수 정의
     df_분봉 = df_분봉.sort_values(['일자', '시간'], ascending=True).reset_index()
     df_분봉20 = df_분봉[-20:].copy().reset_index(drop=True)
-    n_거래량z값_1 = stats.zscore(df_분봉20['거래량'].values)[-1]
+    n_거래량z값_1 = cal_zscore(df_분봉20['거래량'].values)[-1]
     n_추세ma20_1 = np.polyfit(df_분봉20.index, df_분봉20['종가ma20'], 1)[0]
     n_추세ma60_1 = np.polyfit(df_분봉20.index, df_분봉20['종가ma60'], 1)[0]
     n_추세ma120_1 = np.polyfit(df_분봉20.index, df_분봉20['종가ma120'], 1)[0]
@@ -196,7 +206,7 @@ def find_매수신호(df_ohlcv, li_지지저항, dt_일자시간=None):
     return li_매수신호
 
 
-def find_매도신호(n_현재가, dic_지지저항, dt_일자시간=None):
+def find_매도신호(n_현재가, dic_지지저항):
     """ df_ohlcv 받아서 매도 신호 확인 후 list 형태로 리턴 """
     # False return 값 정의
     li_false = [False] * 3
