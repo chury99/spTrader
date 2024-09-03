@@ -206,10 +206,10 @@ def find_매수신호(df_ohlcv, li_지지저항, dt_일자시간=None):
     return li_매수신호
 
 
-def find_매도신호(n_현재가, dic_지지저항):
+def find_매도신호(n_현재가, dic_지지저항, s_현재시간=None):
     """ df_ohlcv 받아서 매도 신호 확인 후 list 형태로 리턴 """
     # False return 값 정의
-    li_false = [False] * 3
+    li_false = [False] * 4
     n_매도단가 = None
 
     # 기준정보 미존재 시 false return
@@ -229,7 +229,7 @@ def find_매도신호(n_현재가, dic_지지저항):
     li_매도신호.append(b_매도신호)
     n_매도단가 = n_저항선 if b_매도신호 else n_매도단가
 
-    # 2) 지자선 붕괴 (1% 마진)
+    # 2) 지지선 붕괴 (1% 마진)
     n_지지선_마진 = int(n_지지선 * (1 - 0.01))
     b_매도신호 = True if n_현재가 < n_지지선_마진 else False
     li_매도신호.append(b_매도신호)
@@ -238,6 +238,12 @@ def find_매도신호(n_현재가, dic_지지저항):
     # 3) 매수가 대비 2% 하락
     n_하락한계 = int(n_매수단가 * (1 - 0.02))
     b_매도신호 = True if n_현재가 < n_하락한계 else False
+    li_매도신호.append(b_매도신호)
+    n_매도단가 = n_하락한계 if b_매도신호 else n_매도단가
+
+    # 4) 장 종료시간 도래
+    s_현재시간 = pd.Timestamp('now').strftime('%H:%M:%S') if s_현재시간 is None else s_현재시간
+    b_매도신호 = True if s_현재시간 > '15:18:40' else False
     li_매도신호.append(b_매도신호)
     n_매도단가 = n_하락한계 if b_매도신호 else n_매도단가
 
