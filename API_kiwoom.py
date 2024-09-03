@@ -666,11 +666,11 @@ class KiwoomAPI(QAxWidget):
         df_체결잔고 = pd.DataFrame(dic_체결잔고)
 
         # df 정리
-        self.df_체결잔고_누적 = pd.concat([df_체결잔고, self.df_체결잔고], axis=0)
-        self.df_체결잔고_누적 = self.df_체결잔고_누적.reset_index(drop=True)
+        self.df_체결잔고 = pd.concat([self.df_체결잔고, df_체결잔고], axis=0)
+        self.df_체결잔고 = self.df_체결잔고_누적.reset_index(drop=True)
 
         # df 저장
-        self.df_체결잔고_누적.to_csv(self.path_체결잔고, index=False, encoding='cp949')
+        self.df_체결잔고.to_csv(self.path_체결잔고, index=False, encoding='cp949')
 
     def _get_chejan_data(self, n_fid):
         """ FID별 체결/잔고 데이터 요청 (OnReceiveChejanData 내부에서 사용) """
