@@ -47,7 +47,7 @@ class Rotator:
 
         # 메인 폴더 구조 생성
         li_폴더분류 = [폴더 for 폴더 in os.listdir(self.folder_work)
-                   if os.path.isdir(os.path.join(self.folder_work, 폴더))]
+                   if os.path.isdir(os.path.join(self.folder_work, 폴더)) and '테스트' not in 폴더]
 
         # 하위 폴더 구성
         for s_폴더분류 in li_폴더분류:
