@@ -667,7 +667,6 @@ class KiwoomAPI(QAxWidget):
 
         # df 정리
         self.df_체결잔고 = pd.concat([self.df_체결잔고, df_체결잔고], axis=0)
-        self.df_체결잔고 = self.df_체결잔고_누적.reset_index(drop=True)
 
         # df 저장
         self.df_체결잔고.to_csv(self.path_체결잔고, index=False, encoding='cp949')
