@@ -32,6 +32,7 @@ class Analyzer:
         import UT_폴더manager
         dic_폴더정보 = UT_폴더manager.dic_폴더정보
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
+        self.folder_일봉변동 = dic_폴더정보['sr종목선정|10_일봉변동']
         self.folder_지지저항 = dic_폴더정보['sr종목선정|20_지지저항']
         self.folder_종목선정 = dic_폴더정보['sr종목선정|50_종목선정']
         self.folder_매수매도 = dic_폴더정보['sr백테스팅|10_매수매도']
@@ -48,7 +49,7 @@ class Analyzer:
         self.s_파일 = os.path.basename(sys.argv[0]).replace('.py', '')
 
         # log 기록
-        self.make_log(f'### 종목 선정 시작 ###')
+        self.make_log(f'### 백테스팅 시작 ###')
 
     def 검증_매수매도(self, b_차트):
         """ 전일 종목선정 데이터 기준으로 당일 매수매도 분석하여 pkl, csv 저장 """
@@ -74,9 +75,11 @@ class Analyzer:
 
             # 종목선정, 지지저항 불러오기 (전일)
             try:
-                df_종목선정 = pd.read_pickle(os.path.join(self.folder_종목선정, f'{s_파일명_기준}_{s_일자_전일}.pkl'))
+                # df_종목선정 = pd.read_pickle(os.path.join(self.folder_종목선정, f'{s_파일명_기준}_{s_일자_전일}.pkl'))
+                df_일봉변동 = pd.read_pickle(os.path.join(self.folder_일봉변동, f'df_일봉변동_{s_일자_전일}.pkl'))
                 df_지지저항 = pd.read_pickle(os.path.join(self.folder_지지저항, f'df_지지저항_{s_일자_전일}.pkl'))
-                li_대상종목 = list(df_종목선정['종목코드'].sort_values().unique())
+                # li_대상종목 = list(df_종목선정['종목코드'].sort_values().unique())
+                li_대상종목 = list(df_일봉변동['종목코드'].sort_values().unique())
             except FileNotFoundError:
                 continue
 
@@ -99,14 +102,19 @@ class Analyzer:
 
                 df_1분봉 = dic_1분봉[s_종목코드]
 
-                li_지지저항 = list(df_지지저항[df_지지저항['종목코드'] == s_종목코드]['고가'].values)
+                df_지지저항_전일 = df_지지저항[df_지지저항['종목코드'] == s_종목코드]
+                df_지지저항_종목 = Logic.find_지지저항_추가통합(df_지지저항_기존=df_지지저항_전일, df_ohlcv_신규=df_3분봉)
 
                 # 매수신호 탐색
                 li_df_매수신호_종목 = list()
                 for s_시간 in df_3분봉_당일['시간']:
-                    # 매수신호 생성
+                    # 데이터 준비 (해당 시점)
                     dt_일자시간 = pd.Timestamp(f'{s_일자} {s_시간}')
                     df_3분봉_시점 = df_3분봉[df_3분봉.index <= dt_일자시간]
+                    df_지지저항_시점 = df_지지저항_종목[df_지지저항_종목.index <= dt_일자시간]
+                    li_지지저항 = list(df_지지저항_시점['고가'].values)
+
+                    # 매수신호 생성
                     li_매수신호 = Logic.find_매수신호(df_ohlcv=df_3분봉_시점, li_지지저항=li_지지저항, dt_일자시간=dt_일자시간)
 
                     # 매수신호 확인
@@ -120,7 +128,7 @@ class Analyzer:
 
                 # 매도신호 탐색
                 li_df_매수매도_종목 = list()
-                li_매수시간 = df_매수신호_종목['매수시간'] if len(df_매수신호_종목) > 0 else list()
+                li_매수시간 = list(df_매수신호_종목['매수시간']) if len(df_매수신호_종목) > 0 else list()
                 s_매도시간 = '00:00:00'
                 for s_매수시간 in li_매수시간:
                     # 매도 전 매수 금지
@@ -129,9 +137,6 @@ class Analyzer:
 
                     # 기준정보 정의
                     n_매수단가 = df_매수신호_종목[df_매수신호_종목['매수시간'] == s_매수시간]['매수단가'].values[0]
-                    n_지지선 = max(지지 for 지지 in li_지지저항 if 지지 < n_매수단가) if min(li_지지저항) < n_매수단가 else None
-                    n_저항선 = min(저항 for 저항 in li_지지저항 if 저항 > n_매수단가) if max(li_지지저항) > n_매수단가 else None
-                    dic_지지저항 = {'n_매수단가': n_매수단가, 'n_지지선': n_지지선, 'n_저항선': n_저항선}
 
                     # 1분봉 데이터 확인
                     for s_시간 in df_1분봉['시간']:
@@ -139,14 +144,24 @@ class Analyzer:
                         if s_시간 < s_매수시간:
                             continue
 
+                        # 기준정보 정의
+                        dt_일자시간 = pd.Timestamp(f'{s_일자} {s_시간}')
+                        df_지지저항_시점 = df_지지저항_종목[df_지지저항_종목.index <= dt_일자시간]
+                        li_지지저항 = list(df_지지저항_시점['고가'].values)
+                        n_지지선 = max(지지 for 지지 in li_지지저항 if 지지 < n_매수단가) if min(li_지지저항) < n_매수단가 else None
+                        n_저항선 = min(저항 for 저항 in li_지지저항 if 저항 > n_매수단가) if max(li_지지저항) > n_매수단가 else None
+                        dic_지지저항 = {'n_매수단가': n_매수단가, 'n_지지선': n_지지선, 'n_저항선': n_저항선}
+
                         # 기준 데이터 정의
                         df_1분봉_시점 = df_1분봉[df_1분봉['시간'] == s_시간]
                         n_고가 = df_1분봉_시점['고가'].values[0]
                         n_저가 = df_1분봉_시점['저가'].values[0]
 
                         # 매도신호 생성
-                        li_매도신호_고가, n_매도단가_고가 = Logic.find_매도신호(n_현재가=n_고가, dic_지지저항=dic_지지저항)
-                        li_매도신호_저가, n_매도단가_저가 = Logic.find_매도신호(n_현재가=n_저가, dic_지지저항=dic_지지저항)
+                        li_매도신호_고가, n_매도단가_고가 = Logic.find_매도신호(n_현재가=n_고가,
+                                                                dic_지지저항=dic_지지저항, s_현재시간=s_시간)
+                        li_매도신호_저가, n_매도단가_저가 = Logic.find_매도신호(n_현재가=n_저가,
+                                                                dic_지지저항=dic_지지저항, s_현재시간=s_시간)
                         li_매도신호 = [(li_매도신호_고가[i] or li_매도신호_저가[i]) for i in range(len(li_매도신호_고가))]
                         n_매도단가 = n_매도단가_고가 or n_매도단가_저가
 
@@ -180,7 +195,7 @@ class Analyzer:
                     # 차트 생성
                     import UT_차트maker as chart
                     fig = chart.make_차트(df_ohlcv=df_3분봉_당일)
-                    for n_지지저항 in li_지지저항:
+                    for n_지지저항 in df_지지저항_종목['고가'].values:
                         fig.axes[0].axhline(n_지지저항)
 
                     # 매수매도 표시 (매수는 ^, 매도는 v)
@@ -272,8 +287,11 @@ class Analyzer:
                            index=False, encoding='cp949')
 
             # log 기록
-            self.make_log(f'결과정리 완료({s_일자}, {df_결과정리["전체거래"].values[0]:,}건 매매,'
-                          f' {df_결과정리["수익거래"].values[0]:,}건 성공, 수익률 {df_결과정리["수익률(%)"].values[0]:.0f}%)')
+            n_수익률 = df_결과정리['수익률(%)'].values[0]
+            s_수익률 = f'{n_수익률:.1f}%' if not pd.isna(n_수익률) else 'None'
+            self.make_log(f'결과정리 완료({s_일자}, {int(df_결과정리["전체거래"].values[0]):,}건 매매,'
+                          f' {int(df_결과정리["수익거래"].values[0]):,}건 성공,'
+                          f' 수익률 {s_수익률})')
 
             # 백테스팅 리포트 생성
             folder_리포트 = os.path.join(self.folder_결과정리, '리포트')
@@ -281,6 +299,7 @@ class Analyzer:
             s_파일명_리포트 = f'백테스팅_리포트_{s_일자}.png'
             fig = self.make_리포트_백테스팅(df_결과정리=df_결과정리)
             fig.savefig(os.path.join(folder_리포트, s_파일명_리포트))
+            plt.close(fig)
 
             # 리포트 복사 to 서버
             import UT_배치worker
@@ -326,16 +345,20 @@ class Analyzer:
         s_일자 = df_결과정리['일자'].max()
 
         # 그래프 설정
-        fig = plt.figure(figsize=[16, 12])
+        fig = plt.figure(figsize=[16, 20])
         fig.suptitle(f'백테스팅 리포트 ({s_일자})', fontsize=16)
-        ax_감시대상_일별 = fig.add_subplot(4, 2, 1)
-        ax_상승예측_일별 = fig.add_subplot(4, 2, 2)
-        ax_성공률_누적 = fig.add_subplot(4, 2, 3)
-        ax_성공률_일별 = fig.add_subplot(4, 2, 4)
-        ax_수익률_누적 = fig.add_subplot(4, 2, 5)
-        ax_수익률_일별 = fig.add_subplot(4, 2, 6)
-        ax_상세정보_월별 = fig.add_subplot(4, 2, 7)
-        ax_상세정보_일별 = fig.add_subplot(4, 2, 8)
+        ax_감시대상_일별 = fig.add_subplot(6, 2, 1)
+        ax_상승예측_일별 = fig.add_subplot(6, 2, 2)
+        ax_성공률_누적 = fig.add_subplot(6, 2, 3)
+        ax_성공률_일별 = fig.add_subplot(6, 2, 4)
+        ax_수익률_누적 = fig.add_subplot(6, 2, 5)
+        ax_수익률_일별 = fig.add_subplot(6, 2, 6)
+        ax_상세_학습정보_월별 = fig.add_subplot(6, 2, 7)
+        ax_상세_학습정보_일별 = fig.add_subplot(6, 2, 8)
+        ax_상세_백테스팅_월별 = fig.add_subplot(6, 2, 9)
+        ax_상세_백테스팅_일별 = fig.add_subplot(6, 2, 10)
+        ax_상세_매매실적_월별 = fig.add_subplot(6, 2, 11)
+        ax_상세_매매실적_일별 = fig.add_subplot(6, 2, 12)
 
         # 일별 감시대상 건수
         li_파일명 = [파일명 for 파일명 in os.listdir(os.path.join(self.folder_종목선정))
@@ -426,10 +449,10 @@ class Analyzer:
         df_테이블_월별['수익률(%)'] = df_테이블_월별['수익률(%)'].apply(lambda x: f'{x:.1f}')
         df_월별 = df_테이블_월별[-10:].T
 
-        ax_상세정보_월별.set_title(f'[ 상세 정보 (월별) ]')
-        ax_상세정보_월별.axis('tight')
-        ax_상세정보_월별.axis('off')
-        obj_테이블 = ax_상세정보_월별.table(cellText=df_월별.values, rowLabels=df_월별.index, loc='center', cellLoc='center')
+        ax_상세_백테스팅_월별.set_title(f'[ 상세정보 - 백테스팅 (월별) ]')
+        ax_상세_백테스팅_월별.axis('tight')
+        ax_상세_백테스팅_월별.axis('off')
+        obj_테이블 = ax_상세_백테스팅_월별.table(cellText=df_월별.values, rowLabels=df_월별.index, loc='center', cellLoc='center')
         obj_테이블.auto_set_font_size(False)
         obj_테이블.set_fontsize(12)
         obj_테이블.scale(1.0, 2.4)
@@ -443,10 +466,10 @@ class Analyzer:
         df_테이블_일별['수익률(%)'] = df_결과정리['수익률(%)'].apply(lambda x: f'{x:.1f}')
         df_일별 = df_테이블_일별[-10:].T
 
-        ax_상세정보_일별.set_title(f'[ 상세 정보 (일별) ]')
-        ax_상세정보_일별.axis('tight')
-        ax_상세정보_일별.axis('off')
-        obj_테이블 = ax_상세정보_일별.table(cellText=df_일별.values, rowLabels=df_일별.index, loc='center', cellLoc='center')
+        ax_상세_백테스팅_일별.set_title(f'[ 상세정보 - 백테스팅 (일별) ]')
+        ax_상세_백테스팅_일별.axis('tight')
+        ax_상세_백테스팅_일별.axis('off')
+        obj_테이블 = ax_상세_백테스팅_일별.table(cellText=df_일별.values, rowLabels=df_일별.index, loc='center', cellLoc='center')
         obj_테이블.auto_set_font_size(False)
         obj_테이블.set_fontsize(12)
         obj_테이블.scale(1.0, 2.4)
@@ -458,5 +481,5 @@ class Analyzer:
 if __name__ == "__main__":
     a = Analyzer(n_분석일수=None)
 
-    a.검증_매수매도(b_차트=True)
-    a.검증_결과정리(b_카톡=True)
+    a.검증_매수매도(b_차트=False)
+    a.검증_결과정리(b_카톡=False)
