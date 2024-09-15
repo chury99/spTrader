@@ -39,6 +39,7 @@ class Trader(QMainWindow, form_class):
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
         self.folder_체결잔고 = dic_폴더정보['이력|체결잔고']
         self.folder_탐색결과 = dic_폴더정보['이력|탐색결과']
+        self.folder_일봉변동 = dic_폴더정보['sr종목선정|10_일봉변동']
         self.folder_지지저항 = dic_폴더정보['sr종목선정|20_지지저항']
         self.folder_감시대상 = dic_폴더정보['sr종목선정|50_종목선정']
         os.makedirs(self.folder_탐색결과, exist_ok=True)
@@ -67,8 +68,8 @@ class Trader(QMainWindow, form_class):
         self.n_모니터링파일생성주기 = int(int(dic_config['재구동_대기시간(초)']) / 2)
         self.s_전일 = self.get_전일날짜()
         self.li_호가단위 = self.make_호가단위()
-        self.li_대상종목, self.dic_코드2종목명_대상종목 = self.get_대상종목()
-        self.dic_지지저항 = self.get_지지저항()
+        self.li_대상종목, self.dic_코드2종목명_대상종목 = self.  get_대상종목()
+        self.dic_지지저항, self.df_지지저항 = self.get_지지저항()
 
         # log 기록
         self.make_log(f'### Short Punch Trader 시작 ({self.s_접속서버}) ###')
@@ -133,10 +134,8 @@ class Trader(QMainWindow, form_class):
         # ui 상태 업데이트 및 log 기록
         self.lb_run_buybot.setText('[ 매수봇 ] 동작중')
         self.make_log(f'매수신호 탐색')
-        self.make_log_신호(f'\n'
-                         f'\t\t ############\n'
-                         f'\t\t # 매수신호 탐색 #\n'
-                         f'\t\t ############')
+        self.make_log_신호(f'##### 매수신호 탐색 #####\n'
+                         f'  ===== 자리검증 | 추세검증 | 배열검증 | sr검증 | 시간검증 =====')
 
         # 대상 종목별 매수신호 탐색
         for s_종목코드 in self.li_대상종목:
@@ -158,8 +157,11 @@ class Trader(QMainWindow, form_class):
             # df_3분봉 = Chart.find_전일종가(df_ohlcv=df_3분봉)     # 장시간 소요 (꼭 필요하면 대상 최소화해서 진행)
             df_3분봉 = Chart.make_이동평균(df_ohlcv=df_3분봉)
 
-            # 지지저항 불러오기
-            li_지지저항 = self.dic_지지저항[s_종목코드] if s_종목코드 in self.dic_지지저항.keys() else list()
+            # 지지저항 업데이트
+            df_지지저항_전일 = self.df_지지저항[self.df_지지저항['종목코드'] == s_종목코드].copy()
+            df_지지저항 = Logic.find_지지저항_추가통합(df_지지저항_기존=df_지지저항_전일, df_ohlcv_신규=df_3분봉[-130:])
+            li_지지저항 = list(df_지지저항['고가'].values)
+            self.dic_지지저항[s_종목코드] = li_지지저항
 
             # 매수신호 탐색
             li_매수신호 = Logic.find_매수신호(df_ohlcv=df_3분봉, li_지지저항=li_지지저항)
@@ -167,8 +169,13 @@ class Trader(QMainWindow, form_class):
 
             # log 기록
             s_종목명 = self.dic_코드2종목명_대상종목[s_종목코드]
+            s_매수신호 = 'ok' if b_매수신호 else 'NG'
+            n_반대신호 = len(li_매수신호) - sum(li_매수신호) if b_매수신호 == False else ''
+            li_s_매수신호 = ['ok' if b_신호 else 'NG' for b_신호 in li_매수신호]
+            li_종류 = ['자리', '추세', '배열', 'sr', '시간']
+            s_li_매수신호 = ', '.join([f'{li_종류[i]}_{li_s_매수신호[i]}' for i in range(len(li_종류))])
             self.make_log_신호(f'{s_종목명}({s_종목코드})\n'
-                             f'\t [{b_매수신호}] {li_매수신호}')
+                             f'  #{s_매수신호}-{n_반대신호}# {s_li_매수신호}')
 
             # 매수 주문 (매수신호 모두 True 조건)
             n_현재가 = self.api.dic_실시간_현재가[s_종목코드]
@@ -210,8 +217,8 @@ class Trader(QMainWindow, form_class):
         # 보유종목 정보 확인
         s_종목코드 = self.df_계좌잔고_종목별['종목코드'].values[0]
         s_종목명 = self.df_계좌잔고_종목별['종목명'].values[0]
-        n_매수단가 = self.df_계좌잔고_종목별['매입가'].values[0]
-        n_보유수량 = self.df_계좌잔고_종목별['보유수량'].values[0]
+        n_매수단가 = int(self.df_계좌잔고_종목별['매입가'].values[0])
+        n_보유수량 = int(self.df_계좌잔고_종목별['보유수량'].values[0])
 
         # 지지저항 정보 확인
         li_지지저항 = self.dic_지지저항[s_종목코드]
@@ -240,19 +247,24 @@ class Trader(QMainWindow, form_class):
         # log 기록
         n_수익률 = (n_현재가 / n_매수단가 - 1) * 100
         self.make_log_신호(f'{s_종목명}({s_종목코드})\n'
-                         f'\t 매수 {n_매수단가:,}원 | 현재 {n_현재가:,}원 | 수익 {n_수익률:.2f}%')
+                         f'\t[매수 {n_매수단가:,}원 | 현재 {n_현재가:,}원 | 수익 {n_수익률:.2f}%]')
 
         # 매도 주문 (매도신호 중 1개 이상 True 조건)
         if b_매도신호:
             # 매도 주문 요청
-            n_주문단가 = self.find_주문단가(n_현재가=n_현재가, n_호가보정=-3)
+            n_주문단가 = self.find_주문단가(n_현재가=n_현재가, n_호가보정=-2)
             n_주문수량 = int(n_보유수량)
             self.api.send_주문(s_계좌번호=self.s_계좌번호, s_주문유형='매도', s_종목코드=s_종목코드,
                              n_주문수량=n_주문수량, n_주문단가=n_주문단가, s_거래구분='지정가IOC')
+
+            # log 기록
+            li_s_매도신호 = ['ON' if b_신호 else 'off' for b_신호 in li_매도신호]
+            li_종류 = ['저항터치', '지지붕괴', '추세이탈', '하락한계', '장종료']
+            s_매도신호 = ', '.join([f'{li_종류[i]}_{li_s_매도신호[i]}' for i in range(len(li_종류))])
             self.make_log_주문(f'#### 매도 주문 ####\n'
                              f'\t{s_종목명}({s_종목코드}) - 현재가 {n_현재가:,}\n'
                              f'\t단가 {n_주문단가:,}원 | 수량 {n_주문수량:,}주 | 금액 {n_주문단가 * n_주문수량:,}원\n'
-                             f'\t매도신호 {li_매도신호}\n')
+                             f'\t[{s_매도신호}]')
 
             # 계좌정보 업데이트
             self.df_계좌잔고_전체, self.df_계좌잔고_종목별 = self.api.get_tr_계좌잔고(s_계좌번호=self.s_계좌번호)
@@ -311,7 +323,8 @@ class Trader(QMainWindow, form_class):
     def get_대상종목(self):
         """ 트레이더 구동 시 감시할 대상종목 읽어와서 종목코드(list), 종목명(dict)  리턴 """
         # 감시대상 파일 읽어오기
-        df_감시대상 = pd.read_pickle(os.path.join(self.folder_감시대상, f'df_종목선정_{self.s_전일}.pkl'))
+        # df_감시대상 = pd.read_pickle(os.path.join(self.folder_감시대상, f'df_종목선정_{self.s_전일}.pkl'))
+        df_감시대상 = pd.read_pickle(os.path.join(self.folder_일봉변동, f'df_일봉변동_{self.s_전일}.pkl'))
 
         # 종목코드 골라내기
         li_대상종목 = list(df_감시대상['종목코드'].sort_values().unique())
@@ -331,7 +344,7 @@ class Trader(QMainWindow, form_class):
         for s_종목코드 in df_지지저항['종목코드'].unique():
             dic_지지저항[s_종목코드] = list(df_지지저항[df_지지저항['종목코드'] == s_종목코드]['고가'].values)
 
-        return dic_지지저항
+        return dic_지지저항, df_지지저항
 
     def find_주문단가(self, n_현재가, n_호가보정):
         """ 주문가 산정을 위해 해당 종목의 현재가 대비 호가보정 후 int 리턴 """
@@ -481,6 +494,7 @@ class Trader(QMainWindow, form_class):
         s_일자 = self.s_오늘
         try:
             df_체결잔고 = pd.read_csv(os.path.join(self.folder_체결잔고, f'체결잔고_{s_일자}.csv'), encoding='cp949')
+            df_체결잔고 = df_체결잔고[pd.notna(df_체결잔고['주문상태'])]
         except FileNotFoundError:
             s_파일명_최근 = max([파일명 for 파일명 in os.listdir(self.folder_체결잔고) if '체결잔고' in 파일명])
             df_체결잔고 = pd.read_csv(os.path.join(self.folder_체결잔고, s_파일명_최근), encoding='cp949')
@@ -509,7 +523,6 @@ class Trader(QMainWindow, form_class):
 
         # 계좌 걸러내기
         df_거래이력 = df_거래이력[df_거래이력['계좌번호'] == self.s_계좌번호]
-        # df_거래이력 = df_거래이력[df_거래이력['계좌번호'] == '5397778810']      ####### 임시 테스트용 코드
         ary_거래이력 = df_거래이력.values
 
         # 테이블 모델 생성
@@ -518,7 +531,6 @@ class Trader(QMainWindow, form_class):
 
         for n_row, ary_row in enumerate(ary_거래이력):
             for n_col, s_항목 in enumerate(ary_row):
-                # obj_정렬 = Qt.AlignRight if n_col in [0] else Qt.AlignCenter
                 obj_정렬 = Qt.AlignRight if n_col in [] else Qt.AlignCenter
                 obj_항목 = QStandardItem(str(s_항목))
                 obj_항목.setTextAlignment(obj_정렬)
