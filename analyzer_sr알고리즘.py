@@ -151,7 +151,7 @@ def find_지지저항_라인통합(df_지지저항, n_퍼센트범위):
 
 
 def find_지지저항_추가통합(df_지지저항_기존, df_ohlcv_신규):
-    """ 신규 지지저항 산출 후 기존 지지저항과 통합 후 df 리턴 """
+    """ 신규 지지저항 산출 후 기존 지지저항 통합 후 df 리턴 """
     # 기존 지지저항 확인
     if len(df_지지저항_기존['종목코드'].unique()) > 1:
         return '[error] df_지지저항_기존 : 1개 종목만 입력 필요'
@@ -245,7 +245,7 @@ def find_매수신호(df_ohlcv, li_지지저항, dt_일자시간=None):
     # 4) [sr검증] 지지저항 위치
     # 종가가 지지저항 내부에 존재
     b_매수신호4_1 = max(li_지지저항) > n_종가_1 > min(li_지지저항)
-    # 저항선과 1.5% 이상 갭 존재
+    # 저항선 대비 1.5% 이상 갭 존재
     n_저항선 = min(저항 for 저항 in li_지지저항 if 저항 > n_종가_1) if b_매수신호4_1 else None
     b_매수신호4_2 = (n_저항선 / n_종가_1 - 1) * 100 > 1.5 if n_저항선 is not None else False
 
@@ -262,50 +262,84 @@ def find_매수신호(df_ohlcv, li_지지저항, dt_일자시간=None):
     return li_매수신호
 
 
-def find_매도신호(n_현재가, dic_지지저항, s_현재시간=None):
+def find_매도신호(n_현재가, dic_기준정보):
     """ df_ohlcv 받아서 매도 신호 확인 후 list 형태로 리턴 """
     # False return 값 정의
     li_false = [False] * 5
+
+    # # 기준정보 미존재 시 false return
+    # if None in dic_기준정보.values():
+    #     return li_false, None
+
+    # 기준정보 정의 - trader / analyzer 공용
+    df_3분봉 = dic_기준정보['df_3분봉']
+    n_매수단가 = dic_기준정보['n_매수단가']
+    n_지지선 = dic_기준정보['n_지지선']
+    n_저항선 = dic_기준정보['n_저항선']
+
+    # 기준정보 정의 - analyzer 전용
+    s_현재시간 = dic_기준정보['s_현재시간'] if 's_현재시간' in dic_기준정보.keys() else None
+    n_시가 = dic_기준정보['n_시가'] if 'n_시가' in dic_기준정보.keys() else None
+    n_고가 = dic_기준정보['n_고가'] if 'n_고가' in dic_기준정보.keys() else None
+    n_저가 = dic_기준정보['n_저가'] if 'n_저가' in dic_기준정보.keys() else None
+    n_종가 = dic_기준정보['n_종가'] if 'n_종가' in dic_기준정보.keys() else None
+
+    # 추가 정보 정의
+    s_구분 = 'analyzer' if s_현재시간 else 'trader'
     n_매도단가 = None
 
-    # 기준정보 미존재 시 false return
-    if None in dic_지지저항.values():
-        return li_false, n_매도단가
-
-    # 기준정보 정의
-    n_매수단가 = dic_지지저항['n_매수단가']
-    n_지지선 = dic_지지저항['n_지지선']
-    n_저항선 = dic_지지저항['n_저항선']
+    # 변수 정의
+    df_3분봉 = df_3분봉.sort_values(['일자', '시간'], ascending=True).reset_index()
+    df_3분봉10 = df_3분봉[-10:].copy().reset_index(drop=True)
+    n_추세10종가_1 = np.polyfit(df_3분봉10.index, df_3분봉10['종가'], 1)[0]
+    n_추세10ma10_1 = np.polyfit(df_3분봉10.index, df_3분봉10['종가ma10'], 1)[0]
+    n_추세10ma20_1 = np.polyfit(df_3분봉10.index, df_3분봉10['종가ma20'], 1)[0]
+    n_추세10ma60_1 = np.polyfit(df_3분봉10.index, df_3분봉10['종가ma60'], 1)[0]
+    n_추세10ma120_1 = np.polyfit(df_3분봉10.index, df_3분봉10['종가ma120'], 1)[0]
+    df_3분봉20 = df_3분봉[-20:].copy().reset_index(drop=True)
+    n_추세20종가_1 = np.polyfit(df_3분봉20.index, df_3분봉20['종가'], 1)[0]
+    n_추세20ma10_1 = np.polyfit(df_3분봉20.index, df_3분봉20['종가ma10'], 1)[0]
+    n_추세20ma20_1 = np.polyfit(df_3분봉20.index, df_3분봉20['종가ma20'], 1)[0]
+    n_추세20ma60_1 = np.polyfit(df_3분봉20.index, df_3분봉20['종가ma60'], 1)[0]
+    n_추세20ma120_1 = np.polyfit(df_3분봉20.index, df_3분봉20['종가ma120'], 1)[0]
 
     # 매도신호 생성 ['저항터치', '지지붕괴', '추세이탈', '하락한계', '장종료']
     li_매도신호 = list()
 
     # 1) 저항선 터치
-    b_매도신호 = True if n_현재가 >= n_저항선 else False
-    li_매도신호.append(b_매도신호)
-    n_매도단가 = n_저항선 if b_매도신호 else n_매도단가
+    n_현재가 = n_고가 if s_구분 == 'analyzer' else n_현재가
+    b_매도신호1 = n_현재가 >= n_저항선
+    li_매도신호.append(b_매도신호1)
+    n_매도단가 = n_저항선 if b_매도신호1 else n_매도단가
 
     # 2) 지지선 붕괴 (1% 마진)
+    n_현재가 = n_저가 if s_구분 == 'analyzer' else n_현재가
     n_지지선_마진 = int(n_지지선 * (1 - 0.01))
-    b_매도신호 = True if n_현재가 < n_지지선_마진 else False
-    li_매도신호.append(b_매도신호)
-    n_매도단가 = n_지지선_마진 if b_매도신호 else n_매도단가
+    b_매도신호2 = n_현재가 <= n_지지선_마진
+    li_매도신호.append(b_매도신호2)
+    n_매도단가 = n_지지선_마진 if b_매도신호2 else n_매도단가
 
-    # 3) 추세 이탈 (이전 5개봉 종가)
-    b_매도신호 = False
-    li_매도신호.append(b_매도신호)
-    n_매도단가 = None if b_매도신호 else n_매도단가
+    # 3) 추세 이탈 (종가, ma20, ma60, ma120) - 매수 동일 조건
+    b_매도신호3_1 = n_추세10종가_1 < 1
+    b_매도신호3_2 = n_추세20ma20_1 < 1
+    b_매도신호3_3 = n_추세20ma60_1 < 1
+    b_매도신호3_4 = n_추세20ma120_1 < 1
+
+    b_매도신호3 = b_매도신호3_1 or b_매도신호3_2 or b_매도신호3_3 or b_매도신호3_4
+    li_매도신호.append(b_매도신호3)
+    n_매도단가 = n_시가 if b_매도신호3 else n_매도단가
 
     # 4) 하락 한계 (매수가 대비 5% 하락)
+    n_현재가 = n_저가 if s_구분 == 'analyzer' else n_현재가
     n_하락한계 = int(n_매수단가 * (1 - 0.05))
-    b_매도신호 = True if n_현재가 < n_하락한계 else False
-    li_매도신호.append(b_매도신호)
-    n_매도단가 = n_하락한계 if b_매도신호 else n_매도단가
+    b_매도신호4 = n_현재가 <= n_하락한계
+    li_매도신호.append(b_매도신호4)
+    n_매도단가 = n_하락한계 if b_매도신호4 else n_매도단가
 
     # 5) 장 종료
-    s_현재시간 = pd.Timestamp('now').strftime('%H:%M:%S') if s_현재시간 is None else s_현재시간
-    b_매도신호 = True if s_현재시간 > '15:18:40' else False
-    li_매도신호.append(b_매도신호)
-    n_매도단가 = None if b_매도신호 else n_매도단가
+    s_현재시간 = pd.Timestamp('now').strftime('%H:%M:%S') if s_구분 == 'trader' else s_현재시간
+    b_매도신호5 = s_현재시간 > '15:18:40'
+    li_매도신호.append(b_매도신호5)
+    n_매도단가 = n_시가 if b_매도신호5 else n_매도단가
 
     return li_매도신호, n_매도단가
