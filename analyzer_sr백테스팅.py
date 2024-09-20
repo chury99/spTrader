@@ -146,8 +146,12 @@ class Analyzer:
             # df_매수매도 생성
             df_매수매도 = pd.concat(li_df_매수매도, axis=0) if len(li_df_매수매도) > 0 else pd.DataFrame()
             if len(df_매수매도) == 0:
-                s_파일명 = max(파일 for 파일 in os.listdir(self.folder_매수매도) if s_파일명_생성 in 파일 and '.pkl' in 파일)
+                s_파일명 = max(파일 for 파일 in os.listdir(self.folder_매수매도)
+                            if s_파일명_생성 in 파일 and '.pkl' in 파일 and '상세' not in 파일)
                 df_매수매도 = pd.read_pickle(os.path.join(self.folder_매수매도, s_파일명))[:0]
+
+            # 매도 전 매수 케이스 제거
+            df_매수매도 = self.make_매수매도_중복거래제거(df_매수매도=df_매수매도)
 
             # 누적 수익률 산출
             df_매수매도 = df_매수매도.loc[:, '일자': '수익률(%)']
@@ -159,20 +163,23 @@ class Analyzer:
             df_매수매도.to_csv(os.path.join(self.folder_매수매도, f'{s_파일명_생성}_{s_일자}.csv'),
                            index=False, encoding='cp949')
 
-            # df_매수신호_상세 생성 및 저장 (csv only)
+            # df_매수신호_상세 생성 및 저장
             df_매수신호_상세 = pd.concat(li_df_매수신호_상세, axis=0) if len(li_df_매수신호_상세) > 0 else pd.DataFrame()
             if len(df_매수신호_상세) == 0:
                 s_파일명 = max(파일 for 파일 in os.listdir(self.folder_매수매도)
-                            if s_파일명_생성 in 파일 and '매수상세.csv' in 파일)
+                            if s_파일명_생성 in 파일 and '매수상세.pkl' in 파일)
                 df_매수신호_상세 = pd.read_pickle(os.path.join(self.folder_매수매도, s_파일명))[:0]
+            df_매수신호_상세.to_pickle(os.path.join(self.folder_매수매도, f'{s_파일명_생성}_{s_일자}_매수상세.pkl'))
             df_매수신호_상세.to_csv(os.path.join(self.folder_매수매도, f'{s_파일명_생성}_{s_일자}_매수상세.csv'),
                               index=False, encoding='cp949')
 
+            # df_매수매도_상세 생성 및 저장
             df_매수매도_상세 = pd.concat(li_df_매수매도_상세, axis=0) if len(li_df_매수매도_상세) > 0 else pd.DataFrame()
             if len(df_매수매도_상세) == 0:
                 s_파일명 = max(파일 for 파일 in os.listdir(self.folder_매수매도)
-                            if s_파일명_생성 in 파일 and '매도상세.csv' in 파일)
+                            if s_파일명_생성 in 파일 and '매도상세.pkl' in 파일)
                 df_매수매도_상세 = pd.read_pickle(os.path.join(self.folder_매수매도, s_파일명))[:0]
+            df_매수매도_상세.to_pickle(os.path.join(self.folder_매수매도, f'{s_파일명_생성}_{s_일자}_매도상세.pkl'))
             df_매수매도_상세.to_csv(os.path.join(self.folder_매수매도, f'{s_파일명_생성}_{s_일자}_매도상세.csv'),
                               index=False, encoding='cp949')
 
@@ -187,17 +194,17 @@ class Analyzer:
 
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매수매도)
-                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and '상세' not in 파일명]
         li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_결과정리)
-                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명 and '상세' not in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
 
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
             # 전체 매수매도 파일 확인
             li_파일일자 = [re.findall(r'\d{8}', 파일)[0] for 파일 in os.listdir(self.folder_매수매도)
-                       if s_파일명_기준 in 파일 and '.pkl' in 파일]
+                       if s_파일명_기준 in 파일 and '.pkl' in 파일 and '상세' not in 파일]
             li_파일일자 = [파일일자 for 파일일자 in li_파일일자 if 파일일자 <= s_일자]
 
             # 파일별 결과 정리
@@ -395,7 +402,7 @@ class Analyzer:
             return df_매수매도
 
         # 데이터 준비
-        df_매수매도 = df_매수매도.reset_index(drop=True)
+        df_매수매도 = df_매수매도.sort_values('매수시간').reset_index(drop=True)
         df_매수매도['검증'] = True
 
         # 매도 전 매수 확인
