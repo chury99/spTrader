@@ -111,8 +111,8 @@ def make_차트(df_ohlcv, n_봉수=None):
     # 차트 정보 생성
     s_종목코드 = df_ohlcv['종목코드'].values[0]
     s_종목명 = df_ohlcv['종목명'].values[0]
-    n_봉구분 = int(
-        (pd.Timestamp(df_ohlcv['일시'][1]) - pd.Timestamp(df_ohlcv['일시'][0])).seconds / 60) if s_구분 == '분봉' else None
+    n_봉구분 = int((pd.Timestamp(df_ohlcv['일시'].values[1]) - pd.Timestamp(df_ohlcv['일시'].values[0])).seconds / 60)\
+            if s_구분 == '분봉' else None
     s_봉구분 = f'{n_봉구분}분봉' if s_구분 == '분봉' else '일봉'
 
     # 추가 데이터 생성
