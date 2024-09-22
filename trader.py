@@ -39,10 +39,12 @@ class Trader(QMainWindow, form_class):
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
         self.folder_체결잔고 = dic_폴더정보['이력|체결잔고']
         self.folder_탐색결과 = dic_폴더정보['이력|탐색결과']
+        self.folder_주문정보 = dic_폴더정보['이력|주문정보']
         self.folder_일봉변동 = dic_폴더정보['sr종목선정|10_일봉변동']
         self.folder_지지저항 = dic_폴더정보['sr종목선정|20_지지저항']
         self.folder_감시대상 = dic_폴더정보['sr종목선정|50_종목선정']
         os.makedirs(self.folder_탐색결과, exist_ok=True)
+        os.makedirs(self.folder_주문정보, exist_ok=True)
 
         # 기준정보 정의
         self.s_오늘 = pd.Timestamp('now').strftime('%Y%m%d')
@@ -82,6 +84,7 @@ class Trader(QMainWindow, form_class):
 
         self.df_계좌잔고_전체, self.df_계좌잔고_종목별 = self.api.get_tr_계좌잔고(s_계좌번호=self.s_계좌번호)
         self.flag_종목보유 = len(self.df_계좌잔고_종목별) > 0
+        self.dic_3분봉 = dict()
 
         # 실시간 설정
         # s_대상종목 = ';'.join(self.li_대상종목)
@@ -147,6 +150,7 @@ class Trader(QMainWindow, form_class):
             # 3분봉 데이터 조회 (실시간 데이터 자동 등록)
             time.sleep(0.2)
             df_3분봉 = self.api.get_tr_분봉조회(s_종목코드=s_종목코드, n_틱범위=3)
+            self.dic_3분봉[s_종목코드] = df_3분봉
             # self.api.set_실시간_종목등록(s_종목코드=s_종목코드, s_등록형태='신규')
 
             # 현재가 초기값 생성
@@ -165,6 +169,7 @@ class Trader(QMainWindow, form_class):
 
             # 매수신호 탐색
             li_매수신호 = Logic.find_매수신호(df_ohlcv=df_3분봉, li_지지저항=li_지지저항)
+            li_신호종류 = ['자리', '추세', '배열', 'sr', '시간']
             b_매수신호 = sum(li_매수신호) == len(li_매수신호)
 
             # log 기록
@@ -172,7 +177,6 @@ class Trader(QMainWindow, form_class):
             s_매수신호 = 'ok' if b_매수신호 else 'NG'
             n_반대신호 = len(li_매수신호) - sum(li_매수신호) if b_매수신호 == False else ''
             li_s_매수신호 = ['ok' if b_신호 else 'NG' for b_신호 in li_매수신호]
-            li_종류 = ['자리', '추세', '배열', 'sr', '시간']
             s_li_매수신호 = ', '.join([f'{li_종류[i]}_{li_s_매수신호[i]}' for i in range(len(li_종류))])
             self.make_log_신호(f'{s_종목명}({s_종목코드})\n'
                              f'  #{s_매수신호}-{n_반대신호}# {s_li_매수신호}')
@@ -190,6 +194,11 @@ class Trader(QMainWindow, form_class):
                                  f'\t{s_종목명}({s_종목코드}) - 현재가 {n_현재가:,}\n'
                                  f'\t단가 {n_주문단가:,}원 | 수량 {n_주문수량:,}주 | 금액 {n_주문단가 * n_주문수량:,}원\n')
 
+                # 주문정보 파일 업데이트
+                dic_주문정보 = dict(df_3분봉=df_3분봉, s_주문구분='매수', n_현재가=n_현재가,
+                                n_주문단가=n_주문단가, n_주문수량=n_주문수량, li_지지저항=li_지지저항)
+                self.update_주문정보파일(dic_주문정보=dic_주문정보)
+
                 # 계좌정보 업데이트
                 self.df_계좌잔고_전체, self.df_계좌잔고_종목별 = self.api.get_tr_계좌잔고(s_계좌번호=self.s_계좌번호)
                 self.flag_종목보유 = len(self.df_계좌잔고_종목별) > 0
@@ -200,8 +209,8 @@ class Trader(QMainWindow, form_class):
             else:
                 self.api.set_실시간_종목해제(s_종목코드=s_종목코드)
 
-            # 이력 파일 업데이트
-            dic_탐색정보 = dict(df_3분봉=df_3분봉, li_매수신호=li_매수신호, n_현재가=n_현재가,
+            # 매수탐색 파일 업데이트
+            dic_탐색정보 = dict(df_3분봉=df_3분봉, li_매수신호=li_매수신호, li_신호종류=li_신호종류, n_현재가=n_현재가,
                             n_주문단가=n_주문단가 if b_매수신호 else None, n_주문수량=n_주문수량 if b_매수신호 else None)
             self.update_매수탐색파일(dic_탐색정보=dic_탐색정보)
 
@@ -220,16 +229,23 @@ class Trader(QMainWindow, form_class):
         n_매수단가 = int(self.df_계좌잔고_종목별['매입가'].values[0])
         n_보유수량 = int(self.df_계좌잔고_종목별['보유수량'].values[0])
 
-        # 지지저항 정보 확인
-        li_지지저항 = self.dic_지지저항[s_종목코드]
-        n_지지선 = max(지지 for 지지 in li_지지저항 if 지지 < n_매수단가) if min(li_지지저항) < n_매수단가 else None
-        n_저항선 = min(저항 for 저항 in li_지지저항 if 저항 > n_매수단가) if max(li_지지저항) > n_매수단가 else None
+        # 지지저항 확인 (주문정보 확인)
+        df_주문정보 = pd.read_csv(os.path.join(self.folder_주문정보, f'매수매도주문_{self.s_오늘}.csv'), encoding='cp949')
+        df_주문정보 = df_주문정보[df_주문정보['주문구분'] == '매수']
+        df_주문정보 = df_주문정보[df_주문정보['종목코드'] == s_종목코드].sort_values('시간')
+        n_지지선 = df_주문정보['지지선'].values[-1]
+        n_저항선 = df_주문정보['저항선'].values[-1]
+
+        # 3분봉 확인 (최종 조회 이후 3분 경과 시 재조회)
+        df_3분봉 = self.dic_3분봉[s_종목코드] if s_종목코드 in self.dic_3분봉.keys()\
+                                         else self.api.get_tr_분봉조회(s_종목코드=s_종목코드, n_틱범위=3)
+        s_최종조회시간 = df_3분봉[df_3분봉['일자'] == df_3분봉['일자'].max()]['시간'].max()
+        if pd.Timestamp('now') - pd.Timestamp(s_최종조회시간) > pd.Timedelta(minutes=3):
+            df_3분봉 = self.api.get_tr_분봉조회(s_종목코드=s_종목코드, n_틱범위=3)
+        self.dic_3분봉[s_종목코드] = df_3분봉
 
         # dic_기준정보 생성
-        dic_기준정보 = dict()
-        dic_기준정보['n_매수단가'] = n_매수단가
-        dic_기준정보['n_지지선'] = n_지지선
-        dic_기준정보['n_저항선'] = n_저항선
+        dic_기준정보 = dict(df_3분봉=df_3분봉, n_매수단가=n_매수단가, n_지지선=n_지지선, n_저항선=n_저항선)
 
         # 현재가 확인 (실처리 미존재 시 tr 요청 => 현재가 확인 + 실시간 등록)
         try:
@@ -241,7 +257,7 @@ class Trader(QMainWindow, form_class):
             n_현재가 = self.api.dic_실시간_현재가[s_종목코드]
 
         # 매도신호 탐색
-        li_매도신호, n_null = Logic.find_매도신호(n_현재가=n_현재가, dic_지지저항=dic_기준정보)
+        li_매도신호, n_null = Logic.find_매도신호(n_현재가=n_현재가, dic_기준정보=dic_기준정보)
         b_매도신호 = sum(li_매도신호) > 0
 
         # log 기록
@@ -266,12 +282,17 @@ class Trader(QMainWindow, form_class):
                              f'\t단가 {n_주문단가:,}원 | 수량 {n_주문수량:,}주 | 금액 {n_주문단가 * n_주문수량:,}원\n'
                              f'\t[{s_매도신호}]')
 
+            # 주문정보 파일 업데이트
+            dic_주문정보 = dict(df_3분봉=df_3분봉, s_주문구분='매도', n_현재가=n_현재가,
+                            n_주문단가=n_주문단가, n_주문수량=n_주문수량, li_매도신호=li_매도신호, li_매도신호종류=li_종류)
+            self.update_주문정보파일(dic_주문정보=dic_주문정보)
+
             # 계좌정보 업데이트
             self.df_계좌잔고_전체, self.df_계좌잔고_종목별 = self.api.get_tr_계좌잔고(s_계좌번호=self.s_계좌번호)
             self.flag_종목보유 = len(self.df_계좌잔고_종목별) > 0
 
         # 이력 파일 업데이트
-        dic_탐색정보 = dict(s_종목코드=s_종목코드, s_종목명=s_종목명,
+        dic_탐색정보 = dict(s_종목코드=s_종목코드, s_종목명=s_종목명, n_지지선=n_지지선, n_저항선=n_저항선,
                         n_매수단가=n_매수단가, n_현재가=n_현재가, n_수익률=n_수익률, li_매도신호=li_매도신호,
                         n_주문단가=n_주문단가 if b_매도신호 else None, n_주문수량=n_주문수량 if b_매도신호 else None)
         self.update_매도탐색파일(dic_탐색정보=dic_탐색정보)
@@ -370,11 +391,50 @@ class Trader(QMainWindow, form_class):
 
         return n_주문단가
 
+    def update_주문정보파일(self, dic_주문정보):
+        """ 매수매도 주문정보 수집 후 csv 파일로 저장 """
+        # 변수 지정
+        df_3분봉 = dic_주문정보['df_3분봉'].sort_values(['일자', '시간'])
+        s_주문구분 = dic_주문정보['s_주문구분']
+        n_현재가 = dic_주문정보['n_현재가']
+        n_주문단가 = dic_주문정보['n_주문단가']
+        n_주문수량 = dic_주문정보['n_주문수량']
+        li_지지저항 = dic_주문정보['li_지지저항'] if s_주문구분 == '매수' else list()
+        li_매도신호 = dic_주문정보['li_매도신호'] if s_주문구분 == '매도' else list()
+        li_매도신호종류 = dic_주문정보['li_매도신호종류'] if s_주문구분 == '매도' else list()
+
+        # df 생성
+        df_주문정보_종목 = df_3분봉.loc[:, ['일자', '종목코드', '종목명']].copy()[-1:]
+        df_주문정보_종목['시간'] = pd.Timestamp('now').strftime('%H:%M:%S')
+        df_주문정보_종목['현재가'] = n_현재가
+        df_주문정보_종목['주문구분'] = s_주문구분
+        df_주문정보_종목['주문단가'] = n_주문단가
+        df_주문정보_종목['주문수량'] = n_주문수량
+        df_주문정보_종목['주문금액'] = n_주문단가 * n_주문수량
+
+        if s_주문구분 == '매수':
+            df_주문정보_종목['지지선'] = max(지지 for 지지 in li_지지저항 if 지지 < n_현재가) if min(li_지지저항) < n_현재가 else None
+            df_주문정보_종목['저항선'] = min(저항 for 저항 in li_지지저항 if 저항 > n_현재가) if max(li_지지저항) > n_현재가 else None
+
+        if s_주문구분 == '매도':
+            for idx in range(len(li_매도신호)):
+                df_주문정보_종목[f'매도{idx + 1}{li_매도신호종류[idx]}'] = li_매도신호[idx]
+
+        # df 업데이트
+        try:
+            df_주문정보 = pd.read_csv(os.path.join(self.folder_주문정보, f'매수매도주문_{self.s_오늘}.csv'), encoding='cp949')
+        except FileNotFoundError:
+            df_주문정보 = pd.DataFrame()
+        df_주문정보 = pd.concat([df_주문정보, df_주문정보_종목], axis=0).drop_duplicates()
+        df_주문정보.to_csv(os.path.join(self.folder_주문정보, f'매수매도주문_{self.s_오늘}.csv'),
+                       index=False, encoding='cp949')
+
     def update_매수탐색파일(self, dic_탐색정보):
         """ 매수탐색 결과 수집 후 csv 파일로 저장 """
         # 변수 지정
         df_3분봉 = dic_탐색정보['df_3분봉']
         li_매수신호 = dic_탐색정보['li_매수신호']
+        li_신호종류 = dic_탐색정보['li_신호종류']
         n_현재가 = dic_탐색정보['n_현재가']
         n_주문단가 = dic_탐색정보['n_주문단가']
         n_주문수량 = dic_탐색정보['n_주문수량']
@@ -383,8 +443,8 @@ class Trader(QMainWindow, form_class):
         df_매수탐색_종목 = df_3분봉.loc[:, ['일자', '종목코드', '종목명']].copy()[-1:]
         df_매수탐색_종목['시간'] = pd.Timestamp('now').strftime('%H:%M:%S')
         df_매수탐색_종목['매수신호'] = sum(li_매수신호) == len(li_매수신호)
-        for i in range(len(li_매수신호)):
-            df_매수탐색_종목[f'매수{i + 1}'] = li_매수신호[i]
+        for idx in range(len(li_매수신호)):
+            df_매수탐색_종목[f'매수{idx + 1}{li_신호종류[idx]}'] = li_매수신호[idx]
         df_매수탐색_종목['현재가'] = n_현재가
         df_매수탐색_종목['주문단가'] = n_주문단가
         df_매수탐색_종목['주문수량'] = n_주문수량
@@ -400,13 +460,15 @@ class Trader(QMainWindow, form_class):
                        index=False, encoding='cp949')
 
     def update_매도탐색파일(self, dic_탐색정보):
-        """ 매수탐색 결과 수집 후 csv 파일로 저장 """
+        """ 매도탐색 결과 수집 후 csv 파일로 저장 """
         # 변수 지정
         s_종목코드 = dic_탐색정보['s_종목코드']
         s_종목명 = dic_탐색정보['s_종목명']
         n_매수단가 = dic_탐색정보['n_매수단가']
         n_현재가 = dic_탐색정보['n_현재가']
         n_수익률 = dic_탐색정보['n_수익률']
+        n_지지선 = dic_탐색정보['n_지지선']
+        n_저항선 = dic_탐색정보['n_저항선']
         li_매도신호 = dic_탐색정보['li_매도신호']
         n_주문단가 = dic_탐색정보['n_주문단가']
         n_주문수량 = dic_탐색정보['n_주문수량']
@@ -420,6 +482,8 @@ class Trader(QMainWindow, form_class):
         df_매도탐색_종목['매수단가'] = n_매수단가
         df_매도탐색_종목['현재가'] = n_현재가
         df_매도탐색_종목['수익률'] = n_수익률
+        df_매도탐색_종목['지지선'] = n_지지선
+        df_매도탐색_종목['저항선'] = n_저항선
         df_매도탐색_종목['매도신호'] = sum(li_매도신호) > 0
         for i in range(len(li_매도신호)):
             df_매도탐색_종목[f'매도{i + 1}'] = li_매도신호[i]
