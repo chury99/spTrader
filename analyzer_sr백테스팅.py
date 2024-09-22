@@ -6,6 +6,7 @@ import re
 
 from tqdm import tqdm
 
+import UT_차트maker as Chart
 import analyzer_sr알고리즘 as Logic
 
 # 그래프 한글 설정
@@ -98,7 +99,8 @@ class Analyzer:
                     df_3분봉_당일 = dic_3분봉_당일[s_종목코드]
                 except KeyError:
                     continue
-                df_3분봉 = pd.concat([dic_3분봉_전일[s_종목코드], df_3분봉_당일], axis=0).sort_values(['일자', '시간'])
+                df_3분봉_전일 = dic_3분봉_전일[s_종목코드] if s_종목코드 in dic_3분봉_전일.keys() else pd.DataFrame()
+                df_3분봉 = pd.concat([df_3분봉_전일, df_3분봉_당일], axis=0).sort_values(['일자', '시간'])
                 df_1분봉 = dic_1분봉[s_종목코드]
                 df_지지저항_전일 = df_지지저항[df_지지저항['종목코드'] == s_종목코드]
 
@@ -120,10 +122,13 @@ class Analyzer:
 
                 # 차트 생성 및 저장
                 if b_차트:
+                    # 데이터 미존재 시 차트 skip
+                    if len(df_3분봉_당일) == 0:
+                        continue
+
                     # 차트 생성
-                    import UT_차트maker as chart
-                    fig = chart.make_차트(df_ohlcv=df_3분봉_당일)
-                    for n_지지저항 in df_지지저항_종목['고가'].values:
+                    fig = Chart.make_차트(df_ohlcv=df_3분봉_당일)
+                    for n_지지저항 in df_매수신호_상세_종목['지지저항'].values[-1]:
                         fig.axes[0].axhline(n_지지저항)
 
                     # 매수매도 표시 (매수는 ^, 매도는 v)
@@ -358,9 +363,11 @@ class Analyzer:
                 n_종가 = df_1분봉_시점['종가'].values[0]
 
                 # 매도신호 생성
-                dic_기준정보 = {'df_3분봉': df_3분봉_시점, 's_현재시간': s_시간,
-                            'n_매수단가': n_매수단가, 'n_지지선': n_지지선, 'n_저항선': n_저항선,
-                            'n_시가': n_시가, 'n_고가': n_고가, 'n_저가': n_저가, 'n_종가': n_종가}
+                # dic_기준정보 = {'df_3분봉': df_3분봉_시점, 's_현재시간': s_시간,
+                #             'n_매수단가': n_매수단가, 'n_지지선': n_지지선, 'n_저항선': n_저항선,
+                #             'n_시가': n_시가, 'n_고가': n_고가, 'n_저가': n_저가, 'n_종가': n_종가}
+                dic_기준정보 = dict(df_3분봉=df_3분봉_시점, n_매수단가=n_매수단가, n_지지선=n_지지선, n_저항선=n_저항선,
+                                s_현재시간=s_시간, n_시가=n_시가, n_고가=n_고가, n_저가=n_저가, n_종가=n_종가)
                 li_매도신호, n_매도단가 = Logic.find_매도신호(n_현재가=None, dic_기준정보=dic_기준정보)
                 li_신호종류 = ['저항터치', '지지붕괴', '추세이탈', '하락한계', '장종료']
 
@@ -559,6 +566,5 @@ class Analyzer:
 #######################################################################################################################
 if __name__ == "__main__":
     a = Analyzer(n_분석일수=None)
-
-    a.검증_매수매도(b_차트=False)
+    a.검증_매수매도(b_차트=True)
     a.검증_결과정리(b_카톡=False)
