@@ -126,11 +126,19 @@ class Analyzer:
             # 대상종목 불러오기
             df_일봉변동 = pd.read_pickle(os.path.join(self.folder_일봉변동, f'{s_파일명_기준}_{s_일자}.pkl'))
 
-            # 3분봉 읽어오기 (5일치)
+            # 일봉 불러오기 (1년치)
+            li_대상월 = [re.findall(r'\d{6}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
+                      if 'dic_코드별_일봉_' in 파일명 and '.pkl' in 파일명]
+            li_대상월 = sorted([대상월 for 대상월 in li_대상월 if 대상월 <= s_일자[:6]])[-13:]
+            dic_일봉_대상월 = dict()
+            for s_대상월 in li_대상월:
+                dic_일봉_대상월[s_대상월] = pd.read_pickle(os.path.join(self.folder_캐시변환,
+                                                                 f'dic_코드별_일봉_{s_대상월}.pkl'))
+
+            # 3분봉 읽어오기 (10일치)
             li_대상일 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
                       if 'dic_코드별_3분봉_' in 파일명 and '.pkl' in 파일명]
-            li_대상일 = sorted([대상일 for 대상일 in li_대상일 if 대상일 <= s_일자])
-            li_대상일 = li_대상일[-5:]
+            li_대상일 = sorted([대상일 for 대상일 in li_대상일 if 대상일 <= s_일자])[-10:]
             dic_3분봉_대상일 = dict()
             for s_대상일 in li_대상일:
                 dic_3분봉_대상일[s_대상일] = pd.read_pickle(os.path.join(self.folder_캐시변환,
@@ -139,20 +147,26 @@ class Analyzer:
             # 종목별 지지저항 찾기
             li_df_지지저항 = list()
             for s_종목코드 in tqdm(df_일봉변동['종목코드'].values, desc=f'종목별 지지저항 분석|{s_일자}'):
+                # 일봉 정리
+                li_df_일봉 = [dic_일봉_대상월[s_대상월][s_종목코드] if s_종목코드 in dic_일봉_대상월[s_대상월].keys()
+                             else pd.DataFrame() for s_대상월 in li_대상월]
+                df_일봉 = pd.concat(li_df_일봉, axis=0).sort_values('일자')
+
                 # 3분봉 정리
                 li_df_3분봉 = [dic_3분봉_대상일[s_대상일][s_종목코드] if s_종목코드 in dic_3분봉_대상일[s_대상일].keys()
                              else pd.DataFrame() for s_대상일 in li_대상일]
-                df_3분봉 = pd.concat(li_df_3분봉, axis=0).sort_index()
+                df_3분봉 = pd.concat(li_df_3분봉, axis=0).sort_values(['일자', '시간'])
 
-                # 추가 데이터 생성
-                df_3분봉 = Chart.find_전일종가(df_ohlcv=df_3분봉)
-                df_3분봉 = Chart.make_이동평균(df_ohlcv=df_3분봉)
+                # 지지저항 값 생성 (거래량 기준 + 피크값 기준), 분봉 + 일봉
+                li_df_지지저항_종목 = list()
+                li_df_지지저항_종목.append(Logic.find_지지저항_거래량(df_ohlcv=df_3분봉, n_윈도우=20))
+                li_df_지지저항_종목.append(Logic.find_지지저항_피크값(df_ohlcv=df_3분봉))
+                li_df_지지저항_종목.append(Logic.find_지지저항_거래량(df_ohlcv=df_일봉, n_윈도우=20))
+                li_df_지지저항_종목.append(Logic.find_지지저항_피크값(df_ohlcv=df_일봉))
 
-                # 지지저항 값 생성 (거래량 기준 + 피크값 기준)
-                df_지지저항_종목_거래량 = Logic.find_지지저항_거래량(df_ohlcv=df_3분봉, n_윈도우=120)
-                df_지지저항_종목_피크값 = Logic.find_지지저항_피크값(df_ohlcv=df_3분봉)
-                df_지지저항_종목 = pd.concat([df_지지저항_종목_거래량, df_지지저항_종목_피크값], axis=0)
-                df_지지저항_종목 = Logic.find_지지저항_라인통합(df_지지저항=df_지지저항_종목, n_퍼센트범위=1.5)
+                # 지지저항 값 통합
+                df_지지저항_종목 = pd.concat(li_df_지지저항_종목, axis=0)
+                df_지지저항_종목 = Logic.find_지지저항_라인통합(df_지지저항=df_지지저항_종목, n_퍼센트범위=5)
                 li_df_지지저항.append(df_지지저항_종목)
 
                 # 차트 생성 및 저장
@@ -219,7 +233,8 @@ class Analyzer:
                     df_3분봉_당일 = dic_3분봉_당일[s_종목코드]
                 except KeyError:
                     continue
-                df_3분봉 = pd.concat([dic_3분봉_전일[s_종목코드], df_3분봉_당일], axis=0).sort_values(['일자', '시간'])
+                df_3분봉_전일 = dic_3분봉_전일[s_종목코드] if s_종목코드 in dic_3분봉_전일.keys() else pd.DataFrame()
+                df_3분봉 = pd.concat([df_3분봉_전일, df_3분봉_당일], axis=0).sort_values(['일자', '시간'])
                 df_지지저항_종목 = df_지지저항[df_지지저항['종목코드'] == s_종목코드]
 
                 # 매수신호 탐색
@@ -232,6 +247,10 @@ class Analyzer:
 
                 # 차트 생성 및 저장
                 if b_차트:
+                    # 데이터 미존재 시 차트 skip
+                    if len(df_매수신호_상세_종목) == 0:
+                        continue
+
                     # 차트 생성
                     fig = Chart.make_차트(df_ohlcv=df_매수신호_상세_종목)
                     for n_지지저항 in df_매수신호_상세_종목['지지저항'].values[-1]:
@@ -307,7 +326,8 @@ class Analyzer:
                     df_3분봉_당일 = dic_3분봉_당일[s_종목코드]
                 except KeyError:
                     continue
-                df_3분봉 = pd.concat([dic_3분봉_전일[s_종목코드], df_3분봉_당일], axis=0).sort_values(['일자', '시간'])
+                df_3분봉_전일 = dic_3분봉_전일[s_종목코드] if s_종목코드 in dic_3분봉_전일.keys() else pd.DataFrame()
+                df_3분봉 = pd.concat([df_3분봉_전일, df_3분봉_당일], axis=0).sort_values(['일자', '시간'])
                 df_1분봉 = dic_1분봉[s_종목코드]
                 df_지지저항_종목 = df_지지저항[df_지지저항['종목코드'] == s_종목코드]
                 df_매수신호_종목 = df_매수신호[df_매수신호['종목코드'] == s_종목코드]
@@ -325,6 +345,10 @@ class Analyzer:
 
                 # 차트 생성 및 저장
                 if b_차트:
+                    # 데이터 미존재 시 차트 skip
+                    if len(df_1분봉) == 0:
+                        continue
+
                     # 차트 생성
                     fig = Chart.make_차트(df_ohlcv=df_1분봉)
                     for n_지지저항 in df_매수매도_상세_종목['지지저항'].values[-1]:
@@ -404,9 +428,12 @@ class Analyzer:
 
                 # 차트 생성 및 저장
                 if b_차트:
+                    # 데이터 미존재 시 차트 skip
+                    if len(df_1분봉) == 0:
+                        continue
+
                     # 차트 생성
-                    import UT_차트maker as chart
-                    fig = chart.make_차트(df_ohlcv=df_1분봉)
+                    fig = Chart.make_차트(df_ohlcv=df_1분봉)
                     for n_지지저항 in li_지지저항:
                         fig.axes[0].axhline(n_지지저항)
 
