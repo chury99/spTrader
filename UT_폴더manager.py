@@ -20,6 +20,7 @@ dic_폴더정보['이력|메세지'] = os.path.join(folder_이력, '메세지')
 dic_폴더정보['이력|실시간'] = os.path.join(folder_이력, '실시간')
 dic_폴더정보['이력|체결잔고'] = os.path.join(folder_이력, '체결잔고')
 dic_폴더정보['이력|탐색결과'] = os.path.join(folder_이력, '탐색결과')
+dic_폴더정보['이력|주문정보'] = os.path.join(folder_이력, '주문정보')
 
 # 데이터 폴더 정의
 folder_데이터 = os.path.join(folder_work, 'collector_데이터')
