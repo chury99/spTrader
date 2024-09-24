@@ -136,6 +136,7 @@ def make_차트(df_ohlcv, n_봉수=None):
     ax_캔들.plot(ary_x, df_ohlcv['종가ma20'], lw=2, color=dic_색상['주황'], label='ma20', alpha=0.5)
     ax_캔들.plot(ary_x, df_ohlcv['종가ma60'], lw=0.5, color=dic_색상['녹색'], label='ma60')
     ax_캔들.plot(ary_x, df_ohlcv['종가ma120'], lw=2, color='black', label='ma120', alpha=0.5)
+    ax_캔들.set_ylim(df_ohlcv['저가'].min() * 0.98, df_ohlcv['고가'].max() * 1.02)
 
     # 거래량 차트 생성
     ax_거래량.bar(ary_x, df_ohlcv['거래량'], width=0.8, color=li_색상_거래량)
