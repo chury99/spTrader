@@ -159,9 +159,11 @@ class Analyzer:
             df_매수매도 = self.make_매수매도_중복거래제거(df_매수매도=df_매수매도)
 
             # 누적 수익률 산출
-            df_매수매도 = df_매수매도.loc[:, '일자': '수익률(%)']
             df_매수매도 = df_매수매도.sort_values('매수시간')
-            df_매수매도['누적수익(%)'] = (1 + df_매수매도['수익률(%)'] / 100).cumprod() * 100
+            df_매수매도1 = df_매수매도.loc[:, '일자': '수익률(%)'].copy()
+            df_매수매도2 = df_매수매도.loc[:, '지지선': '매도5장종료'].copy()
+            df_매수매도1['누적수익(%)'] = (1 + df_매수매도1['수익률(%)'] / 100).cumprod() * 100
+            df_매수매도 = pd.concat([df_매수매도1, df_매수매도2], axis=1)
 
             # df 저장
             df_매수매도.to_pickle(os.path.join(self.folder_매수매도, f'{s_파일명_생성}_{s_일자}.pkl'))
@@ -224,6 +226,10 @@ class Analyzer:
                 df_결과정리_일별['수익거래'] = int(len(df_매수매도[df_매수매도['수익률(%)'] > 0]))
                 df_결과정리_일별['성공률(%)'] = (df_결과정리_일별['수익거래'] / df_결과정리_일별['전체거래']) * 100
                 df_결과정리_일별['수익률(%)'] = df_매수매도['누적수익(%)'].values[-1] - 100 if len(df_매수매도) > 0 else None
+                li_컬럼명_매도 = [컬럼 for 컬럼 in df_매수매도.columns if '매도' in 컬럼
+                             and '매도시간' not in 컬럼 and '매도단가' not in 컬럼]
+                for s_컬럼명 in li_컬럼명_매도:
+                    df_결과정리_일별[s_컬럼명] = sum(df_매수매도[s_컬럼명])
                 li_df_결과정리.append(df_결과정리_일별)
 
             # df_결과정리 생성
@@ -310,7 +316,8 @@ class Analyzer:
             li_지지저항 = list(df_지지저항_시점['고가'].values)
 
             # 매수신호 생성
-            li_매수신호 = Logic.find_매수신호(df_ohlcv=df_3분봉_시점, li_지지저항=li_지지저항, dt_일자시간=dt_일자시간)
+            ret_매수신호 = Logic.find_매수신호(df_ohlcv=df_3분봉_시점, li_지지저항=li_지지저항, dt_일자시간=dt_일자시간)
+            li_매수신호, dic_신호상세 = ret_매수신호
             li_신호종류 = ['자리', '추세', '배열', 'sr', '시간']
 
             # 결과 정리
@@ -321,13 +328,20 @@ class Analyzer:
                 df_매수신호_시점[f'매수{idx + 1}{li_신호종류[idx]}'] = li_매수신호[idx]
             df_매수신호_시점['매수시간'] = s_시간 if b_매수신호 else None
             df_매수신호_시점['매수단가'] = int(df_3분봉_시점['시가'].values[-1]) if b_매수신호 else None
+            df_매수신호_시점['지지선'] = dic_신호상세['n_지지선']
+            df_매수신호_시점['저항선'] = dic_신호상세['n_저항선']
             df_매수신호_시점['지지저항'] = [li_지지저항]
+
+            # 신호상세 추가
+            df_매수신호_시점 = df_매수신호_시점.reset_index()
+            df_신호상세 = pd.DataFrame([dic_신호상세.values()], columns=dic_신호상세.keys())
+            df_매수신호_시점 = pd.concat([df_매수신호_시점, df_신호상세], axis=1)
             li_df_매수신호.append(df_매수신호_시점)
 
         # df_매수신호 생성
         df_매수신호_상세 = pd.concat(li_df_매수신호, axis=0)
-        df_매수신호 = df_매수신호_상세[df_매수신호_상세['매수신호']].copy()
-        df_매수신호 = df_매수신호.loc[:, ['일자', '종목코드', '종목명', '매수시간', '매수단가', '지지저항']]
+        df_매수신호 = df_매수신호_상세[df_매수신호_상세['매수신호']].copy().reset_index()
+        df_매수신호 = df_매수신호.loc[:, ['일자', '종목코드', '종목명', '매수시간', '매수단가', '지지선', '저항선', '지지저항']]
 
         return df_매수신호, df_매수신호_상세
 
@@ -342,20 +356,21 @@ class Analyzer:
 
         # 매도신호 탐색
         li_df_매수매도 = list()
-        for i in df_매수신호.index:
+        for i in range(len(df_매수신호)):
             # 기준정보 생성
-            s_매수시간 = df_매수신호.loc[i, '매수시간']
-            n_매수단가 = df_매수신호.loc[i, '매수단가']
-            li_지지저항 = df_매수신호.loc[i, '지지저항']
-            n_지지선 = max(지지 for 지지 in li_지지저항 if 지지 < n_매수단가) if min(li_지지저항) < n_매수단가 else None
-            n_저항선 = min(저항 for 저항 in li_지지저항 if 저항 > n_매수단가) if max(li_지지저항) > n_매수단가 else None
+            df_매수신호_시점 = df_매수신호[i: i + 1]
+            s_매수시간 = df_매수신호_시점['매수시간'].values[0]
+            n_매수단가 = df_매수신호_시점['매수단가'].values[0]
+            li_지지저항 = df_매수신호_시점['지지저항'].values[0]
+            n_지지선 = df_매수신호_시점['지지선'].values[0]
+            n_저항선 = df_매수신호_시점['저항선'].values[0]
             li_시간 = [시간 for 시간 in df_1분봉['시간'] if 시간 >= s_매수시간]
 
             # 시간별 매도신호 탐색 (1분봉)
             for s_시간 in li_시간:
                 # 기준정보 생성
                 dt_일자시간 = pd.Timestamp(f'{s_일자} {s_시간}')
-                df_3분봉_시점 = df_3분봉[df_3분봉.index < dt_일자시간]
+                df_3분봉_시점 = df_3분봉[df_3분봉.index <= dt_일자시간]
                 df_1분봉_시점 = df_1분봉[df_1분봉.index == dt_일자시간]
                 n_시가 = df_1분봉_시점['시가'].values[0]
                 n_고가 = df_1분봉_시점['고가'].values[0]
@@ -365,7 +380,9 @@ class Analyzer:
                 # 매도신호 생성
                 dic_기준정보 = dict(df_3분봉=df_3분봉_시점, n_매수단가=n_매수단가, n_지지선=n_지지선, n_저항선=n_저항선,
                                 s_현재시간=s_시간, n_시가=n_시가, n_고가=n_고가, n_저가=n_저가, n_종가=n_종가)
-                li_매도신호, n_매도단가 = Logic.find_매도신호(dic_기준정보=dic_기준정보, n_현재가=None)
+                ret_매도신호 = Logic.find_매도신호(dic_기준정보=dic_기준정보, n_현재가=None)
+                li_매도신호, dic_신호상세 = ret_매도신호
+                n_매도단가 = dic_신호상세['n_매도단가']
                 li_신호종류 = ['저항터치', '지지붕괴', '추세이탈', '하락한계', '장종료']
 
                 # 결과 정리 (수익률 산출 시 세금 0.2% 반영)
@@ -377,10 +394,17 @@ class Analyzer:
                 df_매수매도_시점['매도단가'] = n_매도단가 if b_매도신호 else None
                 df_매수매도_시점['수익률(%)'] = n_매도단가 / n_매수단가 - 1 if b_매도신호 else n_종가 / n_매수단가 - 1
                 df_매수매도_시점['수익률(%)'] = df_매수매도_시점['수익률(%)'] * 100 - 0.2
+                df_매수매도_시점['지지선'] = n_지지선
+                df_매수매도_시점['저항선'] = n_저항선
                 df_매수매도_시점['매도신호'] = b_매도신호
                 for idx in range(len(li_매도신호)):
                     df_매수매도_시점[f'매도{idx + 1}{li_신호종류[idx]}'] = li_매도신호[idx]
                 df_매수매도_시점['지지저항'] = [li_지지저항]
+
+                # 신호상세 추가
+                df_매수매도_시점 = df_매수매도_시점.reset_index()
+                df_신호상세 = pd.DataFrame([dic_신호상세.values()], columns=dic_신호상세.keys())
+                df_매수매도_시점 = pd.concat([df_매수매도_시점, df_신호상세], axis=1)
                 li_df_매수매도.append(df_매수매도_시점)
 
                 # 매도 시 1분봉 탐색 종료
@@ -391,9 +415,9 @@ class Analyzer:
         df_매수매도, df_매수매도_상세 = pd.DataFrame(), pd.DataFrame()
         if len(li_df_매수매도) > 0:
             df_매수매도_상세 = pd.concat(li_df_매수매도, axis=0)
-            df_매수매도 = df_매수매도_상세[df_매수매도_상세['매도신호']].copy()
+            df_매수매도 = df_매수매도_상세[df_매수매도_상세['매도신호']].copy().reset_index()
             df_매수매도 = df_매수매도.loc[:, ['일자', '종목코드', '종목명',
-                                      '매수시간', '매수단가', '매도시간', '매도단가', '수익률(%)',
+                                      '매수시간', '매수단가', '매도시간', '매도단가', '수익률(%)', '지지선', '저항선',
                                       '매도1저항터치', '매도2지지붕괴', '매도3추세이탈', '매도4하락한계', '매도5장종료']]
 
         return df_매수매도, df_매수매도_상세
@@ -519,7 +543,7 @@ class Analyzer:
         ax_수익률_일별.axhline(-10, color='C0', alpha=0)
 
         # 월별 상세정보
-        df_결과정리['년월'] = df_결과정리['일자'].apply(lambda x: f'{x[2:4]}-{x[4:6]}')
+        df_결과정리['년월'] = df_결과정리['일자'].apply(lambda x: f'{x[2:4]}.{x[4:6]}')
         df_gr = df_결과정리.groupby('년월')
         df_테이블_월별 = pd.DataFrame()
         df_테이블_월별['년월'] = df_gr['년월'].first()
@@ -529,7 +553,7 @@ class Analyzer:
         df_테이블_월별['수익률(%)'] = [((1 + df_gr.get_group(년월)['수익률(%)'] / 100).cumprod() * 100).values[-1]
                                for 년월 in df_gr.groups.keys()]
         df_테이블_월별['수익률(%)'] = df_테이블_월별['수익률(%)'].apply(lambda x: f'{x:.1f}')
-        df_월별 = df_테이블_월별[-10:].T
+        df_월별 = df_테이블_월별[-13:].T
 
         ax_상세_백테스팅_월별.set_title(f'[ 상세정보 - 백테스팅 (월별) ]')
         ax_상세_백테스팅_월별.axis('tight')
