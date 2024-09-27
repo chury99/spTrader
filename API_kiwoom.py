@@ -664,6 +664,7 @@ class KiwoomAPI(QAxWidget):
         for s_항목 in dic_FID목록.keys():
             dic_체결잔고[s_항목] = [self._get_chejan_data(dic_FID목록[s_항목])]
         df_체결잔고 = pd.DataFrame(dic_체결잔고)
+        df_체결잔고['주문구분'] = df_체결잔고['주문구분'].apply(lambda x: x[1:])
 
         # df 정리
         self.df_체결잔고 = pd.concat([self.df_체결잔고, df_체결잔고], axis=0)
