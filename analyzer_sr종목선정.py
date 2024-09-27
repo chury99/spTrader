@@ -48,7 +48,7 @@ class Analyzer:
         # log 기록
         self.make_log(f'### 종목 선정 시작 ###')
 
-    def 분석_일봉변동(self):
+    def 분석_일봉변동(self, b_차트):
         """ 분석대상종목 기준으로 일봉 분석해서 거래량 변동 발생 종목 선정 후 pkl, csv 저장 \n
                     # 선정기준 : 최근 20일 z-score +3 초과 & 거래대금 100억 초과 되는 종목 """
         # 파일명 정의
@@ -66,15 +66,19 @@ class Analyzer:
 
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
-            # 일봉 데이터 불러오기 (from 캐시변환, 20일분)
+            # 일봉 불러오기 (1년치)
             s_금월 = s_일자[:6]
-            s_전월 = (pd.Timestamp(s_일자) - pd.DateOffset(months=1)).strftime('%Y%m')
-            dic_일봉_금월 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_일봉_{s_금월}.pkl'))
-            dic_일봉_전월 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_일봉_{s_전월}.pkl'))
+            li_대상월 = [re.findall(r'\d{6}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
+                      if 'dic_코드별_일봉_' in 파일명 and '.pkl' in 파일명]
+            li_대상월 = sorted([대상월 for 대상월 in li_대상월 if 대상월 <= s_금월])[-13:]
+            dic_일봉_대상월 = dict()
+            for s_대상월 in li_대상월:
+                dic_일봉_대상월[s_대상월] = pd.read_pickle(os.path.join(self.folder_캐시변환,
+                                                                f'dic_코드별_일봉_{s_대상월}.pkl'))
 
             # 종목별 거래량 변동 확인
             li_df_일봉변동 = list()
-            for s_종목코드 in tqdm(dic_일봉_금월.keys(), desc=f'일봉 변동 분석|{s_일자}'):
+            for s_종목코드 in tqdm(dic_일봉_대상월[s_금월].keys(), desc=f'일봉 변동 분석|{s_일자}'):
                 # 분석대상 종목 확인 (키움 조건식 연계) => dic_분석대상 쌓기 시작한 지 얼마 안돼서 과거 데이터 예외처리 적용
                 try:
                     dic_조건검색 = pd.read_pickle(os.path.join(self.folder_분석대상, f'dic_조건검색_{s_일자}.pkl'))
@@ -84,17 +88,27 @@ class Analyzer:
                 except FileNotFoundError:
                     pass
 
-                # 일봉 불러오기
-                li_df_일봉 = [dic_일봉_금월[s_종목코드], dic_일봉_전월[s_종목코드] if s_종목코드 in dic_일봉_전월.keys()
-                else pd.DataFrame()]
-                df_일봉 = pd.concat(li_df_일봉, axis=0).sort_values('일자').reset_index(drop=True)
+                # 일봉 정리
+                li_df_일봉 = [dic_일봉_대상월[대상월][s_종목코드] if s_종목코드 in dic_일봉_대상월[대상월].keys()
+                            else pd.DataFrame() for 대상월 in li_대상월]
+                df_일봉 = pd.concat(li_df_일봉, axis=0).sort_values('일자')
                 df_일봉 = df_일봉[df_일봉['일자'] <= s_일자]
 
                 # 일봉변동 확인
-                df_일봉변동_종목 = Logic.find_일봉변동_거래량(df_일봉=df_일봉, n_윈도우=20, n_z값=3)
+                df_일봉변동_종목 = Logic.find_일봉변동_거래량(df_일봉=df_일봉, n_윈도우=120, n_z값=3)
 
                 # 종목 결과 list 입력
                 li_df_일봉변동.append(df_일봉변동_종목)
+
+                # 차트 생성 및 저장
+                if b_차트 and len(df_일봉변동_종목) > 0:
+                    # 차트 생성
+                    fig = Chart.make_차트(df_ohlcv=df_일봉, n_봉수=20 * 3)
+
+                    # 차트 저장
+                    folder_그래프 = os.path.join(self.folder_일봉변동, '그래프', f'일봉변동_{s_일자}')
+                    os.makedirs(folder_그래프, exist_ok=True)
+                    fig.savefig(os.path.join(folder_그래프, f'일봉변동_{s_종목코드}_{s_일자}.png'))
 
             # 일봉 변동 종목 df 생성
             df_일봉변동 = pd.concat(li_df_일봉변동, axis=0).reset_index(drop=True)
@@ -172,7 +186,7 @@ class Analyzer:
                 # 차트 생성 및 저장
                 if b_차트:
                     # 차트 생성
-                    fig = chart.make_차트(df_ohlcv=df_3분봉, n_봉수=128 * 2)
+                    fig = Chart.make_차트(df_ohlcv=df_3분봉, n_봉수=128 * 2)
                     for n_지지저항 in df_지지저항_종목['고가'].values:
                         fig.axes[0].axhline(n_지지저항)
 
@@ -495,7 +509,7 @@ class Analyzer:
 if __name__ == "__main__":
     a = Analyzer(n_분석일수=None)
 
-    a.분석_일봉변동()
+    a.분석_일봉변동(b_차트=True)
     a.분석_지지저항(b_차트=False)
     a.분석_매수신호(b_차트=False)
     a.분석_매도신호(b_차트=False)
