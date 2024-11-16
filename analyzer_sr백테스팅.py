@@ -300,7 +300,8 @@ class Analyzer:
         df_3분봉 = df_3분봉.set_index('일자시간').sort_index()
 
         # 지지저항 준비
-        df_지지저항 = Logic.find_지지저항_추가통합(df_지지저항_기존=df_지지저항_전일, df_ohlcv_신규=df_3분봉)
+        # df_지지저항 = Logic.find_지지저항_추가통합(df_지지저항_기존=df_지지저항_전일, df_ohlcv_신규=df_3분봉)
+        df_지지저항 = df_지지저항_전일
 
         # 추가 데이터 준비
         s_일자 = df_3분봉['일자'].max()
@@ -328,8 +329,9 @@ class Analyzer:
                 df_매수신호_시점[f'매수{idx + 1}{li_신호종류[idx]}'] = li_매수신호[idx]
             df_매수신호_시점['매수시간'] = s_시간 if b_매수신호 else None
             df_매수신호_시점['매수단가'] = int(df_3분봉_시점['시가'].values[-1]) if b_매수신호 else None
-            df_매수신호_시점['지지선'] = dic_신호상세['n_지지선']
-            df_매수신호_시점['저항선'] = dic_신호상세['n_저항선']
+            df_매수신호_시점['지지선'] = dic_신호상세['n_지지선'] if 'n_지지선' in dic_신호상세.keys() else None
+            df_매수신호_시점['저항선'] = dic_신호상세['n_저항선'] if 'n_저항선' in dic_신호상세.keys() else None
+            df_매수신호_시점['저가_1_매수'] = dic_신호상세['n_저가_1_매수'] if 'n_저가_1_매수' in dic_신호상세.keys() else None
             df_매수신호_시점['지지저항'] = [li_지지저항]
 
             # 신호상세 추가
@@ -341,7 +343,8 @@ class Analyzer:
         # df_매수신호 생성
         df_매수신호_상세 = pd.concat(li_df_매수신호, axis=0)
         df_매수신호 = df_매수신호_상세[df_매수신호_상세['매수신호']].copy().reset_index()
-        df_매수신호 = df_매수신호.loc[:, ['일자', '종목코드', '종목명', '매수시간', '매수단가', '지지선', '저항선', '지지저항']]
+        df_매수신호 = df_매수신호.loc[:, ['일자', '종목코드', '종목명', '매수시간', '매수단가', '지지선', '저항선', '지지저항',
+                                  '저가_1_매수']]
 
         return df_매수신호, df_매수신호_상세
 
@@ -364,6 +367,7 @@ class Analyzer:
             li_지지저항 = df_매수신호_시점['지지저항'].values[0]
             n_지지선 = df_매수신호_시점['지지선'].values[0]
             n_저항선 = df_매수신호_시점['저항선'].values[0]
+            n_저가_1_매수 = df_매수신호_시점['저가_1_매수'].values[0]
             li_시간 = [시간 for 시간 in df_1분봉['시간'] if 시간 >= s_매수시간]
 
             # 시간별 매도신호 탐색 (1분봉)
@@ -379,6 +383,7 @@ class Analyzer:
 
                 # 매도신호 생성
                 dic_기준정보 = dict(df_3분봉=df_3분봉_시점, n_매수단가=n_매수단가, n_지지선=n_지지선, n_저항선=n_저항선,
+                                n_저가_1_매수=n_저가_1_매수,
                                 s_현재시간=s_시간, n_시가=n_시가, n_고가=n_고가, n_저가=n_저가, n_종가=n_종가)
                 ret_매도신호 = Logic.find_매도신호(dic_기준정보=dic_기준정보, n_현재가=None)
                 li_매도신호, dic_신호상세 = ret_매도신호
@@ -396,6 +401,7 @@ class Analyzer:
                 df_매수매도_시점['수익률(%)'] = df_매수매도_시점['수익률(%)'] * 100 - 0.2
                 df_매수매도_시점['지지선'] = n_지지선
                 df_매수매도_시점['저항선'] = n_저항선
+                df_매수매도_시점['저가_1_매수'] = n_저가_1_매수
                 df_매수매도_시점['매도신호'] = b_매도신호
                 for idx in range(len(li_매도신호)):
                     df_매수매도_시점[f'매도{idx + 1}{li_신호종류[idx]}'] = li_매도신호[idx]
@@ -418,6 +424,7 @@ class Analyzer:
             df_매수매도 = df_매수매도_상세[df_매수매도_상세['매도신호']].copy().reset_index()
             df_매수매도 = df_매수매도.loc[:, ['일자', '종목코드', '종목명',
                                       '매수시간', '매수단가', '매도시간', '매도단가', '수익률(%)', '지지선', '저항선',
+                                      '저가_1_매수',
                                       '매도1저항터치', '매도2지지붕괴', '매도3추세이탈', '매도4하락한계', '매도5장종료']]
 
         return df_매수매도, df_매수매도_상세
@@ -452,16 +459,18 @@ class Analyzer:
         s_일자 = df_결과정리['일자'].max()
 
         # 그래프 설정
-        fig = plt.figure(figsize=[16, 20])
+        fig = plt.figure(figsize=[16, 24])
         fig.suptitle(f'백테스팅 리포트 ({s_일자})', fontsize=16)
         ax_감시대상_일별 = fig.add_subplot(6, 2, 1)
         ax_상승예측_일별 = fig.add_subplot(6, 2, 2)
         ax_성공률_누적 = fig.add_subplot(6, 2, 3)
-        ax_성공률_일별 = fig.add_subplot(6, 2, 4)
-        ax_수익률_누적 = fig.add_subplot(6, 2, 5)
-        ax_수익률_일별 = fig.add_subplot(6, 2, 6)
-        ax_상세_학습정보_월별 = fig.add_subplot(6, 2, 7)
-        ax_상세_학습정보_일별 = fig.add_subplot(6, 2, 8)
+        # ax_성공률_일별 = fig.add_subplot(6, 2, 4)
+        ax_수익률_누적 = fig.add_subplot(6, 2, 4)
+        # ax_수익률_일별 = fig.add_subplot(6, 2, 6)
+        ax_성공률_상세 = fig.add_subplot(6, 2, (5, 6))
+        ax_수익률_상세 = fig.add_subplot(6, 2, (7, 8))
+        # ax_상세_학습정보_월별 = fig.add_subplot(6, 2, 7)
+        # ax_상세_학습정보_일별 = fig.add_subplot(6, 2, 8)
         ax_상세_백테스팅_월별 = fig.add_subplot(6, 2, 9)
         ax_상세_백테스팅_일별 = fig.add_subplot(6, 2, 10)
         ax_상세_매매실적_월별 = fig.add_subplot(6, 2, 11)
@@ -495,26 +504,26 @@ class Analyzer:
         # 누적 예측 성공률
         df_결과정리['성공률_누적'] = df_결과정리['수익거래'].cumsum() / df_결과정리['전체거래'].cumsum() * 100
         ary_x, ary_y = df_결과정리['일자'].values, df_결과정리['성공률_누적'].values
-        
+
         ax_성공률_누적.set_title(f'[ 성공률 (%, 누적, 일별) ]')
         ax_성공률_누적.plot(ary_x, ary_y)
         ax_성공률_누적.set_xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
         ax_성공률_누적.set_yticks(range(0, 101, 20))
         ax_성공률_누적.grid(linestyle='--', alpha=0.5)
         ax_성공률_누적.axhline(100, color='C0', alpha=0)
-        ax_성공률_누적.axhline(70, color='C1')
+        ax_성공률_누적.axhline(50, color='C1')
 
-        # 일별 예측 성공률
-        ary_x, ary_y = df_결과정리['일자'].values, df_결과정리['성공률(%)'].values
-        li_색깔 = ['C0' if 성공률 > 70 else 'C3' for 성공률 in ary_y]
-
-        ax_성공률_일별.set_title(f'[ 성공률 (%, 당일, 일별) ]')
-        ax_성공률_일별.bar(ary_x, ary_y, color=li_색깔)
-        ax_성공률_일별.set_xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
-        ax_성공률_일별.set_yticks(range(0, 101, 20))
-        ax_성공률_일별.grid(linestyle='--', alpha=0.5)
-        ax_성공률_일별.axhline(100, color='C0', alpha=0)
-        ax_성공률_일별.axhline(70, color='C1')
+        # # 일별 예측 성공률
+        # ary_x, ary_y = df_결과정리['일자'].values, df_결과정리['성공률(%)'].values
+        # li_색깔 = ['C0' if 성공률 > 70 else 'C3' for 성공률 in ary_y]
+        #
+        # ax_성공률_일별.set_title(f'[ 성공률 (%, 당일, 일별) ]')
+        # ax_성공률_일별.bar(ary_x, ary_y, color=li_색깔)
+        # ax_성공률_일별.set_xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        # ax_성공률_일별.set_yticks(range(0, 101, 20))
+        # ax_성공률_일별.grid(linestyle='--', alpha=0.5)
+        # ax_성공률_일별.axhline(100, color='C0', alpha=0)
+        # ax_성공률_일별.axhline(70, color='C1')
 
         # 누적 수익률
         df_결과정리['수익률(%)'] = df_결과정리['수익률(%)'].apply(lambda x: 0 if pd.isna(x) else x)
@@ -529,18 +538,75 @@ class Analyzer:
         ax_수익률_누적.axhline(100, color='C1')
         ax_수익률_누적.axhline(40, color='C0', alpha=0)
 
-        # 일별 수익률
-        ary_x, ary_y = df_결과정리['일자'].values, df_결과정리['수익률(%)'].values
-        li_색깔 = ['C0' if 수익률 > 0 else 'C3' for 수익률 in ary_y]
+        # # 일별 수익률
+        # ary_x, ary_y = df_결과정리['일자'].values, df_결과정리['수익률(%)'].values
+        # li_색깔 = ['C0' if 수익률 > 0 else 'C3' for 수익률 in ary_y]
+        #
+        # ax_수익률_일별.set_title(f'[ 수익률 (%, 당일, 일별, 0 기준) ]')
+        # ax_수익률_일별.bar(ary_x, ary_y, color=li_색깔)
+        # ax_수익률_일별.set_xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
+        # ax_수익률_일별.set_yticks(range(-10, 11, 2))
+        # ax_수익률_일별.grid(linestyle='--', alpha=0.5)
+        # ax_수익률_일별.axhline(10, color='C0', alpha=0)
+        # ax_수익률_일별.axhline(0, color='C1')
+        # ax_수익률_일별.axhline(-10, color='C0', alpha=0)
 
-        ax_수익률_일별.set_title(f'[ 수익률 (%, 당일, 일별, 0 기준) ]')
-        ax_수익률_일별.bar(ary_x, ary_y, color=li_색깔)
-        ax_수익률_일별.set_xticks([0, len(ary_x) - 1], [ary_x[0], ary_x[-1]])
-        ax_수익률_일별.set_yticks(range(-10, 11, 2))
-        ax_수익률_일별.grid(linestyle='--', alpha=0.5)
-        ax_수익률_일별.axhline(10, color='C0', alpha=0)
-        ax_수익률_일별.axhline(0, color='C1')
-        ax_수익률_일별.axhline(-10, color='C0', alpha=0)
+        # 성공률 상세
+        df_결과정리['성공률(%)'] = df_결과정리['성공률(%)'].apply(lambda x: 0 if pd.isna(x) else x)
+        df_결과정리['년월'] = df_결과정리['일자'].apply(lambda x: x[:6])
+        li_월누적 = list()
+        for s_년월 in df_결과정리['년월'].unique():
+            df_결과정리_년월 = df_결과정리[df_결과정리['년월'] == s_년월].copy()
+            df_결과정리_년월['성공률_누적'] = df_결과정리_년월['수익거래'].cumsum() / df_결과정리_년월['전체거래'].cumsum() * 100
+            li_월누적 = li_월누적 + list(df_결과정리_년월['성공률_누적'].values)
+        df_결과정리['성공률_월누적'] = li_월누적
+        df_결과정리['성공률_월누적'] = df_결과정리['성공률_월누적'].apply(lambda x: 0 if pd.isna(x) else x)
+        # df_결과정리['수익률_누적'] = (1 + df_결과정리['수익률(%)'] / 100).cumprod() * 100
+
+        ary_x = df_결과정리['일자'].values
+        ary_y_월누적 = df_결과정리['성공률_월누적'].values + 100
+        ary_y_일별 = df_결과정리['성공률(%)'].values
+        li_색깔_일별 = ['C0' if 성공률 > 50 else 'C3' for 성공률 in ary_y_일별]
+
+        ax_성공률_상세.set_title(f'[ 성공률 상세 (%, 월단위 누적-0기준, 일별-0기준) ]')
+        ax_성공률_상세.plot(ary_x, ary_y_월누적)
+        ax_성공률_상세.bar(ary_x, ary_y_일별, color=li_색깔_일별)
+        ax_성공률_상세.grid(linestyle='--', alpha=0.5)
+        ax_성공률_상세.axhline(100, color='C7')
+        ax_성공률_상세.axhline(0, color='C1')
+        ax_성공률_상세.set_yticks([50, 150, ary_y_월누적.min(), ary_y_월누적.max()])
+        df_틱 = df_결과정리.copy().reset_index()
+        df_틱['변화'] = df_틱['년월'] == df_틱['년월'].shift(1)
+        df_틱 = df_틱[df_틱['변화'] == False]
+        ax_성공률_상세.set_xticks(df_틱.index, labels=df_틱['년월'])
+
+        # 수익률 상세
+        df_결과정리['수익률(%)'] = df_결과정리['수익률(%)'].apply(lambda x: 0 if pd.isna(x) else x)
+        df_결과정리['년월'] = df_결과정리['일자'].apply(lambda x: x[:6])
+        li_월누적 = list()
+        for s_년월 in df_결과정리['년월'].unique():
+            df_결과정리_년월 = df_결과정리[df_결과정리['년월'] == s_년월].copy()
+            df_결과정리_년월['수익률_누적'] = (1 + df_결과정리_년월['수익률(%)'] / 100).cumprod() * 100
+            li_월누적 = li_월누적 + list(df_결과정리_년월['수익률_누적'].values)
+        df_결과정리['수익률_월누적'] = li_월누적
+        # df_결과정리['수익률_누적'] = (1 + df_결과정리['수익률(%)'] / 100).cumprod() * 100
+
+        ary_x = df_결과정리['일자'].values
+        ary_y_월누적 = df_결과정리['수익률_월누적'].values
+        ary_y_일별 = df_결과정리['수익률(%)'].values
+        li_색깔_일별 = ['C0' if 수익률 > 0 else 'C3' for 수익률 in ary_y_일별]
+
+        ax_수익률_상세.set_title(f'[ 수익률 상세 (%, 월단위 누적-100기준, 일별-0기준) ]')
+        ax_수익률_상세.plot(ary_x, ary_y_월누적)
+        ax_수익률_상세.bar(ary_x, ary_y_일별, color=li_색깔_일별)
+        ax_수익률_상세.grid(linestyle='--', alpha=0.5)
+        ax_수익률_상세.axhline(100, color='C1')
+        ax_수익률_상세.axhline(0, color='C1')
+        ax_수익률_상세.set_yticks([-10, 10, ary_y_월누적.min(), ary_y_월누적.max()])
+        df_틱 = df_결과정리.copy().reset_index()
+        df_틱['변화'] = df_틱['년월'] == df_틱['년월'].shift(1)
+        df_틱 = df_틱[df_틱['변화'] == False]
+        ax_수익률_상세.set_xticks(df_틱.index, labels=df_틱['년월'])
 
         # 월별 상세정보
         df_결과정리['년월'] = df_결과정리['일자'].apply(lambda x: f'{x[2:4]}.{x[4:6]}')
@@ -587,4 +653,4 @@ class Analyzer:
 if __name__ == "__main__":
     a = Analyzer(n_분석일수=None)
     a.검증_매수매도(b_차트=False)
-    a.검증_결과정리(b_카톡=False)
+    a.검증_결과정리(b_카톡=True)
