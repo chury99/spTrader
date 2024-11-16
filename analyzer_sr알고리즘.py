@@ -41,6 +41,17 @@ def find_일봉변동_거래량(df_일봉, n_윈도우, n_z값):
     else:
         df_일봉변동 = df_일봉변동[:0]
 
+    # 양봉 확인
+    if len(df_일봉변동) > 0:
+        n_시가 = df_일봉변동['시가'].values[-1]
+        n_고가 = df_일봉변동['고가'].values[-1]
+        n_저가 = df_일봉변동['저가'].values[-1]
+        n_종가 = df_일봉변동['종가'].values[-1]
+        if n_종가 - n_시가 > 0 and n_종가 - n_시가 > n_고가 - n_종가:
+            df_일봉변동 = df_일봉변동[-1:]
+        else:
+            df_일봉변동 = df_일봉변동[:0]
+
     return df_일봉변동
 
 
@@ -187,16 +198,20 @@ def find_매수신호(df_ohlcv, li_지지저항, dt_일자시간=None):
 
     # df 값 미존재 시 False return
     if len(df_분봉) < 2 or len(li_지지저항) == 0:
-        return li_false
+        return li_false, dict()
 
     # 변수 정의
     df_분봉 = df_분봉.sort_values(['일자', '시간'], ascending=True).reset_index()
+    df_분봉3 = df_분봉[-3:].copy().reset_index(drop=True)
+    n_추세3고가_1 = np.polyfit(df_분봉3.index, df_분봉3['고가'], 1)[0]
+    n_추세3종가_1 = np.polyfit(df_분봉3.index, df_분봉3['종가'], 1)[0]
     df_분봉5 = df_분봉[-5:].copy().reset_index(drop=True)
+    n_추세5고가_1 = np.polyfit(df_분봉5.index, df_분봉5['고가'], 1)[0]
+    n_추세5종가_1 = np.polyfit(df_분봉5.index, df_분봉5['종가'], 1)[0]
     n_추세5ma10_1 = np.polyfit(df_분봉5.index, df_분봉5['종가ma10'], 1)[0]
     n_추세5ma20_1 = np.polyfit(df_분봉5.index, df_분봉5['종가ma20'], 1)[0]
     n_추세5ma60_1 = np.polyfit(df_분봉5.index, df_분봉5['종가ma60'], 1)[0]
     n_추세5ma120_1 = np.polyfit(df_분봉5.index, df_분봉5['종가ma120'], 1)[0]
-    n_추세5종가_1 = np.polyfit(df_분봉5.index, df_분봉5['종가'], 1)[0]
     df_분봉10 = df_분봉[-10:].copy().reset_index(drop=True)
     n_추세10ma10_1 = np.polyfit(df_분봉10.index, df_분봉10['종가ma10'], 1)[0]
     n_추세10ma20_1 = np.polyfit(df_분봉10.index, df_분봉10['종가ma20'], 1)[0]
@@ -215,13 +230,17 @@ def find_매수신호(df_ohlcv, li_지지저항, dt_일자시간=None):
     n_ma60_1 = df_분봉['종가ma60'].values[-1]
     n_ma120_1 = df_분봉['종가ma120'].values[-1]
     n_시가_1 = df_분봉['시가'].values[-1]
+    n_고가_1 = df_분봉['고가'].values[-1]
     n_저가_1 = df_분봉['저가'].values[-1]
     n_종가_1 = df_분봉['종가'].values[-1]
     n_종가_2 = df_분봉['종가'].values[-2]
-    n_몸통퍼센트_1 = (n_종가_1 / n_시가_1 - 1) * 100
+    # n_몸통퍼센트_1 = (n_종가_1 / n_시가_1 - 1) * 100
+    n_몸통퍼센트_1 = (n_종가_1 / n_종가_2 - n_시가_1 / n_종가_2) * 100
+    n_윗꼬리퍼센트_1 = (n_고가_1 / n_종가_2 - n_종가_1 / n_종가_2) * 100
     n_ma10터치퍼센트_1 = abs(n_저가_1 / n_ma10_1 - 1) * 100
     n_ma20터치퍼센트_1 = abs(n_저가_1 / n_ma20_1 - 1) * 100
     n_ma60터치퍼센트_1 = abs(n_저가_1 / n_ma60_1 - 1) * 100
+    n_종가위치퍼센트_1 = (n_종가_1 - n_저가_1) / (n_고가_1 - n_저가_1) * 100 if n_고가_1 != n_저가_1 else None
     n_지지저항_max = max(li_지지저항)
     n_지지저항_min = min(li_지지저항)
     n_저항선 = min(저항 for 저항 in li_지지저항 if 저항 > n_종가_1) if n_지지저항_max > n_종가_1 else None
@@ -248,20 +267,29 @@ def find_매수신호(df_ohlcv, li_지지저항, dt_일자시간=None):
     b_매수신호1_이평선_터치 = b_매수신호1_이평선_ma10 or b_매수신호1_이평선_ma20 or b_매수신호1_이평선_ma60
     # 몸통이 +1% 초과
     b_매수신호1_이평선_몸통 = n_몸통퍼센트_1 > 1
+    # 윗꼬리 몸통 비교
+    b_매수신호1_이평선_윗꼬리 = n_윗꼬리퍼센트_1 < n_몸통퍼센트_1
     # 이평선 조건
-    b_매수신호1_이평선 = b_매수신호1_이평선_터치 and b_매수신호1_이평선_몸통
+    b_매수신호1_이평선 = b_매수신호1_이평선_터치 and b_매수신호1_이평선_몸통 and b_매수신호1_이평선_윗꼬리
 
-    b_매수신호1 = b_매수신호1_거래량 or b_매수신호1_이평선
-    # b_매수신호1 = b_매수신호1_이평선
+    # 종가 위치 (20% 미만)
+    b_매수신호1_종가위치 = 5 < n_종가위치퍼센트_1 < 20 if n_종가위치퍼센트_1 is not None else False
+
+    # b_매수신호1 = b_매수신호1_거래량 or b_매수신호1_이평선
+    b_매수신호1 = b_매수신호1_이평선
+    # b_매수신호1 = b_매수신호1_종가위치
     li_매수신호.append(b_매수신호1)
 
     # 2) [추세검증] 추세가 1 초과 (종가, ma20, ma60, ma120)
-    b_매수신호2_종가 = n_추세5종가_1 > 1
+    # b_매수신호2_고가 = n_추세3고가_1 > 1
+    b_매수신호2_고가 = n_추세5고가_1 > 1
+    # b_매수신호2_종가 = n_추세5종가_1 > 1
     b_매수신호2_ma20 = n_추세5ma20_1 > 1
     b_매수신호2_ma60 = n_추세5ma60_1 > 1
     b_매수신호2_ma120 = n_추세5ma120_1 > 1
 
-    b_매수신호2 = b_매수신호2_종가 and b_매수신호2_ma20 and b_매수신호2_ma60 and b_매수신호2_ma120
+    b_매수신호2 = b_매수신호2_고가 and b_매수신호2_ma20 and b_매수신호2_ma60 and b_매수신호2_ma120
+    # b_매수신호2 = True
     li_매수신호.append(b_매수신호2)
 
     # 3) [배열검증] 이평선 정배열 (종가, ma20)
@@ -270,6 +298,7 @@ def find_매수신호(df_ohlcv, li_지지저항, dt_일자시간=None):
     b_매수신호3_ma60ma120 = n_ma60_1 > n_ma120_1
 
     b_매수신호3 = b_매수신호3_종가ma20
+    # b_매수신호3 = b_매수신호3_ma20ma60 and b_매수신호3_ma60ma120
     li_매수신호.append(b_매수신호3)
 
     # 4) [sr검증] 지지저항 위치
@@ -279,6 +308,7 @@ def find_매수신호(df_ohlcv, li_지지저항, dt_일자시간=None):
     b_매수신호4_저항마진 = n_저항마진퍼센트 > 1.5 if n_저항선 is not None else False
 
     b_매수신호4 = b_매수신호4_sr내부 and b_매수신호4_저항마진
+    # b_매수신호4 = True
     li_매수신호.append(b_매수신호4)
 
     # 5) [시간검증] 15시 이후 매수 금지
@@ -296,7 +326,8 @@ def find_매수신호(df_ohlcv, li_지지저항, dt_일자시간=None):
                     n_종가_1=n_종가_1, n_ma20_1=n_ma20_1, n_ma60_1=n_ma60_1, n_ma120_1=n_ma120_1,
                     n_지지저항_max=n_지지저항_max, n_지지저항_min=n_지지저항_min,
                     n_지지선=n_지지선, n_저항선=n_저항선, n_저항마진퍼센트=n_저항마진퍼센트,
-                    s_시간=s_시간)
+                    s_시간=s_시간,
+                    n_저가_1_매수=n_저가_1)
 
     return li_매수신호, dic_신호상세
 
@@ -316,6 +347,7 @@ def find_매도신호(dic_기준정보, n_현재가=None):
     n_매수단가 = dic_기준정보['n_매수단가']
     n_지지선 = dic_기준정보['n_지지선']
     n_저항선 = dic_기준정보['n_저항선']
+    n_저가_1_매수 = dic_기준정보['n_저가_1_매수']
 
     # 기준정보 정의 - analyzer 전용
     s_현재시간 = dic_기준정보['s_현재시간'] if 's_현재시간' in dic_기준정보.keys() else None
@@ -336,7 +368,11 @@ def find_매도신호(dic_기준정보, n_현재가=None):
 
     # 변수 정의
     df_3분봉 = df_3분봉.sort_values(['일자', '시간'], ascending=True).reset_index()
+    df_3분봉3 = df_3분봉[-3:].copy().reset_index(drop=True)
+    n_추세3고가_1 = np.polyfit(df_3분봉3.index, df_3분봉3['고가'], 1)[0]
+    n_추세3종가_1 = np.polyfit(df_3분봉3.index, df_3분봉3['종가'], 1)[0]
     df_3분봉5 = df_3분봉[-5:].copy().reset_index(drop=True)
+    n_추세5고가_1 = np.polyfit(df_3분봉5.index, df_3분봉5['고가'], 1)[0]
     n_추세5종가_1 = np.polyfit(df_3분봉5.index, df_3분봉5['종가'], 1)[0]
     n_추세5ma10_1 = np.polyfit(df_3분봉5.index, df_3분봉5['종가ma10'], 1)[0]
     n_추세5ma20_1 = np.polyfit(df_3분봉5.index, df_3분봉5['종가ma20'], 1)[0]
@@ -354,43 +390,57 @@ def find_매도신호(dic_기준정보, n_현재가=None):
     n_추세20ma20_1 = np.polyfit(df_3분봉20.index, df_3분봉20['종가ma20'], 1)[0]
     n_추세20ma60_1 = np.polyfit(df_3분봉20.index, df_3분봉20['종가ma60'], 1)[0]
     n_추세20ma120_1 = np.polyfit(df_3분봉20.index, df_3분봉20['종가ma120'], 1)[0]
+    n_시가_1 = df_3분봉['시가'].values[-1]
+    n_고가_1 = df_3분봉['고가'].values[-1]
+    n_저가_1 = df_3분봉['저가'].values[-1]
+    n_종가_1 = df_3분봉['종가'].values[-1]
+    n_종가위치퍼센트_1 = (n_종가_1 - n_저가_1) / (n_고가_1 - n_저가_1) * 100 if n_고가_1 != n_저가_1 else None
 
     # 매도신호 생성 ['저항터치', '지지붕괴', '추세이탈', '하락한계', '장종료']
     li_매도신호 = list()
 
     # 1) 저항선 터치 (0.5% 마진)
     n_현재가 = n_고가 if s_구분 == 'analyzer' else n_현재가
+    n_저항선_마진 = None
     if n_저항선 is not None:
         n_저항선_마진 = int(n_저항선 * (1 - 0.005))
         b_매도신호1 = n_현재가 >= n_저항선_마진
     else:
         b_매도신호1 = False
+    # b_매도신호1 = False
     li_매도신호.append(b_매도신호1)
     n_매도단가 = n_저항선_마진 if b_매도신호1 else n_매도단가
 
     # 2) 지지선 붕괴 (1% 마진)
     n_현재가 = n_저가 if s_구분 == 'analyzer' else n_현재가
+    n_지지선_마진 = None
     if n_지지선 is not None:
         n_지지선_마진 = int(n_지지선 * (1 - 0.01))
         b_매도신호2 = n_현재가 <= n_지지선_마진
     else:
         b_매도신호2 = False
+    # b_매도신호2 = False
     li_매도신호.append(b_매도신호2)
     n_매도단가 = n_지지선_마진 if b_매도신호2 else n_매도단가
 
     # 3) 추세 이탈 (종가, ma20, ma60, ma120) - 매수 동일 조건
-    b_매도신호3_종가 = n_추세5종가_1 < 1
+    # b_매도신호3_고가 = n_추세3고가_1 < 1
+    b_매도신호3_고가 = n_추세5고가_1 < 1
+    # b_매도신호3_종가 = n_추세5종가_1 < 1
     b_매도신호3_ma20 = n_추세5ma20_1 < 1
     b_매도신호3_ma60 = n_추세5ma60_1 < 1
     b_매도신호3_ma120 = n_추세5ma120_1 < 1
 
-    b_매도신호3 = b_매도신호3_종가 or b_매도신호3_ma20 or b_매도신호3_ma60 or b_매도신호3_ma120
+    b_매도신호3_추세 = b_매도신호3_고가 or b_매도신호3_ma20 or b_매도신호3_ma60 or b_매도신호3_ma120
+    b_매도신호3_종가 = 95 > n_종가위치퍼센트_1 > 80 if n_종가위치퍼센트_1 is not None else False
+    b_매도신호3 = b_매도신호3_추세
     li_매도신호.append(b_매도신호3)
     n_매도단가 = n_시가 if b_매도신호3 else n_매도단가
 
     # 4) 하락 한계 (매수가 대비 5% 하락)
     n_현재가 = n_저가 if s_구분 == 'analyzer' else n_현재가
-    n_하락한계 = int(n_매수단가 * (1 - 0.05))
+    n_하락한계 = int(n_매수단가 * (1 - (0.01 - 0.002)))
+    # n_하락한계 = n_저가_1_매수
 
     b_매도신호4 = n_현재가 <= n_하락한계
     li_매도신호.append(b_매도신호4)
@@ -405,6 +455,7 @@ def find_매도신호(dic_기준정보, n_현재가=None):
     dic_신호상세 = dict(n_지지선=n_지지선, n_저항선=n_저항선, n_지지선_마진=n_지지선_마진, n_저항선_마진=n_저항선_마진,
                     n_추세5종가_1=n_추세5종가_1, n_추세5ma20_1=n_추세5ma20_1, n_추세5ma60_1=n_추세5ma60_1,
                     n_추세5ma120_1=n_추세5ma120_1, n_하락한계=n_하락한계, s_현재시간=s_현재시간,
-                    n_매도단가=n_매도단가, s_3분봉시간=df_3분봉['시간'].values[-1])
+                    n_매도단가=n_매도단가, s_3분봉시간=df_3분봉['시간'].values[-1],
+                    n_저가_1_매수=n_저가_1_매수)
 
     return li_매도신호, dic_신호상세
