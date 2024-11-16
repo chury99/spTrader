@@ -95,7 +95,7 @@ class Analyzer:
                 df_일봉 = df_일봉[df_일봉['일자'] <= s_일자]
 
                 # 일봉변동 확인
-                df_일봉변동_종목 = Logic.find_일봉변동_거래량(df_일봉=df_일봉, n_윈도우=120, n_z값=3)
+                df_일봉변동_종목 = Logic.find_일봉변동_거래량(df_일봉=df_일봉, n_윈도우=60, n_z값=3)
 
                 # 종목 결과 list 입력
                 li_df_일봉변동.append(df_일봉변동_종목)
@@ -173,10 +173,10 @@ class Analyzer:
 
                 # 지지저항 값 생성 (거래량 기준 + 피크값 기준), 분봉 + 일봉
                 li_df_지지저항_종목 = list()
-                li_df_지지저항_종목.append(Logic.find_지지저항_거래량(df_ohlcv=df_3분봉, n_윈도우=20))
-                li_df_지지저항_종목.append(Logic.find_지지저항_피크값(df_ohlcv=df_3분봉))
-                li_df_지지저항_종목.append(Logic.find_지지저항_거래량(df_ohlcv=df_일봉, n_윈도우=20))
-                li_df_지지저항_종목.append(Logic.find_지지저항_피크값(df_ohlcv=df_일봉))
+                # li_df_지지저항_종목.append(Logic.find_지지저항_거래량(df_ohlcv=df_3분봉, n_윈도우=20))
+                # li_df_지지저항_종목.append(Logic.find_지지저항_피크값(df_ohlcv=df_3분봉))
+                li_df_지지저항_종목.append(Logic.find_지지저항_거래량(df_ohlcv=df_일봉, n_윈도우=60))
+                # li_df_지지저항_종목.append(Logic.find_지지저항_피크값(df_ohlcv=df_일봉))
 
                 # 지지저항 값 통합
                 df_지지저항_종목 = pd.concat(li_df_지지저항_종목, axis=0)
@@ -381,8 +381,17 @@ class Analyzer:
                     fig.savefig(os.path.join(folder_그래프, f'매도신호_{s_종목코드}_{s_일자}.png'))
 
             # df 생성
-            df_매도신호 = pd.concat(li_df_매도신호, axis=0)
-            df_매도신호_상세 = pd.concat(li_df_매도신호_상세, axis=0)
+            df_매도신호 = pd.concat(li_df_매도신호, axis=0) if len(li_df_매도신호) > 0 else pd.DataFrame()
+            if len(df_매도신호) == 0:
+                s_파일명 = max(파일 for 파일 in os.listdir(self.folder_매도신호)
+                            if s_파일명_생성 in 파일 and '.pkl' in 파일 and '상세' not in 파일)
+                df_매도신호 = pd.read_pickle(os.path.join(self.folder_매도신호, s_파일명))[:0]
+
+            df_매도신호_상세 = pd.concat(li_df_매도신호_상세, axis=0) if len(li_df_매도신호_상세) > 0 else pd.DataFrame()
+            if len(df_매도신호_상세) == 0:
+                s_파일명 = max(파일 for 파일 in os.listdir(self.folder_매도신호)
+                            if s_파일명_생성 in 파일 and '.pkl' in 파일 and '상세' in 파일)
+                df_매도신호_상세 = pd.read_pickle(os.path.join(self.folder_매도신호, s_파일명))[:0]
 
             # 매도 전 매수 케이스 제거
             df_매도신호 = Backtest.make_매수매도_중복거래제거(df_매수매도=df_매도신호)
@@ -467,8 +476,8 @@ class Analyzer:
             if len(li_df_종목선정) > 0:
                 df_종목선정 = pd.concat(li_df_종목선정, axis=0)
             else:
-                s_최근일자 = max(re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매도신호)
-                             if s_파일명_기준 in 파일명 and '.pkl' in 파일명)
+                s_최근일자 = max(re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_종목선정)
+                             if s_파일명_생성 in 파일명 and '.pkl' in 파일명)
                 df_종목선정 = pd.read_pickle(os.path.join(self.folder_종목선정, f'{s_파일명_생성}_{s_최근일자}.pkl'))
                 df_종목선정 = df_종목선정[:0]
 
