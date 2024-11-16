@@ -791,6 +791,7 @@ class KiwoomAPI(QAxWidget):
             try:
                 with open(os.path.join(self.folder_실시간, f'실시간_{s_실시간타입}_{self.s_오늘}.txt'), 'at') as file:
                     file.write(f'{s_텍스트}\n')
+                    # file.write(f'{li_데이터}\n')
             except PermissionError:
                 pass
 
