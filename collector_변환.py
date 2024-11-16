@@ -2,6 +2,7 @@ import os
 import sys
 import pandas as pd
 import json
+import re
 import sqlite3
 
 import pandas.errors
@@ -27,6 +28,9 @@ class Collector:
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
         self.folder_전체종목 = dic_폴더정보['데이터|전체종목']
         self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
+        self.folder_체결정보 = dic_폴더정보['데이터|체결정보']
+        self.folder_실시간 = dic_폴더정보['이력|실시간']
+        os.makedirs(self.folder_체결정보, exist_ok=True)
 
         # 전체 항목 확인 (df_전체종목.pkl 확인)
         df_전체종목 = pd.read_pickle(os.path.join(self.folder_전체종목, f'df_전체종목_{self.s_오늘}.pkl'))
@@ -571,6 +575,219 @@ class Collector:
             # log 기록
             self.make_log(f'{s_년월일} 데이터 저장 완료')
 
+    def 실시간_텍스트변환(self):
+        """ 텍스트 파일로 저장된 실시간 정보를 불러와서 df 변환 후 pkl 파일 저장 """
+        # 파일명 정의
+        s_파일명_기준 = '실시간_주식체결'
+        s_파일명_생성 = 'df_체결정보'
+
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_실시간)
+                    if s_파일명_기준 in 파일명 and '.txt' in 파일명]
+        li_일자_전체 = [일자 for 일자 in li_일자_전체 if 일자 >= '20241105']
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_체결정보)
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
+        li_일자_대상 = [일자 for 일자 in li_일자_전체 if 일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 파일 읽어오기
+            with open(os.path.join(self.folder_실시간, f'실시간_주식체결_{s_일자}.txt'), 'rt') as file:
+                s_체결정보_원본 = file.read()
+
+            # 데이터 정리
+            s_체결정보 = s_체결정보_원본.replace('실시간 | 주식체결 | ', '')
+            s_체결정보 = s_체결정보.replace("'", '').replace('[', '').replace(']', '')
+            li_체결정보 = s_체결정보.split('\n')
+            li_체결정보 = [체결정보.split(', ') for 체결정보 in li_체결정보]
+            df_체결정보 = pd.DataFrame(li_체결정보,
+                                   columns=['종목코드', '체결시간', '체결단가', '체결량', '매수매도', '체결금액'])
+            df_체결정보 = df_체결정보.dropna().sort_values('체결시간')
+            for s_컬럼명 in ['체결단가', '체결량']:
+                df_체결정보[s_컬럼명] = df_체결정보[s_컬럼명].astype(int)
+            df_체결정보['dt일시'] = pd.to_datetime(s_일자 + ' ' + df_체결정보['체결시간'])
+            df_체결정보 = df_체결정보.set_index('dt일시')
+
+            # df 저장
+            df_체결정보.to_pickle(os.path.join(self.folder_체결정보, f'{s_파일명_생성}_{s_일자}.pkl'))
+            df_체결정보.to_csv(os.path.join(self.folder_체결정보, f'{s_파일명_생성}_{s_일자}.csv'),
+                           index=False, encoding='cp949')
+
+            # log 기록
+            self.make_log(f'{s_일자} 데이터 저장 완료')
+
+    def 실시간_1초봉(self):
+        """ 저장된 체결정보 기준으로 1초봉 생성 후 pkl 파일 저장 """
+        # 파일명 정의
+        s_파일명_기준 = 'df_체결정보'
+        s_파일명_생성 = 'dic_코드별_1초봉'
+
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_체결정보)
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
+        li_일자_대상 = [일자 for 일자 in li_일자_전체 if 일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 파일 읽어오기
+            df_체결정보 = pd.read_pickle(os.path.join(self.folder_체결정보, f'{s_파일명_기준}_{s_일자}.pkl'))
+
+            # 초봉 생성
+            dic_1초봉 = self.make_초봉데이터(df_체결정보=df_체결정보, n_초봉=1)
+
+            # dic 저장
+            pd.to_pickle(dic_1초봉, os.path.join(self.folder_캐시변환, f'{s_파일명_생성}_{s_일자}.pkl'))
+
+            # log 기록
+            self.make_log(f'{s_일자} 데이터 저장 완료')
+
+    def 실시간_2초봉(self):
+        """ 저장된 체결정보 기준으로 1초봉 생성 후 pkl 파일 저장 """
+        # 파일명 정의
+        s_파일명_기준 = 'df_체결정보'
+        s_파일명_생성 = 'dic_코드별_2초봉'
+
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_체결정보)
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
+        li_일자_대상 = [일자 for 일자 in li_일자_전체 if 일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 파일 읽어오기
+            df_체결정보 = pd.read_pickle(os.path.join(self.folder_체결정보, f'{s_파일명_기준}_{s_일자}.pkl'))
+
+            # 초봉 생성
+            dic_2초봉 = self.make_초봉데이터(df_체결정보=df_체결정보, n_초봉=2)
+
+            # dic 저장
+            pd.to_pickle(dic_2초봉, os.path.join(self.folder_캐시변환, f'{s_파일명_생성}_{s_일자}.pkl'))
+
+            # log 기록
+            self.make_log(f'{s_일자} 데이터 저장 완료')
+
+    def 실시간_3초봉(self):
+        """ 저장된 체결정보 기준으로 1초봉 생성 후 pkl 파일 저장 """
+        # 파일명 정의
+        s_파일명_기준 = 'df_체결정보'
+        s_파일명_생성 = 'dic_코드별_3초봉'
+
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_체결정보)
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
+        li_일자_대상 = [일자 for 일자 in li_일자_전체 if 일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 파일 읽어오기
+            df_체결정보 = pd.read_pickle(os.path.join(self.folder_체결정보, f'{s_파일명_기준}_{s_일자}.pkl'))
+
+            # 초봉 생성
+            dic_3초봉 = self.make_초봉데이터(df_체결정보=df_체결정보, n_초봉=3)
+
+            # dic 저장
+            pd.to_pickle(dic_3초봉, os.path.join(self.folder_캐시변환, f'{s_파일명_생성}_{s_일자}.pkl'))
+
+            # log 기록
+            self.make_log(f'{s_일자} 데이터 저장 완료')
+
+    def 실시간_5초봉(self):
+        """ 저장된 체결정보 기준으로 1초봉 생성 후 pkl 파일 저장 """
+        # 파일명 정의
+        s_파일명_기준 = 'df_체결정보'
+        s_파일명_생성 = 'dic_코드별_5초봉'
+
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_체결정보)
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
+        li_일자_대상 = [일자 for 일자 in li_일자_전체 if 일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 파일 읽어오기
+            df_체결정보 = pd.read_pickle(os.path.join(self.folder_체결정보, f'{s_파일명_기준}_{s_일자}.pkl'))
+
+            # 초봉 생성
+            dic_5초봉 = self.make_초봉데이터(df_체결정보=df_체결정보, n_초봉=5)
+
+            # dic 저장
+            pd.to_pickle(dic_5초봉, os.path.join(self.folder_캐시변환, f'{s_파일명_생성}_{s_일자}.pkl'))
+
+            # log 기록
+            self.make_log(f'{s_일자} 데이터 저장 완료')
+
+    def 실시간_10초봉(self):
+        """ 저장된 체결정보 기준으로 1초봉 생성 후 pkl 파일 저장 """
+        # 파일명 정의
+        s_파일명_기준 = 'df_체결정보'
+        s_파일명_생성 = 'dic_코드별_10초봉'
+
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_체결정보)
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
+        li_일자_대상 = [일자 for 일자 in li_일자_전체 if 일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 파일 읽어오기
+            df_체결정보 = pd.read_pickle(os.path.join(self.folder_체결정보, f'{s_파일명_기준}_{s_일자}.pkl'))
+
+            # 초봉 생성
+            dic_10초봉 = self.make_초봉데이터(df_체결정보=df_체결정보, n_초봉=10)
+
+            # dic 저장
+            pd.to_pickle(dic_10초봉, os.path.join(self.folder_캐시변환, f'{s_파일명_생성}_{s_일자}.pkl'))
+
+            # log 기록
+            self.make_log(f'{s_일자} 데이터 저장 완료')
+
+    def make_초봉데이터(self, df_체결정보, n_초봉):
+        """ 체결정보 기준 초봉 데이터로 생성 후 dic_초봉 리턴 """
+        # df 정의
+        df_체결정보 = df_체결정보.copy()
+
+        # 종목별 데이터 처리
+        dic_초봉 = dict()
+        for s_종목코드 in df_체결정보['종목코드'].unique():
+            # 종목 분리
+            df_체결정보_종목 = df_체결정보[df_체결정보['종목코드'] == s_종목코드].copy()
+
+            # 매수매도 분리
+            df_체결정보_종목_매수 = df_체결정보_종목[df_체결정보_종목['매수매도'] == '매수']
+            df_체결정보_종목_매도 = df_체결정보_종목[df_체결정보_종목['매수매도'] == '매도']
+
+            # 초봉 생성
+            df_리샘플 = df_체결정보_종목.resample(f'{n_초봉}s')
+            df_리샘플_매수 = df_체결정보_종목_매수.resample(f'{n_초봉}s')
+            df_리샘플_매도 = df_체결정보_종목_매도.resample(f'{n_초봉}s')
+            df_초봉 = df_리샘플_매수.first().loc[:, '종목코드':'체결시간']
+            df_초봉['종목코드'] = s_종목코드
+            df_초봉['체결시간'] = df_초봉.index.strftime('%H:%M:%S')
+            df_초봉['시가'] = df_리샘플['체결단가'].first()
+            df_초봉['고가'] = df_리샘플['체결단가'].max()
+            df_초봉['저가'] = df_리샘플['체결단가'].min()
+            df_초봉['종가'] = df_리샘플['체결단가'].last()
+            df_초봉['거래량'] = df_리샘플['체결량'].sum()
+            df_초봉['매수량'] = df_리샘플_매수['체결량'].sum()
+            df_초봉['매도량'] = df_리샘플_매도['체결량'].sum()
+            df_초봉['매수량'] = df_초봉['매수량'].fillna(0).astype(int)
+            df_초봉['매도량'] = df_초봉['매도량'].fillna(0).astype(int)
+
+            # dict 입력
+            dic_초봉[s_종목코드] = df_초봉
+
+        return dic_초봉
+
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
         """ 입력 받은 s_text에 시간 붙여서 self.path_log에 저장 """
@@ -602,3 +819,9 @@ if __name__ == "__main__":
     c.캐시저장_3분봉()
     c.캐시저장_5분봉()
     c.캐시저장_10분봉()
+    c.실시간_텍스트변환()
+    c.실시간_1초봉()
+    c.실시간_2초봉()
+    c.실시간_3초봉()
+    c.실시간_5초봉()
+    c.실시간_10초봉()
