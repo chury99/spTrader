@@ -751,10 +751,12 @@ class KiwoomAPI(QAxWidget):
             s_체결시간 = self._get_comm_real_data(s_종목코드, 20)
             s_현재가 = self._get_comm_real_data(s_종목코드, 10)
             s_거래량 = self._get_comm_real_data(s_종목코드, 15)
+            s_등락률 = self._get_comm_real_data(s_종목코드, 12)
 
             # 데이터 정리
             s_체결시간 = f'{s_체결시간[0:2]}:{s_체결시간[2:4]}:{s_체결시간[4:6]}'
             n_현재가 = abs(int(s_현재가))
+            n_등락률 = float(s_등락률)
             s_매수매도 = '매수' if int(s_거래량) > 0 else '매도'
             n_거래량 = abs(int(s_거래량))
             n_거래대금 = n_현재가 * n_거래량
@@ -776,7 +778,7 @@ class KiwoomAPI(QAxWidget):
                 pass
 
             # 주식체결 데이터 저장 (누적)
-            li_데이터 = [s_종목코드, s_체결시간, n_현재가, n_거래량, s_매수매도, n_거래대금]
+            li_데이터 = [s_종목코드, s_체결시간, n_현재가, n_등락률, n_거래량, s_매수매도, n_거래대금]
             try:
                 if s_종목코드 in self.dic_실시간_체결.keys():
                     self.dic_실시간_체결[s_종목코드].append(li_데이터)
