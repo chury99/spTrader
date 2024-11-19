@@ -601,7 +601,7 @@ class Collector:
             li_체결정보 = s_체결정보.split('\n')
             li_체결정보 = [체결정보.split(', ') for 체결정보 in li_체결정보]
             df_체결정보 = pd.DataFrame(li_체결정보,
-                                   columns=['종목코드', '체결시간', '체결단가', '체결량', '매수매도', '체결금액'])
+                                   columns=['종목코드', '체결시간', '체결단가', '전일대비(%)', '체결량', '매수매도', '체결금액'])
             df_체결정보 = df_체결정보.dropna().sort_values('체결시간')
             for s_컬럼명 in ['체결단가', '체결량']:
                 df_체결정보[s_컬럼명] = df_체결정보[s_컬럼명].astype(int)
