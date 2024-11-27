@@ -87,3 +87,22 @@ folder_백테스팅 = os.path.join(folder_SRline, '백테스팅')
 dic_폴더정보['sr백테스팅'] = folder_백테스팅
 dic_폴더정보['sr백테스팅|10_매수매도'] = os.path.join(folder_백테스팅, '10_매수매도')
 dic_폴더정보['sr백테스팅|20_결과정리'] = os.path.join(folder_백테스팅, '20_결과정리')
+
+#######################################################################################################################
+
+# Transaction Flow 분석 폴더 정의
+folder_TransactionFlow = os.path.join(folder_work, 'analyzer_TransactionFlow')
+dic_폴더정보['tf분석'] = folder_TransactionFlow
+
+# 초봉분석 폴더 정의
+folder_초봉분석 = os.path.join(folder_TransactionFlow, '초봉분석')
+dic_폴더정보['tf초봉분석'] = folder_초봉분석
+dic_폴더정보['tf초봉분석|10_지표생성'] = os.path.join(folder_초봉분석, '10_지표생성')
+
+# 백테스팅 폴더 정의
+folder_백테스팅 = os.path.join(folder_TransactionFlow, '백테스팅')
+dic_폴더정보['tf백테스팅'] = folder_백테스팅
+dic_폴더정보['tf백테스팅|10_매수매도'] = os.path.join(folder_백테스팅, '10_매수매도')
+dic_폴더정보['tf백테스팅|20_결과정리'] = os.path.join(folder_백테스팅, '20_결과정리')
+dic_폴더정보['tf백테스팅|30_결과요약'] = os.path.join(folder_백테스팅, '30_결과요약')
+dic_폴더정보['tf백테스팅|40_수익요약'] = os.path.join(folder_백테스팅, '40_수익요약')
