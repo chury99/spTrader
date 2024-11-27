@@ -243,7 +243,7 @@ class KiwoomAPI(QAxWidget):
         self.eventloop_주문조회.exec_()
 
     # ***** [ 조건검색 관련 모듈 ] *****
-    def get_조건검색_전체(self):
+    def get_조건검색_전체(self, li_대상=None, b_실시간=False):
         """ 서버에 등록되어 있는 전체 조건검색 조회하여 검색식명 별 종목코드 list 조회할 수 있는 dict 리턴 """
         # 조건검색 연결
         n_ret = self.dynamicCall('GetConditionLoad()')
@@ -257,11 +257,12 @@ class KiwoomAPI(QAxWidget):
         dic_조건검색_검색식명2번호 = df_조건검색.set_index('검색식명').to_dict()['검색식번호']
 
         # 검색식명 기준 종목코드 가져오기
-        li_li_검색종목 = []
-        for s_검색식명 in df_조건검색['검색식명'].values:
+        li_대상 = list(df_조건검색['검색식명'].values) if li_대상 is None else li_대상
+        dic_조건검색식별종목코드 = dict()
+        for s_검색식명 in li_대상:
             s_화면번호 = '9000'
             n_검색식번호 = int(dic_조건검색_검색식명2번호[s_검색식명])
-            n_실시간옵션 = 0  # [0]조건검색만, [1]조건검색+실시간
+            n_실시간옵션 = 1 if b_실시간 else 0  # [0]조건검색만, [1]조건검색+실시간
             n_ret = self.dynamicCall('SendCondition(QString, QString, int, int)',
                                      s_화면번호, s_검색식명, n_검색식번호, n_실시간옵션)
             self.s_조건검색_종목조회성공여부 = '성공' if n_ret == 1 else '실패'
@@ -274,14 +275,8 @@ class KiwoomAPI(QAxWidget):
             s_검색식명 = self.s_조건검색_검색식명
             li_검색종목 = self.li_검색종목
 
-            # df_조건검색 추가
-            li_li_검색종목.append(li_검색종목)
-
-        # df 추가
-        df_조건검색['검색종목'] = li_li_검색종목
-
-        # 리턴값 생성
-        dic_조건검색식별종목코드 = df_조건검색.set_index('검색식명').to_dict()['검색종목']
+            # dic 추가
+            dic_조건검색식별종목코드[s_검색식명] = li_검색종목
 
         return dic_조건검색식별종목코드
 
@@ -724,23 +719,6 @@ class KiwoomAPI(QAxWidget):
 
     def on_receive_real_data(self, s_종목코드, s_실시간타입, s_실시간데이터):
         """ 실시간 데이터 받아오기 (OnReceiveRealData 이벤트 연결) """
-        # 현재가 관리 (갱신)
-        # if s_실시간타입 == '주식시세':
-        #     s_현재가 = self._get_comm_real_data(s_종목코드, 10)
-        #     n_현재가 = abs(int(s_현재가))
-        #     # dict 저장
-        #     self.dic_실시간_현재가[s_종목코드] = n_현재가
-        #
-        #     # 화면 출력
-        #     li_데이터 = [s_종목코드, n_현재가]
-        #     s_텍스트 = f'실시간 | {s_실시간타입} | {li_데이터}'
-        #     print(s_텍스트)
-        #     try:
-        #         with open(os.path.join(self.folder_실시간, f'실시간_{s_실시간타입}_{self.s_오늘}.txt'), 'at') as file:
-        #             file.write(f'{s_텍스트}\n')
-        #     except PermissionError:
-        #         pass
-
         # dic 정의
         self.dic_실시간_현재가 = dict() if not hasattr(self, 'dic_실시간_현재가') else self.dic_실시간_현재가
         self.dic_실시간_체결 = dict() if not hasattr(self, 'dic_실시간_체결') else self.dic_실시간_체결
