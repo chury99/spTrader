@@ -37,14 +37,17 @@ class Trader(QMainWindow, form_class):
         self.folder_run = dic_폴더정보['run']
         self.folder_정보수집 = dic_폴더정보['데이터|정보수집']
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
+        self.folder_전체종목 = dic_폴더정보['데이터|전체종목']
         self.folder_체결잔고 = dic_폴더정보['이력|체결잔고']
         self.folder_탐색결과 = dic_폴더정보['이력|탐색결과']
         self.folder_주문정보 = dic_폴더정보['이력|주문정보']
+        self.folder_대상종목 = dic_폴더정보['이력|대상종목']
         self.folder_일봉변동 = dic_폴더정보['sr종목선정|10_일봉변동']
         self.folder_지지저항 = dic_폴더정보['sr종목선정|20_지지저항']
         self.folder_감시대상 = dic_폴더정보['sr종목선정|50_종목선정']
         os.makedirs(self.folder_탐색결과, exist_ok=True)
         os.makedirs(self.folder_주문정보, exist_ok=True)
+        os.makedirs(self.folder_대상종목, exist_ok=True)
 
         # 기준정보 정의
         self.s_오늘 = pd.Timestamp('now').strftime('%Y%m%d')
@@ -70,7 +73,7 @@ class Trader(QMainWindow, form_class):
         self.n_모니터링파일생성주기 = int(int(dic_config['재구동_대기시간(초)']) / 2)
         self.s_전일 = self.get_전일날짜()
         self.li_호가단위 = self.make_호가단위()
-        self.li_대상종목, self.dic_코드2종목명_대상종목 = self.  get_대상종목()
+        self.li_대상종목, self.dic_코드2종목명 = self.get_대상종목()
         self.dic_지지저항, self.df_지지저항 = self.get_지지저항()
 
         # log 기록
@@ -86,10 +89,6 @@ class Trader(QMainWindow, form_class):
         self.flag_종목보유 = len(self.df_계좌잔고_종목별) > 0
         self.dic_3분봉 = dict()
 
-        # 실시간 설정
-        s_대상종목 = ';'.join(self.li_대상종목)
-        self.api.set_실시간_종목등록(s_종목코드=s_대상종목, s_등록형태='신규')
-
         # 타이머 기반 동작 설정 (메인봇 연결)
         self.타이머 = QTimer(self)
         self.타이머.start(1 * 1000)  # 1/1000초 단위로 숫자 입력
@@ -104,25 +103,30 @@ class Trader(QMainWindow, form_class):
 
         # 현재 시각 확인
         dt_현재 = pd.Timestamp('now')
+        s_현재 = dt_현재.strftime('%H:%M:%S')
         n_현재_분 = int(dt_현재.strftime('%M'))
         n_현재_초 = int(dt_현재.strftime('%S'))
 
         # 1초 단위 업데이트
         self.setui_실시간()
 
-        # 모니터링 파일 생성 (재구동 대기시간 절반 주기)
-        if n_현재_초 % self.n_모니터링파일생성주기 == 0:
-            self.update_모니터링파일()
+        # 대상종목 업데이트 (10분 주기) - 조건식 1분주기 이내 조회시 미응답
+        if (s_현재 in ['09:03:00', '09:06:00']) or (n_현재_분 % 10 == 0 and n_현재_초 == 0):
+            self.li_대상종목, self.dic_코드2종목명 = self.get_대상종목()
 
-        # 매수봇 호출
+        # 매수봇 호출 (3분 주기)
         if self.flag_종목보유 is False:
             if n_현재_분 % 3 == 0 and n_현재_초 == 1:
                 self.run_매수봇()
 
-        # 매도봇 호출
+        # 매도봇 호출 (1초 주기)
         if self.flag_종목보유 is True:
             if n_현재_초 % 1 == 0:
                 self.run_매도봇()
+
+        # 모니터링 파일 생성 (재구동 대기시간 절반 주기)
+        if n_현재_초 % self.n_모니터링파일생성주기 == 0:
+            self.update_모니터링파일()
 
         # 초기 설정 (3분 주기)
         if n_현재_분 % 3 == 0 and n_현재_초 == 30:
@@ -179,7 +183,7 @@ class Trader(QMainWindow, form_class):
             b_매수신호 = sum(li_매수신호) == len(li_매수신호)
 
             # log 기록
-            s_종목명 = self.dic_코드2종목명_대상종목[s_종목코드]
+            s_종목명 = self.dic_코드2종목명[s_종목코드]
             s_매수신호 = 'ok' if b_매수신호 else 'NG'
             n_반대신호 = len(li_매수신호) - sum(li_매수신호) if b_매수신호 == False else ''
             li_s_매수신호 = ['ok' if b_신호 else 'NG' for b_신호 in li_매수신호]
@@ -353,18 +357,66 @@ class Trader(QMainWindow, form_class):
         return li_호가단위
 
     def get_대상종목(self):
-        """ 트레이더 구동 시 감시할 대상종목 읽어와서 종목코드(list), 종목명(dict)  리턴 """
-        # 감시대상 파일 읽어오기
-        # df_감시대상 = pd.read_pickle(os.path.join(self.folder_감시대상, f'df_종목선정_{self.s_전일}.pkl'))
-        df_감시대상 = pd.read_pickle(os.path.join(self.folder_일봉변동, f'df_일봉변동_{self.s_전일}.pkl'))
+        """ 트레이더 구동 시 감시할 대상종목 읽어와서 종목코드(list), 종목명(dict) 리턴 """
+        # 코드2종목명 생성
+        df_전체종목 = pd.read_pickle(os.path.join(self.folder_전체종목, f'df_전체종목_{self.s_오늘}.pkl'))
+        dic_코드2종목명 = df_전체종목.set_index('종목코드')['종목명'].to_dict()
 
-        # 종목코드 골라내기
-        li_대상종목 = list(df_감시대상['종목코드'].sort_values().unique())
+        # 대상종목 파일 읽어오기
+        try:
+            df_대상종목 = pd.read_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}.pkl'))
+        except FileNotFoundError:
+            df_대상종목 = pd.DataFrame()
+        n_대상종목_기존 = len(df_대상종목)
 
-        # 종목명 변환용 dict 생성
-        dic_코드2종목명_대상종목 = df_감시대상.set_index('종목코드')['종목명'].to_dict()
+        # 대상1) 일봉변동 추가 (전일)
+        df_일봉변동 = pd.read_pickle(os.path.join(self.folder_일봉변동, f'df_일봉변동_{self.s_전일}.pkl'))
+        df_일봉변동['선정사유'] = '일봉변동'
 
-        return li_대상종목, dic_코드2종목명_대상종목
+        # 대상2) 조건검색 추가 (실시간)
+        dic_조건검색 = self.api.get_조건검색_전체(li_대상=['vi발동', '거래량급증'])
+        # dic_조건검색 = self.api.get_조건검색_전체(b_실시간=True)
+        li_df_조건검색 = list()
+        for s_조건명 in ['vi발동', '거래량급증']:
+            df_조건검색_조건명 = pd.DataFrame()
+            df_조건검색_조건명['종목코드'] = dic_조건검색[s_조건명]
+            df_조건검색_조건명['종목명'] = df_조건검색_조건명['종목코드'].apply(lambda x: dic_코드2종목명[x]
+                                                                                if x in dic_코드2종목명.keys() else None)
+            df_조건검색_조건명['선정사유'] = s_조건명
+            li_df_조건검색.append(df_조건검색_조건명)
+        df_조건검색 = pd.concat(li_df_조건검색, axis=0)
+        df_조건검색 = df_조건검색.drop_duplicates(subset='종목코드')
+        df_조건검색 = df_조건검색[~df_조건검색['종목코드'].isin(df_일봉변동['종목코드'])]
+
+        # 신규 대상종목 생성
+        df_대상종목_신규 = pd.concat([df_일봉변동, df_조건검색], axis=0)
+        df_대상종목_신규['추가시점'] = pd.Timestamp('now').strftime('%H:%M:%S')
+        if len(df_대상종목) > 0:
+            df_대상종목_신규 = df_대상종목_신규[~df_대상종목_신규['종목코드'].isin(df_대상종목['종목코드'])]
+        df_대상종목_신규 = df_대상종목_신규.loc[:, ['종목코드', '종목명', '선정사유', '추가시점']]
+
+        # 대상종목 업데이트
+        df_대상종목 = pd.concat([df_대상종목, df_대상종목_신규], axis=0)
+        df_대상종목 = df_대상종목.drop_duplicates(subset='종목코드')
+        df_대상종목.to_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}.pkl'))
+        try:
+            df_대상종목.to_csv(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}.csv'),
+                           index=False, encoding='cp949')
+        except PermissionError:
+            pass
+        n_대상종목_신규 = len(df_대상종목)
+
+        # 대상종목 list 생성
+        li_대상종목 = list(df_대상종목['종목코드'].sort_values().unique())[:99]
+
+        # 실시간 설정
+        s_대상종목 = ';'.join(li_대상종목)
+        self.api.set_실시간_종목등록(s_종목코드=s_대상종목, s_등록형태='신규')
+
+        # 로그 기록(임시)
+        self.make_log(f'대상종목 업데이트 {n_대상종목_기존} -> {n_대상종목_신규}')
+
+        return li_대상종목, dic_코드2종목명
 
     def get_지지저항(self):
         """ 감시대상 종목의 지지저항 정보 읽어와서 종목별 지지저항 list (dict) 리턴 """
@@ -538,8 +590,12 @@ class Trader(QMainWindow, form_class):
             path_pkl = os.path.join(li_폴더파일[0], f'{li_폴더파일[1]}.pkl')
             path_csv = os.path.join(li_폴더파일[0], f'{li_폴더파일[1]}.csv')
             if not os.path.isfile(path_csv):
-                df_파일 = pd.read_pickle(path_pkl)
-                df_파일.to_csv(path_csv, index=False, encoding='cp949')
+                try:
+                    df_파일 = pd.read_pickle(path_pkl)
+                    df_파일.to_csv(path_csv, index=False, encoding='cp949')
+                    self.make_log(f'csv 생성 완료 - {li_폴더파일[1]}')
+                except FileNotFoundError:
+                    self.make_log(f'pkl 미존재 - {li_폴더파일[1]}')
 
     def setui_초기설정(self):
         """ ui 내 정보 표시 및 버튼 동작 설정 """
