@@ -50,7 +50,7 @@ def make_매수신호(df_초봉, dt_일자시간=None):
 
     # 3) 체결강도 검증
     n_체결강도 = df_초봉['체결강도'].values[-1]
-    b_체결강도 = n_체결강도 > 1000
+    b_체결강도 = n_체결강도 > 500
     li_매수신호.append(b_체결강도)
 
     # 정보 전달용 dic 생성
@@ -81,33 +81,33 @@ def make_매도신호(df_초봉, n_매수가, s_매수시간, dt_일자시간=No
     # 매도신호 검증
     li_매도신호 = list()
 
-    # 1) 체결 검증
+    # 1) 매도우세 검증
     n_z매수 = cal_z스코어(df_초봉['z_매수'].values[-30:])
     n_z매도 = cal_z스코어(df_초봉['z_매도'].values[-30:])
     n_매도금액 = df_초봉['만원_매도'].values[-1]
     n_체결강도 = df_초봉['체결강도'].values[-1]
-    b_체결 = n_z매수 < -1 and n_z매도 > 3 and n_매도금액 > 10000 * n_초봉 and n_체결강도 < 50
-    li_매도신호.append(b_체결)
+    b_매도우세 = n_z매수 < 1 and n_z매도 > 3 and n_매도금액 > 7000 * n_초봉 and n_체결강도 < 100
+    li_매도신호.append(b_매도우세)
 
-    # 2) 하락 검증
+    # 2) 하락한계 검증
     ary_종가 = df_초봉['종가'].dropna().values
     n_현재가 = ary_종가[-1] if len(ary_종가) > 0 else None
     n_수익률 = (n_현재가 / n_매수가 - 1) * 100 if n_현재가 is not None else None
-    b_하락 = n_수익률 < -1.0 if n_수익률 is not None else False
-    li_매도신호.append(b_하락)
+    b_하락한계 = n_수익률 < -0.5 if n_수익률 is not None else False
+    li_매도신호.append(b_하락한계)
 
-    # 3) 시간 검증
-    n_타임아웃초 = 60 * 3
+    # 3) 타임아웃 검증
+    n_타임아웃초 = 60 * 5
     dt_현재 = pd.Timestamp('now') if dt_일자시간 is None else dt_일자시간
     s_일자 = dt_현재.strftime('%Y%m%d')
     dt_매수시간 = pd.Timestamp(f'{s_일자} {s_매수시간}')
     n_경과초 = (dt_현재 - dt_매수시간).seconds
-    b_시간 = n_경과초 > n_타임아웃초
-    li_매도신호.append(b_시간)
+    b_타임아웃 = n_경과초 > n_타임아웃초
+    li_매도신호.append(b_타임아웃)
 
-    # 4) 종료 검증
-    b_종료 = dt_현재.strftime('%H:%M:%S') >= '15:15:00'
-    li_매도신호.append(b_종료)
+    # 4) 시장종료 검증
+    b_시장종료 = dt_현재.strftime('%H:%M:%S') >= '15:15:00'
+    li_매도신호.append(b_시장종료)
 
     # 정보 전달용 dic 생성
     dic_신호상세 = dict(n_초봉=n_초봉,
