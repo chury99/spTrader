@@ -413,8 +413,11 @@ class Trader(QMainWindow, form_class):
         s_대상종목 = ';'.join(li_대상종목)
         self.api.set_실시간_종목등록(s_종목코드=s_대상종목, s_등록형태='신규')
 
-        # 로그 기록(임시)
-        self.make_log(f'대상종목 업데이트 {n_대상종목_기존} -> {n_대상종목_신규}')
+        # 로그 기록
+        li_선정사유 = [f'{사유[:2]}-{len(df_대상종목[df_대상종목["선정사유"] == 사유])}'
+                   for 사유 in df_대상종목['선정사유'].unique()]
+        s_선정사유 = ', '.join(li_선정사유)
+        self.make_log(f'대상종목 업데이트 {n_대상종목_기존} -> {n_대상종목_신규} ({s_선정사유})')
 
         return li_대상종목, dic_코드2종목명
 
