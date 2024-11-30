@@ -35,7 +35,9 @@ class Analyzer:
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
         self.folder_대상종목 = dic_폴더정보['이력|대상종목']
         self.folder_지표생성 = dic_폴더정보['tf초봉분석|10_지표생성']
+        self.folder_분봉확인 = dic_폴더정보['tf초봉분석|20_분봉확인']
         os.makedirs(self.folder_지표생성, exist_ok=True)
+        os.makedirs(self.folder_분봉확인, exist_ok=True)
 
         # 변수 설정
         self.n_보관기간_analyzer = int(dic_config['파일보관기간(일)_analyzer'])
@@ -70,6 +72,7 @@ class Analyzer:
             df_대상종목 = pd.read_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{s_일자}.pkl'))
             dic_종목코드2종목명 = df_대상종목.set_index('종목코드').to_dict()['종목명']
             dic_종목코드2추가시점 = df_대상종목.set_index('종목코드').to_dict()['추가시점']
+            dic_종목코드2선정사유 = df_대상종목.set_index('종목코드').to_dict()['선정사유']
 
             # 초봉 불러오기
             try:
@@ -77,15 +80,13 @@ class Analyzer:
             except FileNotFoundError:
                 continue
 
-            # 전체 시간 생성
-            # li_전체시간 = list(pd.concat([dic_초봉[코드]['체결시간'] for 코드 in dic_초봉.keys()]).sort_values().unique())
-
             # 종목별 분석 진행
             dic_지표생성 = dict()
             for s_종목코드 in tqdm(df_대상종목['종목코드'], desc=f'지표생성-{n_초봉}초봉-{s_일자}'):
                 # 기준정보 생성
                 s_종목명 = dic_종목코드2종목명[s_종목코드]
                 s_추가시점 = dic_종목코드2추가시점[s_종목코드]
+                s_선정사유 = dic_종목코드2선정사유[s_종목코드]
 
                 # 종목명 추가
                 df_초봉 = dic_초봉[s_종목코드].sort_index()
@@ -104,6 +105,7 @@ class Analyzer:
                 df_초봉['만원_매도'] = df_초봉['종가'] * df_초봉['매도량'] / 10000
                 df_초봉['만원_거래'] = df_초봉['종가'] * df_초봉['거래량'] / 10000
                 df_초봉['추가시점'] = s_추가시점
+                df_초봉['선정사유'] = s_선정사유
 
                 # 미존재 데이터 처리
                 for s_컬러명 in ['거래량', '매수량', '매도량', '체결강도', 'z_매수', 'z_매도', 'z_거래',
@@ -124,6 +126,67 @@ class Analyzer:
 
             # log 기록
             self.make_log(f'지표생성 완료({s_일자}, {n_초봉}초봉, {len(dic_지표생성):,}개 종목)')
+
+    def 분석_분봉확인(self, b_차트, n_초봉):
+        """ trader 동작 시 생성된 대상종목 기준으로 초봉 데이터에 지표 추가 생성 후 pkl, csv 저장 """
+        # 파일명 정의
+        s_파일명_기준 = 'dic_지표생성'
+        s_파일명_생성 = 'dic_분봉확인'
+
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_지표생성)
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
+        li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_분봉확인)
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
+        li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 초봉 불러오기
+            dic_초봉 = pd.read_pickle(os.path.join(self.folder_지표생성, f'dic_지표생성_{s_일자}_{n_초봉}초봉.pkl'))
+
+            # 분봉 불러오기
+            dic_분봉 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_분봉_{s_일자}.pkl'))
+
+            # 종목별 분석 진행
+            dic_분봉확인 = dict()
+            for s_종목코드 in tqdm(dic_초봉.keys(), desc=f'분봉확인-{n_초봉}초봉-{s_일자}'):
+                # 데이터 확인
+                df_초봉 = dic_초봉[s_종목코드].copy()
+                df_분봉 = dic_분봉[s_종목코드].copy()
+
+                # 분봉 상승 확인
+                df_분봉['고가%'] = (df_분봉['고가'] / df_분봉['종가'].shift(1) - 1) * 100
+                df_분봉_상승 = df_분봉[df_분봉['고가%'] > 2].copy()
+
+                # 확인 구간 생성
+                df_분봉_상승['dt일시'] = pd.to_datetime(df_분봉_상승['일자'] + ' ' + df_분봉_상승['시간'])
+                df_분봉_상승['dt시작'] = df_분봉_상승['dt일시'] - pd.Timedelta(seconds=10)
+                df_분봉_상승['dt종료'] = df_분봉_상승['dt일시'] + pd.Timedelta(seconds=70)
+
+                # 초봉에 구간 표기
+                df_초봉['분봉상승'] = None
+                for i in range(len(df_분봉_상승)):
+                    dt_시작 = df_분봉_상승['dt시작'].values[i]
+                    dt_종료 = df_분봉_상승['dt종료'].values[i]
+                    df_초봉.loc[df_초봉.index >= dt_시작, '분봉상승'] = True
+                    df_초봉.loc[df_초봉.index > dt_종료, '분봉상승'] = None
+
+                # dic 추가
+                dic_분봉확인[s_종목코드] = df_초봉
+
+                # csv 저장
+                s_폴더 = os.path.join(self.folder_분봉확인, f'종목별_{s_일자}')
+                os.makedirs(s_폴더, exist_ok=True)
+                df_초봉.to_csv(os.path.join(s_폴더, f'df_분봉확인_{s_일자}_{n_초봉}초봉_{s_종목코드}.csv'),
+                              index=False, encoding='cp949')
+
+            # dic 저장
+            pd.to_pickle(dic_분봉확인, os.path.join(self.folder_분봉확인, f'dic_분봉확인_{s_일자}_{n_초봉}초봉.pkl'))
+
+            # log 기록
+            self.make_log(f'분봉확인 완료({s_일자}, {n_초봉}초봉, {len(dic_분봉확인):,}개 종목)')
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
@@ -151,3 +214,5 @@ if __name__ == "__main__":
     li_초봉 = [1, 2, 3, 5, 10]
     for n_초봉 in li_초봉:
         a.분석_지표생성(b_차트=True, n_초봉=n_초봉)
+    for n_초봉 in li_초봉:
+        a.분석_분봉확인(b_차트=True, n_초봉=n_초봉)
