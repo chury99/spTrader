@@ -18,14 +18,44 @@ def cal_z스코어(데이터):
     return n_z스코어
 
 
+def make_초봉데이터(li_체결정보, s_오늘, n_초봉):
+    """ list 형태의 체결정보 데이터를 초봉 데이터로 변환 후 df 리턴 """
+    # 체결정보 정리
+    df_체결정보 = pd.DataFrame(li_체결정보,
+                           columns=['종목코드', '체결시간', '체결단가', '전일대비(%)', '체결량', '매수매도', '체결금액'])
+    df_체결정보 = df_체결정보.dropna().sort_values('체결시간')
+    df_체결정보['dt일시'] = pd.to_datetime(s_오늘 + ' ' + df_체결정보['체결시간'])
+    df_체결정보 = df_체결정보.set_index('dt일시')
+
+    # 매수매도 분리
+    df_체결정보_매수 = df_체결정보[df_체결정보['매수매도'] == '매수']
+    df_체결정보_매도 = df_체결정보[df_체결정보['매수매도'] == '매도']
+
+    # 리샘플 생성
+    df_리샘플 = df_체결정보.resample(f'{n_초봉}s')
+    df_리샘플_매수 = df_체결정보_매수.resample(f'{n_초봉}s')
+    df_리샘플_매도 = df_체결정보_매도.resample(f'{n_초봉}s')
+
+    # 초봉 생성
+    df_초봉 = df_리샘플.first().loc[:, '종목코드':'체결시간']
+    df_초봉['체결시간'] = df_초봉.index.strftime('%H:%M:%S')
+    df_초봉['시가'] = df_리샘플['체결단가'].first()
+    df_초봉['고가'] = df_리샘플['체결단가'].max()
+    df_초봉['저가'] = df_리샘플['체결단가'].min()
+    df_초봉['종가'] = df_리샘플['체결단가'].last()
+    df_초봉['거래량'] = df_리샘플['체결량'].sum()
+    df_초봉['매수량'] = df_리샘플_매수['체결량'].sum()
+    df_초봉['매도량'] = df_리샘플_매도['체결량'].sum()
+    df_초봉['매수량'] = df_초봉['매수량'].fillna(0).astype(int)
+    df_초봉['매도량'] = df_초봉['매도량'].fillna(0).astype(int)
+
+    return df_초봉
+
+
 def make_매수신호(df_초봉, dt_일자시간=None):
     """ 입력 받은 초봉 데이터 기준으로 매수신호 생성 후 리턴 """
     # 현재봉 제외
-    # if dt_일자시간 is None:
-    #     s_일자 = df_ohlcv['일자'].max()
-    #     li_dt_3분봉 = [pd.Timestamp(f'{s_일자} 09:00:00') + pd.Timedelta(minutes=n * 3) for n in range(131)]
-    #     dt_일자시간 = max(dt for dt in li_dt_3분봉 if dt < pd.Timestamp('now'))
-    df_초봉 = df_초봉[df_초봉.index < dt_일자시간].copy()
+    df_초봉 = df_초봉[df_초봉.index < dt_일자시간].copy() if dt_일자시간 is not None else df_초봉
 
     # 데이터 길이 검증
     if len(df_초봉) < 30:
@@ -62,14 +92,10 @@ def make_매수신호(df_초봉, dt_일자시간=None):
     return li_매수신호, dic_신호상세
 
 
-def make_매도신호(df_초봉, n_매수가, s_매수시간, dt_일자시간=None):
+def make_매도신호(df_초봉, n_매수가, s_매수시간, n_현재가=None, dt_일자시간=None):
     """ 입력 받은 초봉 데이터 기준으로 매수신호 생성 후 리턴 """
     # 현재봉 제외
-    # if dt_일자시간 is None:
-    #     s_일자 = df_ohlcv['일자'].max()
-    #     li_dt_3분봉 = [pd.Timestamp(f'{s_일자} 09:00:00') + pd.Timedelta(minutes=n * 3) for n in range(131)]
-    #     dt_일자시간 = max(dt for dt in li_dt_3분봉 if dt < pd.Timestamp('now'))
-    df_초봉 = df_초봉[df_초봉.index < dt_일자시간].copy()
+    df_초봉 = df_초봉[df_초봉.index < dt_일자시간].copy() if dt_일자시간 is not None else df_초봉
 
     # 데이터 길이 검증
     if len(df_초봉) < 30:
@@ -90,8 +116,9 @@ def make_매도신호(df_초봉, n_매수가, s_매수시간, dt_일자시간=No
     li_매도신호.append(b_매도우세)
 
     # 2) 하락한계 검증
-    ary_종가 = df_초봉['종가'].dropna().values
-    n_현재가 = ary_종가[-1] if len(ary_종가) > 0 else None
+    if n_현재가 is None:
+        ary_종가 = df_초봉['종가'].dropna().values
+        n_현재가 = ary_종가[-1] if len(ary_종가) > 0 else None
     n_수익률 = (n_현재가 / n_매수가 - 1) * 100 if n_현재가 is not None else None
     b_하락한계 = n_수익률 < -0.5 if n_수익률 is not None else False
     li_매도신호.append(b_하락한계)
