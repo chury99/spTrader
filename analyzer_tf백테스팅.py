@@ -5,6 +5,7 @@ import json
 import re
 
 from tqdm import tqdm
+import multiprocessing as mp
 
 import UT_차트maker as Chart
 import analyzer_tf알고리즘 as Logic
@@ -56,7 +57,7 @@ class Analyzer:
         # log 기록
         self.make_log(f'### 백테스팅 시작 ###')
 
-    def 검증_매수매도(self, b_차트, n_초봉):
+    def 검증_매수매도(self, n_초봉):
         """ 지표 추가된 초봉 데이터 기준 매수, 매도 검증 후 pkl, csv 저장 """
         # 파일명 정의
         s_파일명_기준 = 'dic_분봉확인'
@@ -168,7 +169,7 @@ class Analyzer:
             # log 기록
             self.make_log(f'신호생성 완료({s_일자}, {n_초봉}초봉, {len(dic_매수매도):,}개 종목)')
 
-    def 검증_결과정리(self, b_차트, n_초봉):
+    def 검증_결과정리(self, n_초봉):
         """ 매수 매도 신호 기준으로 결과 정리 후 pkl, csv 저장 """
         # 파일명 정의
         s_파일명_기준 = 'dic_매수매도'
@@ -188,27 +189,35 @@ class Analyzer:
             dic_초봉 = pd.read_pickle(os.path.join(self.folder_매수매도, f'dic_매수매도_{s_일자}_{n_초봉}초봉.pkl'))
 
             # 종목별 매수매도 통합
-            li_df_결과정리 = list()
+            li_df_결과정리_전체 = list()
             for s_종목코드 in dic_초봉.keys():
                 df_초봉 = dic_초봉[s_종목코드].sort_index().copy()
-                li_df_결과정리.append(df_초봉[df_초봉['매도시간'] > '00:00:00'])
-            df_결과정리 = pd.concat(li_df_결과정리, axis=0)
+                li_df_결과정리_전체.append(df_초봉)
+            df_결과정리_전체 = pd.concat(li_df_결과정리_전체, axis=0)
 
             # 추가정보 생성
-            df_결과정리['수익률%'] = (df_결과정리['매도가'] / df_결과정리['매수가'] - 1) * 100 - 0.2
-            df_결과정리['보유초'] = (pd.to_datetime(df_결과정리['매도시간'], format='%H:%M:%S')
-                                    - pd.to_datetime(df_결과정리['매수시간'], format='%H:%M:%S')).dt.total_seconds()
-            df_결과정리['타임아웃'] = df_결과정리['매도사유'].apply(lambda x: True if x == '타임아웃' else None)
+            df_결과정리_전체['수익률%'] = (df_결과정리_전체['매도가'] / df_결과정리_전체['매수가'] - 1) * 100 - 0.2
+            df_결과정리_전체['보유초'] = (pd.to_datetime(df_결과정리_전체['매도시간'], format='%H:%M:%S')
+                                    - pd.to_datetime(df_결과정리_전체['매수시간'], format='%H:%M:%S')).dt.total_seconds()
+            df_결과정리_전체['타임아웃'] = df_결과정리_전체['매도사유'].apply(lambda x: True if x == '타임아웃' else None)
 
-            # 파일 저장
+            # 매도 데이터 있는 항목만 골라내기
+            df_결과정리 = df_결과정리_전체[df_결과정리_전체['매도시간'] > '00:00:00']
+
+            # 파일 저장 (매수매도 only)
             df_결과정리.to_pickle(os.path.join(self.folder_결과정리, f'df_결과정리_{s_일자}_{n_초봉}초봉.pkl'))
             df_결과정리.to_csv(os.path.join(self.folder_결과정리, f'df_결과정리_{s_일자}_{n_초봉}초봉.csv'),
+                          index=False, encoding='cp949')
+
+            # 파일 저장 (매수매도 only)
+            df_결과정리_전체.to_pickle(os.path.join(self.folder_결과정리, f'df_결과정리_{s_일자}_{n_초봉}초봉_전체.pkl'))
+            df_결과정리_전체.to_csv(os.path.join(self.folder_결과정리, f'df_결과정리_{s_일자}_{n_초봉}초봉_전체.csv'),
                           index=False, encoding='cp949')
 
             # log 기록
             self.make_log(f'결과정리 완료({s_일자}, {n_초봉}초봉, 수익률: {df_결과정리["수익률%"].sum():,.1f}%)')
 
-    def 검증_결과요약(self, b_차트, n_초봉):
+    def 검증_결과요약(self, n_초봉):
         """ 결과정리 데이터 기준으로 일별 데이터 요약 후 pkl, csv 저장 """
         # 파일명 정의
         s_파일명_기준 = 'df_결과정리'
@@ -216,7 +225,7 @@ class Analyzer:
 
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_결과정리)
-                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명 and '_전체' not in 파일명]
         li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_결과요약)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
@@ -226,7 +235,7 @@ class Analyzer:
         for s_일자 in li_일자_대상:
             # 전체 결과정리 파일 확인
             li_파일일자 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_결과정리)
-                       if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
+                       if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명 and '_전체' not in 파일명]
             li_파일일자 = [파일일자 for 파일일자 in li_파일일자 if 파일일자 <= s_일자]
 
             # 파일별 결과 요약
@@ -295,38 +304,32 @@ class Analyzer:
             df_수익요약 = pd.DataFrame()
             li_선정사유 = ['일봉변동', 'vi발동', '거래량급증']
             for s_초봉 in li_초봉:
+                # 초 이름 정의
+                s_초 = s_초봉.replace('초봉', '초')
+
                 # 전체 수익률
                 df_결과 = pd.read_pickle(os.path.join(self.folder_결과요약, f'df_결과요약_{s_일자}_{s_초봉}.pkl'))
                 df_수익요약['일자'] = ['누적%'] + list(df_결과['일자'])
-                df_수익요약[f'전체|{s_초봉}'] = [df_결과['수익률%'].sum()] + list(df_결과['수익률%'])
+                df_수익요약[f'{s_초}|전체'] = [df_결과['수익률%'].sum()] + list(df_결과['수익률%'])
 
                 # 선정 사유별 수익률
                 for s_선정사유 in li_선정사유:
-                    df_수익요약[f'{s_선정사유[:2]}|{s_초봉}'] = ([df_결과[f'{s_선정사유[:2]}|수익률%'].sum()]
+                    df_수익요약[f'{s_초}|{s_선정사유[:2]}'] = ([df_결과[f'{s_선정사유[:2]}|수익률%'].sum()]
                                                             + list(df_결과[f'{s_선정사유[:2]}|수익률%']))
-
-            # 컬럼 정리
-            li_컬럼명 = ['일자']
-            for s_선정사유 in ['전체'] + li_선정사유:
-                li_컬럼명 = li_컬럼명 + [컬럼명 for 컬럼명 in df_수익요약.columns if f'{s_선정사유[:2]}|' in 컬럼명]
-            df_수익요약 = df_수익요약.loc[:, li_컬럼명]
 
             # 파일 저장
             df_수익요약.to_pickle(os.path.join(self.folder_수익요약, f'df_수익요약_{s_일자}.pkl'))
             df_수익요약.to_csv(os.path.join(self.folder_수익요약, f'df_수익요약_{s_일자}.csv'),
                           index=False, encoding='cp949')
 
-            # log 기록
-            self.make_log(f'수익요약 완료({s_일자})')
-
             # df_리포트 생성
             li_컬럼명 = [컬럼명 for 컬럼명 in df_수익요약.columns if '일자' not in 컬럼명]
             df_리포트 = pd.DataFrame()
             df_리포트['일자'] = df_수익요약['일자']
             for s_컬럼명 in li_컬럼명:
-                df_리포트[s_컬럼명] = df_수익요약[s_컬럼명].apply(lambda x: f'{x:.2f}')
-            df_리포트['v+거|5'] = (df_수익요약['vi|5초봉'] + df_수익요약['거래|5초봉']).apply(lambda x: f'{x:.2f}')
-            df_리포트 = df_리포트[:15]
+                df_리포트[s_컬럼명] = df_수익요약[s_컬럼명].apply(lambda x: f'{x:.1f}')
+            df_리포트['5초|v+거'] = (df_수익요약['5초|vi'] + df_수익요약['5초|거래']).apply(lambda x: f'{x:.1f}')
+            df_리포트 = df_리포트[:20]
 
             # 리포트 생성
             n_세로 = int(len(df_리포트) / 2)
@@ -353,7 +356,7 @@ class Analyzer:
             w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
 
             # 카톡 보내기
-            if b_카톡:
+            if b_카톡 and s_일자 == li_일자_대상[-1]:
                 import API_kakao
                 k = API_kakao.KakaoAPI()
                 result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 백테스팅 완료',
@@ -387,10 +390,11 @@ class Analyzer:
 if __name__ == "__main__":
     a = Analyzer(n_분석일수=None)
     li_초봉 = [1, 2, 3, 5, 10]
+    n_코어수 = mp.cpu_count() - 3
+    with mp.Pool(processes=n_코어수) as pool:
+        ret_매수매도 = pool.map(a.검증_매수매도, li_초봉)
+    with mp.Pool(processes=n_코어수) as pool:
+        ret_결과정리 = pool.map(a.검증_결과정리, li_초봉)
     for n_초봉 in li_초봉:
-        a.검증_매수매도(b_차트=True, n_초봉=n_초봉)
-    for n_초봉 in li_초봉:
-        a.검증_결과정리(b_차트=True, n_초봉=n_초봉)
-    for n_초봉 in li_초봉:
-        a.검증_결과요약(b_차트=True, n_초봉=n_초봉)
+        a.검증_결과요약(n_초봉=n_초봉)
     a.검증_수익요약(b_카톡=True)
