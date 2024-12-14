@@ -58,36 +58,45 @@ def make_매수신호(df_초봉, dt_일자시간=None):
     df_초봉 = df_초봉[df_초봉.index < dt_일자시간].copy() if dt_일자시간 is not None else df_초봉
 
     # 데이터 길이 검증
-    if len(df_초봉) < 30:
+    if len(df_초봉) == 0:
         return [False] * 3, dict()
 
     # 초봉 확인
-    n_초봉 = (df_초봉.index[1] - df_초봉.index[0]).seconds
+    n_초봉 = (df_초봉.index[1] - df_초봉.index[0]).seconds if len(df_초봉) > 1 else 10
+
+    # 데이터 정의
+    ary_매수량 = df_초봉['매수량'].values[-30:]
+    ary_매도량 = df_초봉['매도량'].values[-30:]
+    n_매수량 = df_초봉['매수량'].values[-1]
+    n_매도량 = df_초봉['매도량'].values[-1]
+    n_종가 = df_초봉['종가'].values[-1]
 
     # 매수신호 검증
     li_매수신호 = list()
 
     # 1) z스코어 검증
-    n_z매수 = cal_z스코어(df_초봉['z_매수'].values[-30:])
-    n_z매도 = cal_z스코어(df_초봉['z_매도'].values[-30:])
-    b_z스코어 = n_z매수 > 3 and n_z매도 < 1
+    n_z매수 = cal_z스코어(ary_매수량)
+    n_z매도 = cal_z스코어(ary_매도량)
+    b_z스코어 = (n_z매수 > 3 and n_z매도 < 1) if len(df_초봉) >= 30 else False
     li_매수신호.append(b_z스코어)
 
     # 2) 거래금액 검증
-    n_매수금액 = df_초봉['만원_매수'].values[-1]
+    n_매수금액 = n_종가 * n_매수량 / 10000
     b_거래금액 = n_매수금액 > 10000 * n_초봉
     li_매수신호.append(b_거래금액)
 
     # 3) 체결강도 검증
-    n_체결강도 = df_초봉['체결강도'].values[-1]
+    n_체결강도 = (n_매수량 / n_매도량 * 100) if n_매도량 != 0 else 99999
     b_체결강도 = n_체결강도 > 500
     li_매수신호.append(b_체결강도)
 
     # 정보 전달용 dic 생성
+    li_신호종류 = ['z값', '금액', '강도']
     dic_신호상세 = dict(n_초봉=n_초봉,
                     n_z매수=n_z매수, n_z매도=n_z매도,
                     n_매수금액=n_매수금액,
-                    n_체결강도=n_체결강도)
+                    n_체결강도=n_체결강도,
+                    li_신호종류=li_신호종류)
 
     return li_매수신호, dic_신호상세
 
@@ -98,21 +107,29 @@ def make_매도신호(df_초봉, n_매수가, s_매수시간, n_현재가=None, 
     df_초봉 = df_초봉[df_초봉.index < dt_일자시간].copy() if dt_일자시간 is not None else df_초봉
 
     # 데이터 길이 검증
-    if len(df_초봉) < 30:
+    if len(df_초봉) == 0:
         return [False] * 4, dict()
 
     # 초봉 확인
-    n_초봉 = (df_초봉.index[1] - df_초봉.index[0]).seconds
+    n_초봉 = (df_초봉.index[1] - df_초봉.index[0]).seconds if len(df_초봉) > 1 else 10
+
+    # 데이터 정의
+    ary_매수량 = df_초봉['매수량'].values[-30:]
+    ary_매도량 = df_초봉['매도량'].values[-30:]
+    n_매수량 = df_초봉['매수량'].values[-1]
+    n_매도량 = df_초봉['매도량'].values[-1]
+    n_종가 = df_초봉['종가'].values[-1]
 
     # 매도신호 검증
     li_매도신호 = list()
 
     # 1) 매도우세 검증
-    n_z매수 = cal_z스코어(df_초봉['z_매수'].values[-30:])
-    n_z매도 = cal_z스코어(df_초봉['z_매도'].values[-30:])
-    n_매도금액 = df_초봉['만원_매도'].values[-1]
-    n_체결강도 = df_초봉['체결강도'].values[-1]
-    b_매도우세 = n_z매수 < 1 and n_z매도 > 3 and n_매도금액 > 7000 * n_초봉 and n_체결강도 < 100
+    n_z매수 = cal_z스코어(ary_매수량)
+    n_z매도 = cal_z스코어(ary_매도량)
+    n_매도금액 = n_종가 * n_매도량 / 10000
+    n_체결강도 = (n_매수량 / n_매도량 * 100) if n_매도량 != 0 else 99999
+    b_매도우세 = (n_z매수 < 1 and n_z매도 > 3 and n_매도금액 > 7000 * n_초봉 and n_체결강도 < 100)\
+                if len(df_초봉) >= 30 else False
     li_매도신호.append(b_매도우세)
 
     # 2) 하락한계 검증
@@ -137,9 +154,11 @@ def make_매도신호(df_초봉, n_매수가, s_매수시간, n_현재가=None, 
     li_매도신호.append(b_시장종료)
 
     # 정보 전달용 dic 생성
+    li_신호종류 = ['매도우세', '하락한계', '타임아웃', '시장종료']
     dic_신호상세 = dict(n_초봉=n_초봉,
                     n_z매수=n_z매수, n_z매도=n_z매도, n_매도금액=n_매도금액, n_체결강도=n_체결강도,
                     n_현재가=n_현재가, n_수익률=n_수익률,
-                    n_경과초=n_경과초)
+                    n_경과초=n_경과초,
+                    li_신호종류=li_신호종류)
 
     return li_매도신호, dic_신호상세
