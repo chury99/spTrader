@@ -6,8 +6,12 @@ import numpy as np
 
 def cal_z스코어(데이터):
     """ 입력 받은 데이터 기준으로 마지막 값의 z스코어 계산 후 리턴 """
+    # nan 제거 (nan : 자기 자신과 같지 않음)
+    ary_데이터 = np.array([x for x in 데이터 if x == x])
+    if len(ary_데이터) < 20:
+        return np.nan
+
     # 데이터 계산
-    ary_데이터 = np.array(데이터)
     n_평균값 = ary_데이터.mean()
     n_표준편차 = ary_데이터.std()
     n_데이터 = ary_데이터[-1]
@@ -77,7 +81,8 @@ def make_매수신호(df_초봉, dt_일자시간=None):
     # 1) z스코어 검증
     n_z매수 = cal_z스코어(ary_매수량)
     n_z매도 = cal_z스코어(ary_매도량)
-    b_z스코어 = (n_z매수 > 3 and n_z매도 < 1) if len(df_초봉) >= 30 else False
+    b_z스코어 = (n_z매수 > 3 and n_z매도 < 1)\
+                if len(df_초봉) >= 30 and n_z매수 is not None and n_z매도 is not None else False
     li_매수신호.append(b_z스코어)
 
     # 2) 거래금액 검증
@@ -128,7 +133,7 @@ def make_매도신호(df_초봉, n_매수가, s_매수시간, n_현재가=None, 
     n_z매도 = cal_z스코어(ary_매도량)
     n_매도금액 = n_종가 * n_매도량 / 10000
     n_체결강도 = (n_매수량 / n_매도량 * 100) if n_매도량 != 0 else 99999
-    b_매도우세 = (n_z매수 < 1 and n_z매도 > 3 and n_매도금액 > 7000 * n_초봉 and n_체결강도 < 100)\
+    b_매도우세 = (n_z매수 < 1 and n_z매도 > 2 and n_매도금액 > 5000 * n_초봉 and n_체결강도 < 100)\
                 if len(df_초봉) >= 30 else False
     li_매도신호.append(b_매도우세)
 
