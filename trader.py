@@ -73,11 +73,14 @@ class Trader(QMainWindow, form_class):
         self.n_모니터링파일생성주기 = int(int(dic_config['재구동_대기시간(초)']) / 2)
         self.s_전일 = self.get_전일날짜()
         self.li_호가단위 = self.make_호가단위()
-        self.li_대상종목, self.df_대상종목, self.dic_코드2종목명 = self.get_대상종목()
 
         # log 기록
         self.make_log(f'### Short Punch Trader 시작 ({self.s_접속서버}) ###')
-        self.make_log(f'대상종목 감시 시작 - {len(self.li_대상종목)}개 종목')
+        # self.make_log(f'대상종목 감시 시작 - {len(self.li_대상종목)}개 종목')
+
+        # 대상종목 설정
+        # self.li_대상종목, self.df_대상종목, self.dic_코드2종목명 = self.get_대상종목()
+        self.dic_대상종목, self.df_대상종목_매매, self.dic_코드2종목명 = self.get_대상종목()
 
         # 초기 설정
         self.setui_초기설정()
@@ -86,7 +89,6 @@ class Trader(QMainWindow, form_class):
 
         self.df_계좌잔고_전체, self.df_계좌잔고_종목별 = self.api.get_tr_계좌잔고(s_계좌번호=self.s_계좌번호)
         self.flag_종목보유 = len(self.df_계좌잔고_종목별) > 0
-        self.dic_3분봉 = dict()
 
         # 타이머 기반 동작 설정 (메인봇 연결)
         self.타이머 = QTimer(self)
@@ -112,7 +114,8 @@ class Trader(QMainWindow, form_class):
         # 대상종목 업데이트 (10분 주기) - 조건식 1분주기 이내 조회시 미응답
         li_초반탐색시간 = ['09:01:30', '09:03:00', '09:04:30', '09:06:00', '09:08:00']
         if (s_현재 in li_초반탐색시간) or (n_현재_분 % 10 == 0 and n_현재_초 == 0):
-            self.li_대상종목, self.df_대상종목, self.dic_코드2종목명 = self.get_대상종목()
+            # self.li_대상종목, self.df_대상종목, self.dic_코드2종목명 = self.get_대상종목()
+            self.dic_대상종목, self.df_대상종목_매매, self.dic_코드2종목명 = self.get_대상종목()
 
         # 매수봇 호출 (5초 주기)
         if self.flag_종목보유 is False:
@@ -149,14 +152,15 @@ class Trader(QMainWindow, form_class):
                          f'  ===== z값검증 | 금액검증 | 강도검증 =====')
 
         # 대상종목 필터링
-        li_선정사유 = ['vi발동', '거래량급증']
-        df_대상종목_필터 = self.df_대상종목.copy()
-        df_대상종목_필터['필터'] = df_대상종목_필터['선정사유'].apply(lambda x: x in li_선정사유)
-        df_대상종목_필터 = df_대상종목_필터[df_대상종목_필터['필터']]
-        dic_코드2선정사유 = df_대상종목_필터.set_index('종목코드').to_dict()['선정사유']
+        # li_선정사유 = ['vi발동', '거래량급증']
+        # df_대상종목_필터 = self.df_대상종목.copy()
+        # df_대상종목_필터['필터'] = df_대상종목_필터['선정사유'].apply(lambda x: x in li_선정사유)
+        # df_대상종목_필터 = df_대상종목_필터[df_대상종목_필터['필터']]
+        # dic_코드2선정사유 = df_대상종목_필터.set_index('종목코드').to_dict()['선정사유']
 
         # 대상 종목별 매수신호 탐색
-        for s_종목코드 in df_대상종목_필터['종목코드']:
+        dic_코드2선정사유 = self.df_대상종목_매매.set_index('종목코드').to_dict()['선정사유']
+        for s_종목코드 in self.df_대상종목_매매['종목코드']:
             # 5초봉 데이터 생성
             n_초봉 = 5
             n_봉수 = 30
@@ -354,68 +358,145 @@ class Trader(QMainWindow, form_class):
         return li_호가단위
 
     def get_대상종목(self):
-        """ 트레이더 구동 시 감시할 대상종목 읽어와서 종목코드(list), 종목명(dict) 리턴 """
+        """ 트레이더 구동 시 감시할 대상종목 읽어와서 전체 대상종목(dict), 매매 대상종목(df), 코드2종목명(dict) 리턴 """
         # 코드2종목명 생성
         df_전체종목 = pd.read_pickle(os.path.join(self.folder_전체종목, f'df_전체종목_{self.s_오늘}.pkl'))
         dic_코드2종목명 = df_전체종목.set_index('종목코드')['종목명'].to_dict()
 
-        # 대상종목 파일 읽어오기
+        # 기존 대상종목 파일 읽어오기
         try:
-            df_대상종목 = pd.read_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}.pkl'))
+            dic_대상종목 = pd.read_pickle(os.path.join(self.folder_대상종목, f'dic_대상종목_{self.s_오늘}.pkl'))
         except FileNotFoundError:
-            df_대상종목 = pd.DataFrame()
-        n_대상종목_기존 = len(df_대상종목)
+            dic_대상종목 = dict()
 
-        # 대상1) 일봉변동 추가 (전일)
-        df_일봉변동 = pd.read_pickle(os.path.join(self.folder_일봉변동, f'df_일봉변동_{self.s_전일}.pkl'))
-        df_일봉변동['선정사유'] = '일봉변동'
-
-        # 대상2) 조건검색 추가 (실시간)
-        dic_조건검색 = self.api.get_조건검색_전체(li_대상=['vi발동', '거래량급증'])
-        li_df_조건검색 = list()
-        for s_조건명 in ['vi발동', '거래량급증']:
-            df_조건검색_조건명 = pd.DataFrame()
-            df_조건검색_조건명['종목코드'] = dic_조건검색[s_조건명]
-            df_조건검색_조건명['종목명'] = df_조건검색_조건명['종목코드'].apply(lambda x: dic_코드2종목명[x]
-                                                                                if x in dic_코드2종목명.keys() else None)
-            df_조건검색_조건명['선정사유'] = s_조건명
-            li_df_조건검색.append(df_조건검색_조건명)
-        df_조건검색 = pd.concat(li_df_조건검색, axis=0)
-        df_조건검색 = df_조건검색.drop_duplicates(subset='종목코드')
-        df_조건검색 = df_조건검색[~df_조건검색['종목코드'].isin(df_일봉변동['종목코드'])]
-
-        # 신규 대상종목 생성
-        df_대상종목_신규 = pd.concat([df_일봉변동, df_조건검색], axis=0)
-        df_대상종목_신규['추가시점'] = pd.Timestamp('now').strftime('%H:%M:%S')
-        if len(df_대상종목) > 0:
-            df_대상종목_신규 = df_대상종목_신규[~df_대상종목_신규['종목코드'].isin(df_대상종목['종목코드'])]
-        df_대상종목_신규 = df_대상종목_신규.loc[:, ['종목코드', '종목명', '선정사유', '추가시점']]
+        # 기존 대상종목 갯수 확인
+        path_기존_수집 = os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}_수집.pkl')
+        path_기존_매매 = os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}_매매.pkl')
+        n_대상종목_기존_수집 = len(pd.read_pickle(path_기존_수집)) if os.path.isfile(path_기존_수집) else 0
+        n_대상종목_기존_매매 = len(pd.read_pickle(path_기존_매매)) if os.path.isfile(path_기존_매매) else 0
 
         # 대상종목 업데이트
-        df_대상종목 = pd.concat([df_대상종목, df_대상종목_신규], axis=0)
-        df_대상종목 = df_대상종목.drop_duplicates(subset='종목코드')
-        df_대상종목.to_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}.pkl'))
-        try:
-            df_대상종목.to_csv(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}.csv'),
-                           index=False, encoding='cp949')
-        except PermissionError:
-            pass
-        n_대상종목_신규 = len(df_대상종목)
+        li_선정사유 = ['일봉변동', 'vi발동', '거래량급증']
+        li_조건검색 = ['vi발동', '거래량급증']
+        dic_조건검색 = self.api.get_조건검색_전체(li_대상=li_조건검색)
+        for s_선정사유 in li_선정사유:
+            # 기존 대상종목 불러오기
+            df_대상종목_기존 = dic_대상종목[s_선정사유] if s_선정사유 in dic_대상종목.keys() else pd.DataFrame()
+            df_대상종목_신규 = pd.DataFrame()
 
-        # 대상종목 list 생성
-        li_대상종목 = list(df_대상종목['종목코드'].sort_values().unique())[:99]
+            # 대상1) 일봉변동 추가 (전일)
+            if s_선정사유 == '일봉변동':
+                df_대상종목_신규 = pd.read_pickle(os.path.join(self.folder_일봉변동, f'df_일봉변동_{self.s_전일}.pkl'))
+                df_대상종목_신규['선정사유'] = s_선정사유
 
-        # 실시간 설정
-        s_대상종목 = ';'.join(li_대상종목)
-        self.api.set_실시간_종목등록(s_종목코드=s_대상종목, s_등록형태='신규')
+            # 대상2) 조건검색 추가 (실시간)
+            if s_선정사유 in li_조건검색:
+                df_대상종목_신규 = pd.DataFrame()
+                df_대상종목_신규['종목코드'] = dic_조건검색[s_선정사유]
+                df_대상종목_신규['종목명'] = df_대상종목_신규['종목코드'].apply(lambda x: dic_코드2종목명[x]
+                                                                                if x in dic_코드2종목명.keys() else None)
+                df_대상종목_신규['선정사유'] = s_선정사유
+
+            # 추가정보 생성
+            df_대상종목_신규['추가시점'] = pd.Timestamp('now').strftime('%H:%M:%S')
+            df_대상종목_신규 = df_대상종목_신규.loc[:, ['종목코드', '종목명', '선정사유', '추가시점']]
+
+            # 대상종목 합치기
+            df_대상종목 = pd.concat([df_대상종목_기존, df_대상종목_신규], axis=0).drop_duplicates(subset='종목코드')
+            dic_대상종목[s_선정사유] = df_대상종목
+
+        # 수집용 대상종목 생성
+        li_df = [dic_대상종목[s_사유] for s_사유 in dic_대상종목.keys() if s_사유 in ['일봉변동', 'vi발동', '거래량급증']]
+        df_대상종목_수집 = pd.concat(li_df, axis=0).drop_duplicates(subset='종목코드')
+
+        # 매매용 대상종목 생성
+        li_df = [dic_대상종목[s_사유] for s_사유 in dic_대상종목.keys() if s_사유 in ['vi발동', '거래량급증']]
+        df_대상종목_매매 = pd.concat(li_df, axis=0).drop_duplicates(subset='종목코드')
+
+        # 실시간 종목등록
+        s_대상종목_수집 = ';'.join(list(df_대상종목_수집['종목코드'])[:99])
+        self.api.set_실시간_종목등록(s_종목코드=s_대상종목_수집, s_등록형태='신규')
+
+        # 파일 저장
+        pd.to_pickle(dic_대상종목, os.path.join(self.folder_대상종목, f'dic_대상종목_{self.s_오늘}.pkl'))
+        df_대상종목_수집.to_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}_수집.pkl'))
+        df_대상종목_수집.to_csv(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}_수집.csv'),
+                          index=False, encoding='cp949')
+        df_대상종목_매매.to_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}_매매.pkl'))
+        df_대상종목_매매.to_csv(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}_매매.csv'),
+                          index=False, encoding='cp949')
 
         # 로그 기록
-        li_선정사유 = [f'{사유[:2]}-{len(df_대상종목[df_대상종목["선정사유"] == 사유])}'
-                   for 사유 in df_대상종목['선정사유'].unique()]
-        s_선정사유 = ', '.join(li_선정사유)
-        self.make_log(f'대상종목 업데이트 {n_대상종목_기존} -> {n_대상종목_신규} ({s_선정사유})')
+        s_대상별종목수 = ', '.join([f'{사유[:2]}-{len(df_대상종목_매매[df_대상종목_매매["선정사유"] == 사유])}'
+                                    for 사유 in df_대상종목_매매['선정사유'].unique()])
+        self.make_log(f'수집종목 업데이트 {n_대상종목_기존_수집} -> {len(df_대상종목_수집)}\n'
+                      f'매매종목 업데이트 {n_대상종목_기존_매매} -> {len(df_대상종목_매매)} ({s_대상별종목수})')
 
-        return li_대상종목, df_대상종목, dic_코드2종목명
+        return dic_대상종목, df_대상종목_매매, dic_코드2종목명
+
+    # def get_대상종목(self):
+    #     """ 트레이더 구동 시 감시할 대상종목 읽어와서 종목코드(list), 종목명(dict) 리턴 """
+    #     # 코드2종목명 생성
+    #     df_전체종목 = pd.read_pickle(os.path.join(self.folder_전체종목, f'df_전체종목_{self.s_오늘}.pkl'))
+    #     dic_코드2종목명 = df_전체종목.set_index('종목코드')['종목명'].to_dict()
+    #
+    #     # 대상종목 파일 읽어오기
+    #     try:
+    #         df_대상종목 = pd.read_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}.pkl'))
+    #     except FileNotFoundError:
+    #         df_대상종목 = pd.DataFrame()
+    #     n_대상종목_기존 = len(df_대상종목)
+    #
+    #     # 대상1) 일봉변동 추가 (전일)
+    #     df_일봉변동 = pd.read_pickle(os.path.join(self.folder_일봉변동, f'df_일봉변동_{self.s_전일}.pkl'))
+    #     df_일봉변동['선정사유'] = '일봉변동'
+    #
+    #     # 대상2) 조건검색 추가 (실시간)
+    #     dic_조건검색 = self.api.get_조건검색_전체(li_대상=['vi발동', '거래량급증'])
+    #     li_df_조건검색 = list()
+    #     for s_조건명 in ['vi발동', '거래량급증']:
+    #         df_조건검색_조건명 = pd.DataFrame()
+    #         df_조건검색_조건명['종목코드'] = dic_조건검색[s_조건명]
+    #         df_조건검색_조건명['종목명'] = df_조건검색_조건명['종목코드'].apply(lambda x: dic_코드2종목명[x]
+    #                                                                             if x in dic_코드2종목명.keys() else None)
+    #         df_조건검색_조건명['선정사유'] = s_조건명
+    #         li_df_조건검색.append(df_조건검색_조건명)
+    #     df_조건검색 = pd.concat(li_df_조건검색, axis=0)
+    #     df_조건검색 = df_조건검색.drop_duplicates(subset='종목코드')
+    #     df_조건검색 = df_조건검색[~df_조건검색['종목코드'].isin(df_일봉변동['종목코드'])]
+    #
+    #     # 신규 대상종목 생성
+    #     df_대상종목_신규 = pd.concat([df_일봉변동, df_조건검색], axis=0)
+    #     df_대상종목_신규['추가시점'] = pd.Timestamp('now').strftime('%H:%M:%S')
+    #     if len(df_대상종목) > 0:
+    #         df_대상종목_신규 = df_대상종목_신규[~df_대상종목_신규['종목코드'].isin(df_대상종목['종목코드'])]
+    #     df_대상종목_신규 = df_대상종목_신규.loc[:, ['종목코드', '종목명', '선정사유', '추가시점']]
+    #
+    #     # 대상종목 업데이트
+    #     df_대상종목 = pd.concat([df_대상종목, df_대상종목_신규], axis=0)
+    #     df_대상종목 = df_대상종목.drop_duplicates(subset='종목코드')
+    #     df_대상종목.to_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}.pkl'))
+    #     try:
+    #         df_대상종목.to_csv(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}.csv'),
+    #                        index=False, encoding='cp949')
+    #     except PermissionError:
+    #         pass
+    #     n_대상종목_신규 = len(df_대상종목)
+    #
+    #     # 대상종목 list 생성
+    #     li_대상종목 = list(df_대상종목['종목코드'].sort_values().unique())[:99]
+    #
+    #     # 실시간 설정
+    #     s_대상종목 = ';'.join(li_대상종목)
+    #     self.api.set_실시간_종목등록(s_종목코드=s_대상종목, s_등록형태='신규')
+    #
+    #     # 로그 기록
+    #     li_선정사유 = [f'{사유[:2]}-{len(df_대상종목[df_대상종목["선정사유"] == 사유])}'
+    #                for 사유 in df_대상종목['선정사유'].unique()]
+    #     s_선정사유 = ', '.join(li_선정사유)
+    #     self.make_log(f'대상종목 업데이트 {n_대상종목_기존} -> {n_대상종목_신규} ({s_선정사유})')
+    #
+    #     return li_대상종목, df_대상종목, dic_코드2종목명
 
     def find_주문단가(self, n_현재가, n_호가보정):
         """ 주문가 산정을 위해 해당 종목의 현재가 대비 호가보정 후 int 리턴 """
@@ -557,9 +638,10 @@ class Trader(QMainWindow, form_class):
     def convert_이력파일(self):
         """ pkl 형식으로 저장된 이력 파일을 csv 형식으로 변환 후 저장 """
         # 기준정보 정의
-        li_li_폴더파일 = [[self.folder_주문정보, f'주문정보_{self.s_오늘}'],
-                      [self.folder_신호탐색, f'신호탐색_{self.s_오늘}_매수'],
-                      [self.folder_신호탐색, f'신호탐색_{self.s_오늘}_매도']]
+        # li_li_폴더파일 = [[self.folder_주문정보, f'주문정보_{self.s_오늘}'],
+        #               [self.folder_신호탐색, f'신호탐색_{self.s_오늘}_매수'],
+        #               [self.folder_신호탐색, f'신호탐색_{self.s_오늘}_매도']]
+        li_li_폴더파일 = [[self.folder_주문정보, f'주문정보_{self.s_오늘}']]
 
         # 파일 변환 후 저장
         for li_폴더파일 in li_li_폴더파일:
