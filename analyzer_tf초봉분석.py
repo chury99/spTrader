@@ -64,7 +64,7 @@ class Analyzer:
 
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_대상종목)
-                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and '매매' in 파일명]
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and '수집' in 파일명]
         li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_지표생성)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
@@ -73,7 +73,7 @@ class Analyzer:
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
             # 대상종목 불러오기
-            df_대상종목 = pd.read_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{s_일자}_매매.pkl'))
+            df_대상종목 = pd.read_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{s_일자}_수집.pkl'))
             dic_종목코드2종목명 = df_대상종목.set_index('종목코드').to_dict()['종목명']
             dic_종목코드2추가시점 = df_대상종목.set_index('종목코드').to_dict()['추가시점']
             dic_종목코드2선정사유 = df_대상종목.set_index('종목코드').to_dict()['선정사유']
@@ -127,13 +127,16 @@ class Analyzer:
         df_초봉['종목명'] = s_종목명
         df_초봉 = df_초봉.loc[:, ['종목코드', '종목명'] + li_컬럼명[1:]]
 
+        # 거래량 nan 처리
+        df_초봉.loc[df_초봉['종가'] != df_초봉['종가'], ['거래량', '매수량', '매도량']] = None
+
         # 추가정보 생성
         df_초봉 = df_초봉[df_초봉['체결시간'] >= s_추가시점].copy()
         df_초봉['체결강도'] = (df_초봉['매수량'] / df_초봉['매도량'] * 100).apply(lambda x:
                                                                   99999 if x == float('inf') else x)
-        df_초봉['z_매수'] = df_초봉['매수량'].rolling(30).apply(lambda x: Logic.cal_z스코어(x))
-        df_초봉['z_매도'] = df_초봉['매도량'].rolling(30).apply(lambda x: Logic.cal_z스코어(x))
-        df_초봉['z_거래'] = df_초봉['거래량'].rolling(30).apply(lambda x: Logic.cal_z스코어(x))
+        df_초봉['z_매수'] = df_초봉['매수량'].rolling(window=30, min_periods=20).apply(lambda x: Logic.cal_z스코어(x))
+        df_초봉['z_매도'] = df_초봉['매도량'].rolling(window=30, min_periods=20).apply(lambda x: Logic.cal_z스코어(x))
+        df_초봉['z_거래'] = df_초봉['거래량'].rolling(window=30, min_periods=20).apply(lambda x: Logic.cal_z스코어(x))
         df_초봉['만원_매수'] = df_초봉['종가'] * df_초봉['매수량'] / 10000
         df_초봉['만원_매도'] = df_초봉['종가'] * df_초봉['매도량'] / 10000
         df_초봉['만원_거래'] = df_초봉['종가'] * df_초봉['거래량'] / 10000
