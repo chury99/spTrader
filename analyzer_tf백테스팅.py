@@ -21,7 +21,7 @@ rcParams['axes.unicode_minus'] = False
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
 # noinspection PyShadowingNames,PyUnusedLocal
 class Analyzer:
-    def __init__(self, b_멀티=False, n_분석일수=None):
+    def __init__(self, b_멀티=False, s_시작일자=None, n_분석일수=None):
         # config 읽어 오기
         with open('config.json', mode='rt', encoding='utf-8') as file:
             dic_config = json.load(file)
@@ -46,6 +46,7 @@ class Analyzer:
 
         # 변수 설정
         self.n_보관기간_analyzer = int(dic_config['파일보관기간(일)_analyzer'])
+        self.s_시작일자 = s_시작일자
         self.n_분석일수 = n_분석일수
         self.b_멀티 = b_멀티
         self.n_멀티코어수 = mp.cpu_count() - 2
@@ -68,6 +69,7 @@ class Analyzer:
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_분봉확인)
                     if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
+        li_일자_전체 = [일자 for 일자 in li_일자_전체 if 일자 >= self.s_시작일자] if self.s_시작일자 is not None else li_일자_전체
         li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매수매도)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
@@ -86,12 +88,6 @@ class Analyzer:
                     li_df_매수매도 = list(tqdm(pool.imap(self.종목별_매수매도, li_대상종목),
                                            total=len(li_대상종목), desc=f'매수매도-{n_초봉}초봉-{s_일자}'))
                 dic_매수매도 = dict(zip(li_대상종목, li_df_매수매도))
-
-                # 멀티 데이터 틀어짐 확인
-                li_데이터확인 = [종목코드 == dic_매수매도[종목코드]['종목코드'].values[-1] for 종목코드 in li_대상종목]
-                if sum(li_데이터확인) != len(li_데이터확인):
-                    self.make_log(f'!!! 멀티 데이터 틀어짐 발생 !!! - {s_일자}, {n_초봉}초봉')
-                    break
             else:
                 dic_매수매도 = dict()
                 for s_종목코드 in tqdm(li_대상종목, desc=f'매수매도-{n_초봉}초봉-{s_일자}'):
@@ -112,7 +108,10 @@ class Analyzer:
         dic_초봉 = self.dic_정보_매수매도['dic_초봉']
 
         # df 정의
-        df_초봉 = dic_초봉[s_종목코드].sort_index().copy()
+        try:
+            df_초봉 = dic_초봉[s_종목코드].sort_index().copy()
+        except KeyError:
+            return pd.DataFrame(dict(종목코드=[s_종목코드]))
 
         # 검증 초기값 생성
         b_매수신호 = False
@@ -126,6 +125,7 @@ class Analyzer:
 
         # 시간별 검증
         li_df_매수매도 = list()
+        dic_신호상세 = dict()
         for idx in df_초봉.index:
             # 초봉 데이터 준비
             df_초봉_시점 = df_초봉[:idx]
@@ -141,23 +141,29 @@ class Analyzer:
                 # 매수 정보 생성
                 if b_매수신호:
                     n_시가 = df_초봉_시점['시가'].values[-1]
-                    n_매수가 = n_시가 if pd.notna(n_시가) else df_초봉_시점['종가'].values[-2]
-                    s_매수시간 = df_초봉_시점['체결시간'].values[-1]
-                    b_보유신호 = True
+                    n_고가 = df_초봉_시점['고가'].values[-1]
+                    # n_매수가 = n_시가 if pd.notna(n_시가) else df_초봉_시점['종가'].values[-2]
+                    n_매수가 = n_고가 if pd.notna(n_고가) else None
+                    s_매수시간 = df_초봉_시점['체결시간'].values[-1] if n_매수가 is not None else None
+                    b_보유신호 = True if n_매수가 is not None else False
+                    b_매수신호 = b_매수신호 if n_매수가 is not None else False
 
             # 매도검증
             if b_보유신호:
                 # 매도신호 검증
-                li_매도신호, dic_신호상세 = Logic.make_매도신호(df_초봉=df_초봉_시점,
-                                                    n_매수가=n_매수가, s_매수시간=s_매수시간, dt_일자시간=idx)
+                n_수익률max = dic_신호상세['n_수익률max'] if 'n_수익률max' in dic_신호상세.keys() else None
+                li_매도신호, dic_신호상세 = Logic.make_매도신호(df_초봉=df_초봉_시점, n_매수가=n_매수가, s_매수시간=s_매수시간,
+                                                            n_수익률max=n_수익률max, dt_일자시간=idx)
                 li_신호종류 = dic_신호상세['li_신호종류'] if 'li_신호종류' in dic_신호상세.keys() else list()
                 b_매도신호 = sum(li_매도신호) > 0
 
                 # 매도 정보 생성
                 if b_매도신호:
                     n_시가 = df_초봉_시점['시가'].values[-1]
-                    n_매도가 = n_시가 if pd.notna(n_시가) else df_초봉_시점['종가'].values[-2]
-                    s_매도시간 = df_초봉_시점['체결시간'].values[-1]
+                    n_저가 = df_초봉_시점['저가'].values[-1]
+                    # n_매도가 = n_시가 if pd.notna(n_시가) else None
+                    n_매도가 = n_저가 if pd.notna(n_저가) else None
+                    s_매도시간 = df_초봉_시점['체결시간'].values[-1] if n_매도가 is not None else None
                     s_매도사유 = [li_신호종류[i] for i in range(len(li_매도신호)) if li_매도신호[i]][0]
 
             # df 정리
@@ -170,11 +176,12 @@ class Analyzer:
             df_매수매도['매수시간'] = s_매수시간
             df_매수매도['매도시간'] = s_매도시간
             df_매수매도['매도사유'] = s_매도사유
-            df_매수매도['수익률%'] = (df_매수매도['시가'] / df_매수매도['매수가'] - 1) * 100 - 0.2
+            df_매수매도['수익률%'] = (df_매수매도['시가'] / df_매수매도['매수가'] - 1) * 100 - 0.2\
+                                    if '시가' in df_매수매도.columns and '매수가' in df_매수매도.columns else None
             li_df_매수매도.append(df_매수매도)
 
             # 초기화
-            if b_매도신호:
+            if b_매도신호 and n_매도가 is not None:
                 b_매수신호 = False
                 b_매도신호 = False
                 b_보유신호 = False
@@ -185,7 +192,7 @@ class Analyzer:
                 s_매도사유 = None
 
         # df 생성
-        df_매수매도 = pd.concat(li_df_매수매도, axis=0).sort_index()
+        df_매수매도 = pd.concat(li_df_매수매도, axis=0).sort_index() if len(li_df_매수매도) > 0 else pd.DataFrame()
 
         # csv 저장
         s_폴더 = os.path.join(self.folder_매수매도, f'종목별_{s_일자}')
@@ -225,7 +232,7 @@ class Analyzer:
             df_결과정리_전체['수익률%'] = (df_결과정리_전체['매도가'] / df_결과정리_전체['매수가'] - 1) * 100 - 0.2
             df_결과정리_전체['보유초'] = (pd.to_datetime(df_결과정리_전체['매도시간'], format='%H:%M:%S')
                                     - pd.to_datetime(df_결과정리_전체['매수시간'], format='%H:%M:%S')).dt.total_seconds()
-            df_결과정리_전체['타임아웃'] = df_결과정리_전체['매도사유'].apply(lambda x: True if x == '타임아웃' else None)
+            # df_결과정리_전체['타임아웃'] = df_결과정리_전체['매도사유'].apply(lambda x: True if x == '타임아웃' else None)
 
             # 매도 데이터 있는 항목만 골라내기
             df_결과정리 = df_결과정리_전체[df_결과정리_전체['매도시간'] > '00:00:00']
@@ -414,7 +421,7 @@ class Analyzer:
 
 #######################################################################################################################
 if __name__ == "__main__":
-    a = Analyzer(b_멀티=True, n_분석일수=None)
+    a = Analyzer(b_멀티=True, s_시작일자='20241201', n_분석일수=20)
     li_초봉 = [1, 2, 3, 5, 10]
     [a.검증_매수매도(n_초봉=n_초봉) for n_초봉 in li_초봉]
     [a.검증_결과정리(n_초봉=n_초봉) for n_초봉 in li_초봉]
