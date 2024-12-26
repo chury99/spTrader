@@ -21,7 +21,7 @@ rcParams['axes.unicode_minus'] = False
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
 # noinspection PyShadowingNames,PyUnusedLocal
 class Analyzer:
-    def __init__(self, b_멀티=False, n_분석일수=None):
+    def __init__(self, b_멀티=False, s_시작일자=None, n_분석일수=None):
         # config 읽어 오기
         with open('config.json', mode='rt', encoding='utf-8') as file:
             dic_config = json.load(file)
@@ -42,6 +42,7 @@ class Analyzer:
 
         # 변수 설정
         self.n_보관기간_analyzer = int(dic_config['파일보관기간(일)_analyzer'])
+        self.s_시작일자 = s_시작일자
         self.n_분석일수 = n_분석일수
         self.b_멀티 = b_멀티
         self.n_멀티코어수 = mp.cpu_count() - 2
@@ -65,6 +66,7 @@ class Analyzer:
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_대상종목)
                     if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and '수집' in 파일명]
+        li_일자_전체 = [일자 for 일자 in li_일자_전체 if 일자 >= self.s_시작일자] if self.s_시작일자 is not None else li_일자_전체
         li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_지표생성)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
@@ -93,12 +95,6 @@ class Analyzer:
                     li_df_지표생성 = list(tqdm(pool.imap(self.종목별_지표생성, li_대상종목),
                                            total=len(li_대상종목), desc=f'지표생성-{n_초봉}초봉-{s_일자}'))
                 dic_지표생성 = dict(zip(li_대상종목, li_df_지표생성))
-
-                # 멀티 데이터 틀어짐 확인
-                li_데이터확인 = [종목코드 == dic_지표생성[종목코드]['종목코드'].values[-1] for 종목코드 in li_대상종목]
-                if sum(li_데이터확인) != len(li_데이터확인):
-                    self.make_log(f'!!! 멀티 데이터 틀어짐 발생 !!! - {s_일자}, {n_초봉}초봉')
-                    break
             else:
                 dic_지표생성 = dict()
                 for s_종목코드 in tqdm(li_대상종목, desc=f'지표생성-{n_초봉}초봉-{s_일자}'):
@@ -122,7 +118,10 @@ class Analyzer:
         s_선정사유 = self.dic_정보_지표생성['dic_종목코드2선정사유'][s_종목코드]
 
         # 종목명 추가
-        df_초봉 = dic_초봉[s_종목코드].sort_index()
+        try:
+            df_초봉 = dic_초봉[s_종목코드].sort_index()
+        except KeyError:
+            return pd.DataFrame(dict(종목코드=[s_종목코드]))
         li_컬럼명 = list(df_초봉.columns)
         df_초봉['종목명'] = s_종목명
         df_초봉 = df_초봉.loc[:, ['종목코드', '종목명'] + li_컬럼명[1:]]
@@ -312,7 +311,7 @@ class Analyzer:
 
 #######################################################################################################################
 if __name__ == "__main__":
-    a = Analyzer(b_멀티=True, n_분석일수=None)
+    a = Analyzer(b_멀티=True, s_시작일자='20241201', n_분석일수=20)
     li_초봉 = [1, 2, 3, 5, 10]
     [a.분석_지표생성(n_초봉=n_초봉) for n_초봉 in li_초봉]
     [a.분석_분봉확인(n_초봉=n_초봉) for n_초봉 in li_초봉]
