@@ -76,11 +76,10 @@ class Trader(QMainWindow, form_class):
 
         # log 기록
         self.make_log(f'### Short Punch Trader 시작 ({self.s_접속서버}) ###')
-        # self.make_log(f'대상종목 감시 시작 - {len(self.li_대상종목)}개 종목')
 
-        # 대상종목 설정
-        # self.li_대상종목, self.df_대상종목, self.dic_코드2종목명 = self.get_대상종목()
-        self.dic_대상종목, self.df_대상종목_매매, self.dic_코드2종목명 = self.get_대상종목()
+        # 대상 정보 설정
+        self.n_초봉, self.li_매매대상 = 3, ['일봉변동']
+        self.dic_대상종목, self.df_대상종목_매매, self.dic_코드2종목명 = self.get_대상종목(li_매매대상=self.li_매매대상)
 
         # 초기 설정
         self.setui_초기설정()
@@ -114,12 +113,11 @@ class Trader(QMainWindow, form_class):
         # 대상종목 업데이트 (10분 주기) - 조건식 1분주기 이내 조회시 미응답
         li_초반탐색시간 = ['09:01:30', '09:03:00', '09:04:30', '09:06:00', '09:08:00']
         if (s_현재 in li_초반탐색시간) or (n_현재_분 % 10 == 0 and n_현재_초 == 0):
-            # self.li_대상종목, self.df_대상종목, self.dic_코드2종목명 = self.get_대상종목()
-            self.dic_대상종목, self.df_대상종목_매매, self.dic_코드2종목명 = self.get_대상종목()
+            self.dic_대상종목, self.df_대상종목_매매, self.dic_코드2종목명 = self.get_대상종목(li_매매대상=self.li_매매대상)
 
-        # 매수봇 호출 (5초 주기)
+        # 매수봇 호출 (초봉 주기)
         if self.flag_종목보유 is False:
-            if n_현재_초 % 5 == 1 and s_현재 < '15:10:00':
+            if n_현재_초 % self.n_초봉 == 1 and s_현재 < '15:10:00':
                 self.run_매수봇()
 
         # 매도봇 호출 (1초 주기)
@@ -138,6 +136,7 @@ class Trader(QMainWindow, form_class):
 
             self.df_계좌잔고_전체, self.df_계좌잔고_종목별 = self.api.get_tr_계좌잔고(s_계좌번호=self.s_계좌번호)
             self.flag_종목보유 = len(self.df_계좌잔고_종목별) > 0
+            self.n_수익률max = self.n_수익률max if self.flag_종목보유 else None
 
         # 파일 변환
         if dt_현재 > pd.Timestamp('15:19:00') and n_현재_초 == 10:
@@ -145,34 +144,33 @@ class Trader(QMainWindow, form_class):
 
     def run_매수봇(self):
         """ 매수 조건 확인하여 조건 만족 시 매수 주문 실행 """
+        # cloud 내 로그 업데이트 위한 신호 생성
+        b_로그 = pd.Timestamp('now').second != 1
+
         # ui 상태 업데이트 및 log 기록
         self.lb_run_buybot.setText('[ 매수봇 ] 동작중')
-        self.make_log(f'매수신호 탐색')
-        self.make_log_신호(f'##### 매수신호 탐색 #####\n'
-                         f'  ===== z값검증 | 금액검증 | 강도검증 =====')
-
-        # 대상종목 필터링
-        # li_선정사유 = ['vi발동', '거래량급증']
-        # df_대상종목_필터 = self.df_대상종목.copy()
-        # df_대상종목_필터['필터'] = df_대상종목_필터['선정사유'].apply(lambda x: x in li_선정사유)
-        # df_대상종목_필터 = df_대상종목_필터[df_대상종목_필터['필터']]
-        # dic_코드2선정사유 = df_대상종목_필터.set_index('종목코드').to_dict()['선정사유']
+        if b_로그:
+            self.make_log(f'매수신호 탐색')
+            self.make_log_신호(f'##### 매수신호 탐색 #####\n'
+                             f'  ===== z값검증 | 금액검증 | 강도검증 =====')
 
         # 대상 종목별 매수신호 탐색
         dic_코드2선정사유 = self.df_대상종목_매매.set_index('종목코드').to_dict()['선정사유']
         for s_종목코드 in self.df_대상종목_매매['종목코드']:
-            # 5초봉 데이터 생성
-            n_초봉 = 5
+            # 초봉 데이터 생성
             n_봉수 = 30
-            n_기준시간 = n_초봉 * (n_봉수 + 3)
+            n_기준시간 = self.n_초봉 * (n_봉수 + 3)
             s_기준시간 = (pd.Timestamp('now') - pd.Timedelta(seconds=n_기준시간)).strftime('%H:%M:%S')
-            li_체결정보 = [li_체결 for li_체결 in self.api.dic_실시간_체결[s_종목코드] if li_체결[1] > s_기준시간]\
-                            if s_종목코드 in self.api.dic_실시간_체결.keys() else list()
+            if hasattr(self.api, 'dic_실시간_체결'):
+                li_체결정보 = [li_체결 for li_체결 in self.api.dic_실시간_체결[s_종목코드] if li_체결[1] > s_기준시간]\
+                                if s_종목코드 in self.api.dic_실시간_체결.keys() else list()
+            else:
+                li_체결정보 = list()
             self.api.dic_실시간_체결[s_종목코드] = li_체결정보
-            df_초봉 = Logic.make_초봉데이터(li_체결정보=li_체결정보, s_오늘=self.s_오늘, n_초봉=n_초봉)
+            df_초봉 = Logic.make_초봉데이터(li_체결정보=li_체결정보, s_오늘=self.s_오늘, n_초봉=self.n_초봉)
 
             # 마지막 데이터 잘라내기
-            dt_마지막 = pd.Timestamp('now') - pd.Timedelta(seconds=n_초봉)
+            dt_마지막 = pd.Timestamp('now') - pd.Timedelta(seconds=self.n_초봉)
             df_초봉 = df_초봉[df_초봉.index <= dt_마지막]
 
             # 매수신호 탐색
@@ -187,8 +185,9 @@ class Trader(QMainWindow, form_class):
             n_반대신호 = len(li_매수신호) - sum(li_매수신호) if b_매수신호 == False else ''
             li_s_매수신호 = ['ok' if b_신호 else 'NG' for b_신호 in li_매수신호]
             s_li_매수신호 = ', '.join([f'{li_신호종류[i]}_{li_s_매수신호[i]}' for i in range(len(li_신호종류))])
-            self.make_log_신호(f'{s_종목명}({s_종목코드})-{s_선정사유[:2]}\n'
-                             f'  #{s_매수신호}-{n_반대신호}# {s_li_매수신호}-초봉{len(df_초봉)}봉')
+            if b_로그:
+                self.make_log_신호(f'{s_종목명}({s_종목코드})-{s_선정사유[:2]}\n'
+                                 f'  #{s_매수신호}-{n_반대신호}# {s_li_매수신호}-초봉{len(df_초봉)}봉')
 
             # 매수 주문 (매수신호 모두 True 조건)
             n_현재가 = self.api.dic_실시간_현재가[s_종목코드] if s_종목코드 in self.api.dic_실시간_현재가.keys() else None
@@ -211,8 +210,8 @@ class Trader(QMainWindow, form_class):
                 self.df_계좌잔고_전체, self.df_계좌잔고_종목별 = self.api.get_tr_계좌잔고(s_계좌번호=self.s_계좌번호)
                 self.flag_종목보유 = len(self.df_계좌잔고_종목별) > 0
 
-                # 5초봉 저장
-                s_파일명 = f'5초봉_{self.s_오늘}_{s_종목코드}_{s_종목명}'
+                # 초봉 저장
+                s_파일명 = f'{self.n_초봉}초봉_{self.s_오늘}_{s_종목코드}_{s_종목명}'
                 df_초봉.to_pickle(os.path.join(self.folder_초봉정보, f'{s_파일명}.pkl'))
                 df_초봉.to_csv(os.path.join(self.folder_초봉정보, f'{s_파일명}.csv'), index=False, encoding='cp949')
 
@@ -247,13 +246,12 @@ class Trader(QMainWindow, form_class):
         except FileNotFoundError:
             s_매수시간 = '00:00:00'
 
-        # 5초봉 데이터 생성
-        n_초봉 = 5
+        # 초봉 데이터 생성
         li_체결정보 = self.api.dic_실시간_체결[s_종목코드] if s_종목코드 in self.api.dic_실시간_체결.keys() else list()
-        df_초봉 = Logic.make_초봉데이터(li_체결정보=li_체결정보, s_오늘=self.s_오늘, n_초봉=n_초봉)
+        df_초봉 = Logic.make_초봉데이터(li_체결정보=li_체결정보, s_오늘=self.s_오늘, n_초봉=self.n_초봉)
 
         # 마지막 데이터 잘라내기
-        dt_마지막 = pd.Timestamp('now') - pd.Timedelta(seconds=n_초봉)
+        dt_마지막 = pd.Timestamp('now') - pd.Timedelta(seconds=self.n_초봉)
         df_초봉 = df_초봉[df_초봉.index <= dt_마지막]
 
         # 현재가 확인 (실처리 미존재 시 tr 요청 => 현재가 확인 + 실시간 등록)
@@ -266,15 +264,17 @@ class Trader(QMainWindow, form_class):
             n_현재가 = self.api.dic_실시간_현재가[s_종목코드]
 
         # 매도신호 탐색
-        li_매도신호, dic_신호상세 = Logic.make_매도신호(df_초봉=df_초봉,
-                                            n_매수가=n_매수단가, s_매수시간=s_매수시간, n_현재가=n_현재가)
+        n_수익률max = self.n_수익률max if hasattr(self, 'n_수익률max') else None
+        li_매도신호, dic_신호상세 = Logic.make_매도신호(df_초봉=df_초봉, n_매수가=n_매수단가, s_매수시간=s_매수시간,
+                                                    n_수익률max=n_수익률max, n_현재가=n_현재가)
         li_신호종류 = dic_신호상세['li_신호종류'] if 'li_신호종류' in dic_신호상세.keys() else list()
+        self.n_수익률max = dic_신호상세['n_수익률max']
         b_매도신호 = sum(li_매도신호) > 0
 
         # log 기록
         n_수익률 = (n_현재가 / n_매수단가 - 1) * 100 - 0.2
         self.make_log_신호(f'{s_종목명}({s_종목코드})-초봉{len(df_초봉)}봉\n'
-                         f'\t[매수 {n_매수단가:,}원 | 현재 {n_현재가:,}원 | 수익 {n_수익률:.2f}%]-매도{b_매도신호}')
+                         f'  [매수 {n_매수단가:,}원 | 현재 {n_현재가:,}원 | 수익 {n_수익률:.2f}%]-매도{b_매도신호}')
 
         # 매도 주문 (매도신호 중 1개 이상 True 조건)
         if b_매도신호:
@@ -300,9 +300,10 @@ class Trader(QMainWindow, form_class):
             # 계좌정보 업데이트
             self.df_계좌잔고_전체, self.df_계좌잔고_종목별 = self.api.get_tr_계좌잔고(s_계좌번호=self.s_계좌번호)
             self.flag_종목보유 = len(self.df_계좌잔고_종목별) > 0
+            self.n_수익률max = self.n_수익률max if self.flag_종목보유 else None
 
-            # 5초봉 저장
-            s_파일명 = f'5초봉_{self.s_오늘}_{s_종목코드}_{s_종목명}'
+            # 초봉 저장
+            s_파일명 = f'{self.n_초봉}초봉_{self.s_오늘}_{s_종목코드}_{s_종목명}'
             df_초봉.to_pickle(os.path.join(self.folder_초봉정보, f'{s_파일명}.pkl'))
             df_초봉.to_csv(os.path.join(self.folder_초봉정보, f'{s_파일명}.csv'), index=False, encoding='cp949')
 
@@ -310,7 +311,6 @@ class Trader(QMainWindow, form_class):
         dic_탐색정보 = dict(s_종목코드=s_종목코드, s_종목명=s_종목명,
                         n_매수단가=n_매수단가, n_현재가=n_현재가, n_수익률=n_수익률, li_매도신호=li_매도신호, li_신호종류=li_신호종류,
                         n_주문단가=n_주문단가 if b_매도신호 else None, n_주문수량=n_주문수량 if b_매도신호 else None)
-        # self.update_매도탐색파일(dic_탐색정보=dic_탐색정보, dic_신호상세=dic_신호상세)
         self.update_신호탐색파일(s_매수매도='매도', dic_탐색정보=dic_탐색정보, dic_신호상세=dic_신호상세)
 
         # ui 상태 업데이트
@@ -357,7 +357,7 @@ class Trader(QMainWindow, form_class):
 
         return li_호가단위
 
-    def get_대상종목(self):
+    def get_대상종목(self, li_매매대상):
         """ 트레이더 구동 시 감시할 대상종목 읽어와서 전체 대상종목(dict), 매매 대상종목(df), 코드2종목명(dict) 리턴 """
         # 코드2종목명 생성
         df_전체종목 = pd.read_pickle(os.path.join(self.folder_전체종목, f'df_전체종목_{self.s_오늘}.pkl'))
@@ -410,7 +410,7 @@ class Trader(QMainWindow, form_class):
         df_대상종목_수집 = pd.concat(li_df, axis=0).drop_duplicates(subset='종목코드')
 
         # 매매용 대상종목 생성
-        li_df = [dic_대상종목[s_사유] for s_사유 in dic_대상종목.keys() if s_사유 in ['vi발동', '거래량급증']]
+        li_df = [dic_대상종목[s_사유] for s_사유 in dic_대상종목.keys() if s_사유 in li_매매대상]
         df_대상종목_매매 = pd.concat(li_df, axis=0).drop_duplicates(subset='종목코드')
 
         # 실시간 종목등록
@@ -430,73 +430,9 @@ class Trader(QMainWindow, form_class):
         s_대상별종목수 = ', '.join([f'{사유[:2]}-{len(df_대상종목_매매[df_대상종목_매매["선정사유"] == 사유])}'
                                     for 사유 in df_대상종목_매매['선정사유'].unique()])
         self.make_log(f'수집종목 업데이트 {n_대상종목_기존_수집} -> {len(df_대상종목_수집)}\n'
-                      f'매매종목 업데이트 {n_대상종목_기존_매매} -> {len(df_대상종목_매매)} ({s_대상별종목수})')
+                      f'\t 매매종목 업데이트 {n_대상종목_기존_매매} -> {len(df_대상종목_매매)} ({s_대상별종목수})')
 
         return dic_대상종목, df_대상종목_매매, dic_코드2종목명
-
-    # def get_대상종목(self):
-    #     """ 트레이더 구동 시 감시할 대상종목 읽어와서 종목코드(list), 종목명(dict) 리턴 """
-    #     # 코드2종목명 생성
-    #     df_전체종목 = pd.read_pickle(os.path.join(self.folder_전체종목, f'df_전체종목_{self.s_오늘}.pkl'))
-    #     dic_코드2종목명 = df_전체종목.set_index('종목코드')['종목명'].to_dict()
-    #
-    #     # 대상종목 파일 읽어오기
-    #     try:
-    #         df_대상종목 = pd.read_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}.pkl'))
-    #     except FileNotFoundError:
-    #         df_대상종목 = pd.DataFrame()
-    #     n_대상종목_기존 = len(df_대상종목)
-    #
-    #     # 대상1) 일봉변동 추가 (전일)
-    #     df_일봉변동 = pd.read_pickle(os.path.join(self.folder_일봉변동, f'df_일봉변동_{self.s_전일}.pkl'))
-    #     df_일봉변동['선정사유'] = '일봉변동'
-    #
-    #     # 대상2) 조건검색 추가 (실시간)
-    #     dic_조건검색 = self.api.get_조건검색_전체(li_대상=['vi발동', '거래량급증'])
-    #     li_df_조건검색 = list()
-    #     for s_조건명 in ['vi발동', '거래량급증']:
-    #         df_조건검색_조건명 = pd.DataFrame()
-    #         df_조건검색_조건명['종목코드'] = dic_조건검색[s_조건명]
-    #         df_조건검색_조건명['종목명'] = df_조건검색_조건명['종목코드'].apply(lambda x: dic_코드2종목명[x]
-    #                                                                             if x in dic_코드2종목명.keys() else None)
-    #         df_조건검색_조건명['선정사유'] = s_조건명
-    #         li_df_조건검색.append(df_조건검색_조건명)
-    #     df_조건검색 = pd.concat(li_df_조건검색, axis=0)
-    #     df_조건검색 = df_조건검색.drop_duplicates(subset='종목코드')
-    #     df_조건검색 = df_조건검색[~df_조건검색['종목코드'].isin(df_일봉변동['종목코드'])]
-    #
-    #     # 신규 대상종목 생성
-    #     df_대상종목_신규 = pd.concat([df_일봉변동, df_조건검색], axis=0)
-    #     df_대상종목_신규['추가시점'] = pd.Timestamp('now').strftime('%H:%M:%S')
-    #     if len(df_대상종목) > 0:
-    #         df_대상종목_신규 = df_대상종목_신규[~df_대상종목_신규['종목코드'].isin(df_대상종목['종목코드'])]
-    #     df_대상종목_신규 = df_대상종목_신규.loc[:, ['종목코드', '종목명', '선정사유', '추가시점']]
-    #
-    #     # 대상종목 업데이트
-    #     df_대상종목 = pd.concat([df_대상종목, df_대상종목_신규], axis=0)
-    #     df_대상종목 = df_대상종목.drop_duplicates(subset='종목코드')
-    #     df_대상종목.to_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}.pkl'))
-    #     try:
-    #         df_대상종목.to_csv(os.path.join(self.folder_대상종목, f'df_대상종목_{self.s_오늘}.csv'),
-    #                        index=False, encoding='cp949')
-    #     except PermissionError:
-    #         pass
-    #     n_대상종목_신규 = len(df_대상종목)
-    #
-    #     # 대상종목 list 생성
-    #     li_대상종목 = list(df_대상종목['종목코드'].sort_values().unique())[:99]
-    #
-    #     # 실시간 설정
-    #     s_대상종목 = ';'.join(li_대상종목)
-    #     self.api.set_실시간_종목등록(s_종목코드=s_대상종목, s_등록형태='신규')
-    #
-    #     # 로그 기록
-    #     li_선정사유 = [f'{사유[:2]}-{len(df_대상종목[df_대상종목["선정사유"] == 사유])}'
-    #                for 사유 in df_대상종목['선정사유'].unique()]
-    #     s_선정사유 = ', '.join(li_선정사유)
-    #     self.make_log(f'대상종목 업데이트 {n_대상종목_기존} -> {n_대상종목_신규} ({s_선정사유})')
-    #
-    #     return li_대상종목, df_대상종목, dic_코드2종목명
 
     def find_주문단가(self, n_현재가, n_호가보정):
         """ 주문가 산정을 위해 해당 종목의 현재가 대비 호가보정 후 int 리턴 """
@@ -560,7 +496,7 @@ class Trader(QMainWindow, form_class):
             df_주문정보 = pd.read_pickle(os.path.join(self.folder_주문정보, f'{s_파일명}_{self.s_오늘}.pkl'))
         except FileNotFoundError:
             df_주문정보 = pd.DataFrame()
-        df_주문정보 = pd.concat([df_주문정보, df_주문정보_종목], axis=0).drop_duplicates()
+        df_주문정보 = pd.concat([df_주문정보, df_주문정보_종목], axis=0).drop_duplicates(subset=['종목코드', '시간'])
         df_주문정보.to_pickle(os.path.join(self.folder_주문정보, f'{s_파일명}_{self.s_오늘}.pkl'))
         df_주문정보.to_csv(os.path.join(self.folder_주문정보, f'{s_파일명}_{self.s_오늘}.csv'), index=False, encoding='cp949')
 
@@ -638,9 +574,6 @@ class Trader(QMainWindow, form_class):
     def convert_이력파일(self):
         """ pkl 형식으로 저장된 이력 파일을 csv 형식으로 변환 후 저장 """
         # 기준정보 정의
-        # li_li_폴더파일 = [[self.folder_주문정보, f'주문정보_{self.s_오늘}'],
-        #               [self.folder_신호탐색, f'신호탐색_{self.s_오늘}_매수'],
-        #               [self.folder_신호탐색, f'신호탐색_{self.s_오늘}_매도']]
         li_li_폴더파일 = [[self.folder_주문정보, f'주문정보_{self.s_오늘}']]
 
         # 파일 변환 후 저장
