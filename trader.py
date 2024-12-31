@@ -44,6 +44,7 @@ class Trader(QMainWindow, form_class):
         self.folder_대상종목 = dic_폴더정보['이력|대상종목']
         self.folder_초봉정보 = dic_폴더정보['이력|초봉정보']
         self.folder_일봉변동 = dic_폴더정보['sr종목선정|10_일봉변동']
+        self.folder_수익요약 = dic_폴더정보['tf백테스팅|40_수익요약']
         os.makedirs(self.folder_신호탐색, exist_ok=True)
         os.makedirs(self.folder_주문정보, exist_ok=True)
         os.makedirs(self.folder_대상종목, exist_ok=True)
@@ -78,7 +79,8 @@ class Trader(QMainWindow, form_class):
         self.make_log(f'### Short Punch Trader 시작 ({self.s_접속서버}) ###')
 
         # 대상 정보 설정
-        self.n_초봉, self.li_매매대상 = 3, ['일봉변동']
+        # self.n_초봉, self.li_매매대상 = self.get_대상선정(n_초봉=3, li_매매대상=['일봉변동'])
+        self.n_초봉, self.li_매매대상 = self.get_대상선정()
         self.dic_대상종목, self.df_대상종목_매매, self.dic_코드2종목명 = self.get_대상종목(li_매매대상=self.li_매매대상)
 
         # 초기 설정
@@ -145,14 +147,15 @@ class Trader(QMainWindow, form_class):
     def run_매수봇(self):
         """ 매수 조건 확인하여 조건 만족 시 매수 주문 실행 """
         # cloud 내 로그 업데이트 위한 신호 생성
-        b_로그 = pd.Timestamp('now').second != 1
+        b_로그 = pd.Timestamp('now').second != 1 and self.n_초봉 not in [1, 2, 3]
 
         # ui 상태 업데이트 및 log 기록
         self.lb_run_buybot.setText('[ 매수봇 ] 동작중')
         if b_로그:
-            self.make_log(f'매수신호 탐색')
+            li_매매대상 = [대상[:2] for 대상 in self.li_매매대상]
+            self.make_log(f'매수신호 탐색 - {self.n_초봉}초{li_매매대상}')
             self.make_log_신호(f'##### 매수신호 탐색 #####\n'
-                             f'  ===== z값검증 | 금액검증 | 강도검증 =====')
+                             f'  ===== z값검증 | 금액검증 | 강도검증 ===== {self.n_초봉}초{li_매매대상}')
 
         # 대상 종목별 매수신호 탐색
         dic_코드2선정사유 = self.df_대상종목_매매.set_index('종목코드').to_dict()['선정사유']
@@ -164,9 +167,9 @@ class Trader(QMainWindow, form_class):
             if hasattr(self.api, 'dic_실시간_체결'):
                 li_체결정보 = [li_체결 for li_체결 in self.api.dic_실시간_체결[s_종목코드] if li_체결[1] > s_기준시간]\
                                 if s_종목코드 in self.api.dic_실시간_체결.keys() else list()
+                self.api.dic_실시간_체결[s_종목코드] = li_체결정보
             else:
                 li_체결정보 = list()
-            self.api.dic_실시간_체결[s_종목코드] = li_체결정보
             df_초봉 = Logic.make_초봉데이터(li_체결정보=li_체결정보, s_오늘=self.s_오늘, n_초봉=self.n_초봉)
 
             # 마지막 데이터 잘라내기
@@ -357,6 +360,40 @@ class Trader(QMainWindow, form_class):
 
         return li_호가단위
 
+    def get_대상선정(self, n_초봉=None, li_매매대상=None):
+        """ 백테스팅 데이터 읽어와서 성능 데이터 기준 초봉(int), 매매대상(list) 선정 후 리턴 """
+        # 초봉, 매매대상 입력 시 bypass 리턴
+        if n_초봉 is not None and li_매매대상 is not None:
+            return n_초봉, li_매매대상
+
+        # 수익요약 파일 읽어오기
+        try:
+            df_수익요약 = pd.read_pickle(os.path.join(self.folder_수익요약, f'df_수익요약_{self.s_전일}.pkl'))
+        except FileNotFoundError:
+            li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_수익요약) if 'df_수익요약' in 파일명 and '.pkl' in 파일명]
+            df_수익요약 = pd.read_pickle(os.path.join(self.folder_수익요약, max(li_파일명)))
+
+        # # 최근 10일 중 수익률 0% 4개 이상 제외
+        # df_수익요약10 = df_수익요약[2:12]
+        # sri_0카운트 = (df_수익요약10 == 0).sum()
+        # li_0컬럼명 = list(sri_0카운트[sri_0카운트 > 3].index)
+        # li_컬럼명 = [컬럼명 for 컬럼명 in df_수익요약.columns if 컬럼명 not in li_0컬럼명]
+        # df_수익요약_0제외 = df_수익요약.loc[:, li_컬럼명]
+
+        # 성능 기준 max 찾기
+        # df_성능 = df_수익요약_0제외.set_index('일자').T
+        # df_성능 = df_수익요약.set_index('일자').T
+        # s_성능 = df_성능[df_성능['10성능%'] == df_성능['10성능%'].max()].index[0]
+        s_성능 = df_수익요약.set_index('일자').T['10성능%'].idxmax()
+
+        # 초봉, 매매대상 생성
+        li_성능 = s_성능.split('|')
+        n_초봉 = int(li_성능[0].replace('초', ''))
+        dic_매매대상 = dict(일봉='일봉변동', vi='vi발동', 거래='거래량급증')
+        li_매매대상 = [dic_매매대상[li_성능[1]]]
+
+        return n_초봉, li_매매대상
+
     def get_대상종목(self, li_매매대상):
         """ 트레이더 구동 시 감시할 대상종목 읽어와서 전체 대상종목(dict), 매매 대상종목(df), 코드2종목명(dict) 리턴 """
         # 코드2종목명 생성
@@ -412,6 +449,7 @@ class Trader(QMainWindow, form_class):
         # 매매용 대상종목 생성
         li_df = [dic_대상종목[s_사유] for s_사유 in dic_대상종목.keys() if s_사유 in li_매매대상]
         df_대상종목_매매 = pd.concat(li_df, axis=0).drop_duplicates(subset='종목코드')
+        df_대상종목_매매['초봉'] = self.n_초봉
 
         # 실시간 종목등록
         s_대상종목_수집 = ';'.join(list(df_대상종목_수집['종목코드'])[:99])
