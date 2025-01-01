@@ -305,6 +305,11 @@ class KiwoomAPI(QAxWidget):
         #     self.dic_실시간_체결 = dict()
         #     self.dic_실시간_호가잔량 = dict()
 
+        # dic 정의 (미 존재시 생성)
+        self.dic_실시간_현재가 = dict() if not hasattr(self, 'dic_실시간_현재가') else self.dic_실시간_현재가
+        self.dic_실시간_체결 = dict() if not hasattr(self, 'dic_실시간_체결') else self.dic_실시간_체결
+        self.dic_실시간_호가잔량 = dict() if not hasattr(self, 'dic_실시간_호가잔량') else self.dic_실시간_호가잔량
+
         # 요일, 시간 확인하여 장중일 때만 실시간 등록 요청
         dt_현재 = pd.Timestamp('now')
         s_요일 = dt_현재.strftime('%a')
