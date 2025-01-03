@@ -390,9 +390,10 @@ class Analyzer:
                           index=False, encoding='cp949')
 
             # 리포트 기준정보 생성
-            df_대상종목_매매 = pd.read_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{s_일자}_매매.pkl'))
-            n_초봉 = df_대상종목_매매['초봉'].values[-1]
-            s_선정사유 = df_대상종목_매매['선정사유'].values[-1]
+            df_대상종목_매매 = pd.read_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{s_일자}_매매.pkl'))\
+                                if f'df_대상종목_{s_일자}_매매.pkl' in os.listdir(self.folder_대상종목) else None
+            n_초봉 = df_대상종목_매매['초봉'].values[-1] if df_대상종목_매매 is not None else 5
+            s_선정사유 = df_대상종목_매매['선정사유'].values[-1] if df_대상종목_매매 is not None else 'vi발동'
             dic_초봉 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_{n_초봉}초봉_{s_일자}.pkl'))
             try:
                 df_체결잔고 = pd.read_csv(os.path.join(self.folder_체결잔고, f'체결잔고_{s_일자}.csv'), encoding='cp949')
@@ -525,9 +526,17 @@ class Analyzer:
         df_체결잔고_종목_매수 = df_체결잔고_종목[df_체결잔고_종목['주문구분'] == '매수']
         df_체결잔고_종목_매도 = df_체결잔고_종목[df_체결잔고_종목['주문구분'] == '매도']
         dt_매수시점 = df_체결잔고_종목_매수.index[n_거래순번]
-        dt_매도시점 = df_체결잔고_종목_매도[df_체결잔고_종목_매도.index >= dt_매수시점].index[0]
-        n_매수가 = df_체결잔고_종목_매수['체결가'][dt_매수시점]
-        n_매도가 = df_체결잔고_종목_매도['체결가'][dt_매도시점]
+        dt_매도시점 = df_체결잔고_종목_매도[df_체결잔고_종목_매도.index >= dt_매수시점].index[0]\
+                        if len(df_체결잔고_종목_매도) > 0 else None
+        n_매수가 = df_체결잔고_종목_매수['체결가'][dt_매수시점]\
+                    if len(df_체결잔고_종목_매수[df_체결잔고_종목_매수.index == dt_매수시점]) == 1\
+                    else max(df_체결잔고_종목_매수['체결가'][dt_매수시점])
+        if dt_매도시점 is not None:
+            n_매도가 = df_체결잔고_종목_매도['체결가'][dt_매도시점]\
+                        if len(df_체결잔고_종목_매도[df_체결잔고_종목_매도.index == dt_매도시점]) == 1\
+                        else max(df_체결잔고_종목_매도['체결가'][dt_매도시점])
+        else:
+            n_매도가 = None
         # dt_매수시점 = df_체결잔고_종목[df_체결잔고_종목['주문구분'] == '매수'].index[n_거래순번]
         # dt_매도시점 = df_체결잔고_종목[df_체결잔고_종목.index > dt_매수시점].index[0]
         # n_매수가 = df_체결잔고_종목['체결가'][dt_매수시점]
@@ -544,10 +553,10 @@ class Analyzer:
         ax_거래량.plot(df_초봉_차트.index, df_초봉_차트['매도량'], lw=0.5, alpha=0.7, color=dic_색상['파랑'])
 
         # 매수매도 시점 표기
-        ax.axvline(dt_매수시점, lw=1, alpha=0.5, color=dic_색상['녹색'])
-        ax.axvline(dt_매도시점, lw=1, alpha=0.5, color=dic_색상['보라'])
-        ax.axhline(n_매수가, lw=1, alpha=0.5, color=dic_색상['녹색'])
-        ax.axhline(n_매도가, lw=1, alpha=0.5, color=dic_색상['보라'])
+        ax.axvline(dt_매수시점, lw=1, alpha=0.5, color=dic_색상['녹색']) if dt_매수시점 is not None else None
+        ax.axvline(dt_매도시점, lw=1, alpha=0.5, color=dic_색상['보라']) if dt_매도시점 is not None else None
+        ax.axhline(n_매수가, lw=1, alpha=0.5, color=dic_색상['녹색']) if n_매수가 is not None else None
+        ax.axhline(n_매도가, lw=1, alpha=0.5, color=dic_색상['보라']) if n_매도가 is not None else None
 
         # 스케일 설정
         ax.set_ylim(n_시세_min, n_시세_max)
