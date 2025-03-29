@@ -257,7 +257,7 @@ class KiwoomAPI(QAxWidget):
         dic_조건검색_검색식명2번호 = df_조건검색.set_index('검색식명').to_dict()['검색식번호']
 
         # 검색식명 기준 종목코드 가져오기
-        li_대상 = list(df_조건검색['검색식명'].values) if li_대상 is None else li_대상
+        li_대상 = df_조건검색['검색식명'].to_list() if li_대상 is None else li_대상
         dic_조건검색식별종목코드 = dict()
         for s_검색식명 in li_대상:
             s_화면번호 = '9000'
@@ -494,6 +494,7 @@ class KiwoomAPI(QAxWidget):
         """ 계좌 현황 조회하여 df_계좌잔고, df_종목별잔고 리턴 (OnReceiveTrData 이벤트 발생) """
         # TR 요청
         self.set_input_value('계좌번호', s_계좌번호)
+        self.set_input_value('조회구분', '1')
         self.comm_rq_data('계좌평가잔고내역요청', 'opw00018', 0, '2001')
 
         # 결과 가져오기
