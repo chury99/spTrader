@@ -32,9 +32,13 @@ class Collector:
         self.folder_실시간 = dic_폴더정보['이력|실시간']
         os.makedirs(self.folder_체결정보, exist_ok=True)
 
-        # 전체 항목 확인 (df_전체종목.pkl 확인)
-        df_전체종목 = pd.read_pickle(os.path.join(self.folder_전체종목, f'df_전체종목_{self.s_오늘}.pkl'))
-        self.li_종목코드_전체 = list(df_전체종목['종목코드'].values)
+        # 수집정보 가져오기
+        self.dic_수집정보_일봉 = pd.read_pickle(os.path.join(self.folder_정보수집, f'dic_수집정보_일봉.pkl'))
+        self.dic_수집정보_분봉 = pd.read_pickle(os.path.join(self.folder_정보수집, f'dic_수집정보_분봉.pkl'))
+
+        # # 전체 항목 확인
+        self.li_전체종목_일봉 = self.dic_수집정보_일봉['df_전체종목']['종목코드'].to_list()
+        self.li_전체종목_분봉 = self.dic_수집정보_분봉['df_전체종목']['종목코드'].to_list()
 
         # 제외 항목 확인 - 일봉 (데이터 길이 0 인 종목코드)
         try:
@@ -65,7 +69,7 @@ class Collector:
             return
 
         # 데이터 무결성 확인
-        n_전체종목 = len(self.li_종목코드_전체)
+        n_전체종목 = len(self.li_전체종목_일봉)
         n_제외종목 = len(self.li_종목코드_제외_일봉)
         n_수집종목 = len(df_일봉['종목코드'].unique())
         if n_전체종목 != n_수집종목 + n_제외종목:
@@ -114,7 +118,7 @@ class Collector:
             return
 
         # 데이터 무결성 확인
-        n_전체종목 = len(self.li_종목코드_전체)
+        n_전체종목 = len(self.li_전체종목_분봉)
         n_제외종목 = len(self.li_종목코드_제외_분봉)
         n_수집종목 = len(df_분봉['종목코드'].unique())
         if n_전체종목 != n_수집종목 + n_제외종목:
@@ -156,7 +160,7 @@ class Collector:
             df_테이블명 = pd.read_sql(f'SELECT name FROM sqlite_master WHERE type="table"', con=con)
             li_df_테이블명.append(df_테이블명)
         df_테이블명 = pd.concat(li_df_테이블명, axis=0).sort_values('name')
-        li_테이블명_전체 = list(df_테이블명['name'].values)
+        li_테이블명_전체 = df_테이블명['name'].to_list()
 
         # 저장된 캐시파일 확인
         li_파일명_캐시 = [파일명 for 파일명 in os.listdir(self.folder_캐시변환)
@@ -227,7 +231,7 @@ class Collector:
             df_테이블명 = pd.read_sql(f'SELECT name FROM sqlite_master WHERE type="table"', con=con)
             li_df_테이블명.append(df_테이블명)
         df_테이블명 = pd.concat(li_df_테이블명, axis=0).sort_values('name')
-        li_테이블명_전체 = list(df_테이블명['name'].values)
+        li_테이블명_전체 = df_테이블명['name'].to_list()
 
         # 저장된 캐시파일 확인
         li_파일명_캐시 = [파일명 for 파일명 in os.listdir(self.folder_캐시변환)
@@ -303,7 +307,7 @@ class Collector:
             df_테이블명 = pd.read_sql(f'SELECT name FROM sqlite_master WHERE type="table"', con=con)
             li_df_테이블명.append(df_테이블명)
         df_테이블명 = pd.concat(li_df_테이블명, axis=0).sort_values('name')
-        li_테이블명_전체 = list(df_테이블명['name'].values)
+        li_테이블명_전체 = df_테이블명['name'].to_list()
 
         # 저장된 캐시파일 확인
         li_파일명_캐시 = [파일명 for 파일명 in os.listdir(self.folder_캐시변환)
@@ -398,7 +402,7 @@ class Collector:
             df_테이블명 = pd.read_sql(f'SELECT name FROM sqlite_master WHERE type="table"', con=con)
             li_df_테이블명.append(df_테이블명)
         df_테이블명 = pd.concat(li_df_테이블명, axis=0).sort_values('name')
-        li_테이블명_전체 = list(df_테이블명['name'].values)
+        li_테이블명_전체 = df_테이블명['name'].to_list()
 
         # 저장된 캐시파일 확인
         li_파일명_캐시 = [파일명 for 파일명 in os.listdir(self.folder_캐시변환)
@@ -493,7 +497,7 @@ class Collector:
             df_테이블명 = pd.read_sql(f'SELECT name FROM sqlite_master WHERE type="table"', con=con)
             li_df_테이블명.append(df_테이블명)
         df_테이블명 = pd.concat(li_df_테이블명, axis=0).sort_values('name')
-        li_테이블명_전체 = list(df_테이블명['name'].values)
+        li_테이블명_전체 = df_테이블명['name'].to_list()
 
         # 저장된 캐시파일 확인
         li_파일명_캐시 = [파일명 for 파일명 in os.listdir(self.folder_캐시변환)
@@ -751,7 +755,8 @@ class Collector:
             # log 기록
             self.make_log(f'{s_일자} 데이터 저장 완료')
 
-    def make_초봉데이터(self, df_체결정보, n_초봉):
+    @staticmethod
+    def make_초봉데이터(df_체결정보, n_초봉):
         """ 체결정보 기준 초봉 데이터로 생성 후 dic_초봉 리턴 """
         # df 정의
         df_체결정보 = df_체결정보.copy()
