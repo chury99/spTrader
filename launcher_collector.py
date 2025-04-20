@@ -166,7 +166,7 @@ class LauncherCollector:
 
         # 모니터링 진행
         dt_시작시각 = pd.Timestamp('now')
-        n_지연시간_초 = 3
+        n_지연시간_초 = 5
         while True:
             # 현재시각 확인
             dt_현재시각 = pd.Timestamp('now')
@@ -277,7 +277,7 @@ if __name__ == "__main__":
 
     # 오전과 오후 나눠서 별도 모듈 실행
     dt_현재 = pd.Timestamp('now')
-    if dt_현재 < pd.Timestamp('12:00:00'):
+    if dt_현재 < pd.Timestamp('12:00:00') and dt_현재.weekday() < 5:
         l.collector_다운_retry()
     else:
         l.collector_다운()
