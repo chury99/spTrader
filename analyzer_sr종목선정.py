@@ -196,7 +196,11 @@ class Analyzer:
                     fig.savefig(os.path.join(folder_그래프, f'지지저항_{s_종목코드}_{s_일자}.png'))
 
             # df_지지저항 생성
-            df_지지저항 = pd.concat(li_df_지지저항, axis=0)
+            df_지지저항 = pd.concat(li_df_지지저항, axis=0) if len(li_df_지지저항) > 0 else None
+            if df_지지저항 is None:
+                li_파일명 = [파일 for 파일 in os.listdir(self.folder_지지저항) if s_파일명_생성 in 파일 and '.pkl' in 파일]
+                df_지지저항 = pd.read_pickle(os.path.join(self.folder_지지저항, max(li_파일명)))
+                df_지지저항 = df_지지저항[:0]
 
             # df 저장
             df_지지저항.to_pickle(os.path.join(self.folder_지지저항, f'{s_파일명_생성}_{s_일자}.pkl'))
@@ -280,8 +284,16 @@ class Analyzer:
                     fig.savefig(os.path.join(folder_그래프, f'매수신호_{s_종목코드}_{s_일자}.png'))
 
             # df 생성
-            df_매수신호 = pd.concat(li_df_매수신호, axis=0)
-            df_매수신호_상세 = pd.concat(li_df_매수신호_상세, axis=0)
+            df_매수신호 = pd.concat(li_df_매수신호, axis=0) if len(li_df_매수신호) > 0 else None
+            df_매수신호_상세 = pd.concat(li_df_매수신호_상세, axis=0) if len(li_df_매수신호_상세) > 0 else None
+
+            li_파일명 = [파일 for 파일 in os.listdir(self.folder_매수신호) if s_파일명_생성 in 파일 and '.pkl' in 파일]
+            if df_매수신호 is None:
+                li_파일명_신호 = [파일 for 파일 in li_파일명 if '_상세' not in 파일]
+                df_매수신호 = pd.read_pickle(os.path.join(self.folder_매수신호, max(li_파일명_신호)))[:0]
+            if df_매수신호_상세 is None:
+                li_파일명_상세 = [파일 for 파일 in li_파일명 if '_상세' in 파일]
+                df_매수신호_상세 = pd.read_pickle(os.path.join(self.folder_매수신호, max(li_파일명_상세)))[:0]
 
             # df 저장
             df_매수신호.to_pickle(os.path.join(self.folder_매수신호, f'{s_파일명_생성}_{s_일자}.pkl'))
