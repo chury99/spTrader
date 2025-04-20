@@ -92,13 +92,13 @@ class Analyzer:
                                     dic_종목코드2추가시점=dic_종목코드2추가시점, dic_종목코드2선정사유=dic_종목코드2선정사유)
             if self.b_멀티:
                 with mp.Pool(processes=self.n_멀티코어수) as pool:
-                    li_df_지표생성 = list(tqdm(pool.imap(self.종목별_지표생성, li_대상종목),
+                    li_df_지표생성 = list(tqdm(pool.imap(self.분석_지표생성_종목별, li_대상종목),
                                            total=len(li_대상종목), desc=f'지표생성-{n_초봉}초봉-{s_일자}'))
                 dic_지표생성 = dict(zip(li_대상종목, li_df_지표생성))
             else:
                 dic_지표생성 = dict()
                 for s_종목코드 in tqdm(li_대상종목, desc=f'지표생성-{n_초봉}초봉-{s_일자}'):
-                    df_지표생성 = self.종목별_지표생성(s_종목코드=s_종목코드)
+                    df_지표생성 = self.분석_지표생성_종목별(s_종목코드=s_종목코드)
                     dic_지표생성[s_종목코드] = df_지표생성
 
             # dic 저장
@@ -107,7 +107,7 @@ class Analyzer:
             # log 기록
             self.make_log(f'지표생성 완료({s_일자}, {n_초봉}초봉, {len(dic_지표생성):,}개 종목)')
 
-    def 종목별_지표생성(self, s_종목코드):
+    def 분석_지표생성_종목별(self, s_종목코드):
         """ 종목별 매수매도 정보 생성 후 df 리턴 """
         # 기준정보 정의
         n_초봉 = self.dic_정보_지표생성['n_초봉']
@@ -182,7 +182,11 @@ class Analyzer:
             for s_종목코드 in tqdm(dic_초봉.keys(), desc=f'분봉확인-{n_초봉}초봉-{s_일자}'):
                 # 데이터 확인
                 df_초봉 = dic_초봉[s_종목코드].copy()
-                df_분봉 = dic_분봉[s_종목코드].copy()
+                df_분봉 = dic_분봉[s_종목코드].copy() if s_종목코드 in dic_분봉.keys() else None
+
+                # 초봉 없을 시 통과
+                if df_초봉.shape == (1, 1) or df_분봉 is None:
+                    continue
 
                 # 분봉 상승 확인
                 df_분봉['고가%'] = (df_분봉['고가'] / df_분봉['종가'].shift(1) - 1) * 100
