@@ -23,6 +23,7 @@ dic_폴더정보['이력|신호탐색'] = os.path.join(folder_이력, '신호탐
 dic_폴더정보['이력|주문정보'] = os.path.join(folder_이력, '주문정보')
 dic_폴더정보['이력|대상종목'] = os.path.join(folder_이력, '대상종목')
 dic_폴더정보['이력|초봉정보'] = os.path.join(folder_이력, '초봉정보')
+dic_폴더정보['이력|매개변수'] = os.path.join(folder_이력, '매개변수')
 
 # 데이터 폴더 정의
 folder_데이터 = os.path.join(folder_work, 'collector_데이터')
