@@ -69,13 +69,10 @@ def make_매수신호(dic_매개변수, dt_일자시간=None):
     # 데이터 길이 검증
     if len(df_초봉) == 0:
         li_매수신호 = [False] * len(li_신호종류)
-        dic_신호상세 = dict(n_z매수량_매수봇='', n_z매도량_매수봇='', n_매수금액_매수봇='', n_체결강도_매수봇='',
-                        li_신호종류_매수봇=li_신호종류)
-        df_초봉_기준봉 = df_초봉[-1:]
-        return li_매수신호, dic_신호상세, df_초봉_기준봉
-
-    # # 초봉 확인
-    # n_초봉 = (df_초봉.index[1] - df_초봉.index[0]).seconds if len(df_초봉) > 1 else 10
+        dic_매수신호 = dict(b_매수신호_매수봇=False, li_매수신호_매수봇=li_매수신호,
+                        n_z매수량_매수봇='', n_z매도량_매수봇='', n_매수금액_매수봇='', n_체결강도_매수봇='',
+                        li_신호종류_매수봇=li_신호종류, df_초봉_기준봉_매수봇=df_초봉[-1:])
+        return dic_매수신호
 
     # 데이터 정의
     ary_매수량 = df_초봉['매수량'].values[-30:]
@@ -106,12 +103,14 @@ def make_매수신호(dic_매개변수, dt_일자시간=None):
     li_매수신호.append(b_체결강도)
 
     # 정보 전달용 dic 생성
-    dic_신호상세 = dict(n_z매수량_매수봇=n_z매수량, n_z매도량_매수봇=n_z매도량,
+    b_매수신호 = sum(li_매수신호) == len(li_매수신호)
+    dic_매수신호 = dict(b_매수신호_매수봇=b_매수신호, li_매수신호_매수봇=li_매수신호,
+                    n_z매수량_매수봇=n_z매수량, n_z매도량_매수봇=n_z매도량,
                     n_매수금액_매수봇=n_매수금액,
                     n_체결강도_매수봇=n_체결강도,
-                    li_신호종류_매수봇=li_신호종류)
+                    li_신호종류_매수봇=li_신호종류, df_초봉_기준봉_매수봇=df_초봉_기준봉)
 
-    return li_매수신호, dic_신호상세, df_초봉_기준봉
+    return dic_매수신호
 
 
 def make_매도신호(dic_매개변수, n_현재가=None, dt_일자시간=None):
@@ -134,18 +133,20 @@ def make_매도신호(dic_매개변수, n_현재가=None, dt_일자시간=None):
 
     # 데이터 길이 검증
     if len(df_초봉) == 0:
-        return [False] * len(li_신호종류), dict(n_초봉='', n_현재가='',
-                                                n_수익률='', n_경과초='', li_신호종류=li_신호종류)
-
-    # # 초봉 확인
-    # n_초봉 = (df_초봉.index[1] - df_초봉.index[0]).seconds if len(df_초봉) > 1 else 10
+        # return [False] * len(li_신호종류), dict(n_초봉='', n_현재가='',
+        #                                         n_수익률='', n_경과초='', li_신호종류=li_신호종류)
+        li_매도신호 = [False] * len(li_신호종류)
+        dic_매도신호 = dict(b_매도신호_매도봇=False, li_매도신호_매도봇=li_매도신호,
+                        n_현재가_매도봇='', n_수익률_매도봇='', n_경과초_매도봇='', n_매도량_누적_매도봇='', n_매수량_누적_매도봇='',
+                        n_매수량max_매도봇='', n_매수량_매도봇='', li_신호종류_매도봇='', li_매도신호_수치_매도봇='')
+        return dic_매도신호
 
     # 데이터 정의
     n_매수량 = df_초봉['매수량'].values[-1]
     if n_현재가 is None:
         ary_종가 = df_초봉['종가'].dropna().values
         n_현재가 = ary_종가[-1] if len(ary_종가) > 0 else None
-    n_수익률 = (n_현재가 / n_매수가 - 1) * 100 if n_현재가 is not None else None
+    n_수익률 = (n_현재가 / n_매수가 - 1) * 100 - 0.2 if n_현재가 is not None else None
     df_초봉_매수이후 = df_초봉[df_초봉.index >= df_초봉_기준봉.index[0]] if len(df_초봉_기준봉) > 0 else df_초봉
     n_매수량_누적 = df_초봉_매수이후['매수량'].sum()
     n_매도량_누적 = df_초봉_매수이후['매도량'].sum()
@@ -170,7 +171,7 @@ def make_매도신호(dic_매개변수, n_현재가=None, dt_일자시간=None):
     li_매도신호_수치.append(f'{n_매수비율:.0f}%')
 
     # 3) 하락한계 검증
-    b_하락한계 = n_수익률 < -1.0 if n_수익률 is not None else False
+    b_하락한계 = n_수익률 < -1.2 if n_수익률 is not None else False
     li_매도신호.append(b_하락한계)
     li_매도신호_수치.append(f'{n_수익률:.1f}%')
 
@@ -185,13 +186,15 @@ def make_매도신호(dic_매개변수, n_현재가=None, dt_일자시간=None):
     li_매도신호_수치.append(f'{n_경과초:.0f}초')
 
     # 정보 전달용 dic 생성
-    dic_신호상세 = dict(n_현재가_매도봇=n_현재가, n_수익률_매도봇=n_수익률,
+    b_매도신호 = sum(li_매도신호) > 0
+    dic_매도신호 = dict(b_매도신호_매도봇=b_매도신호, li_매도신호_매도봇=li_매도신호,
+                    n_현재가_매도봇=n_현재가, n_수익률_매도봇=n_수익률,
                     n_경과초_매도봇=n_경과초,
                     n_매도량_누적_매도봇=n_매도량_누적, n_매수량_누적_매도봇=n_매수량_누적,
                     n_매수량max_매도봇=n_매수량max, n_매수량_매도봇=n_매수량,
                     li_신호종류_매도봇=li_신호종류, li_매도신호_수치_매도봇=li_매도신호_수치)
 
-    return li_매도신호, dic_신호상세
+    return dic_매도신호
 
 
 # def make_매도신호_old(df_초봉, n_매수가, s_매수시간, df_초봉_기준봉=None, n_현재가=None, dt_일자시간=None):
