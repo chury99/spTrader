@@ -193,6 +193,7 @@ class Trader(QMainWindow, form_class):
             dic_매개변수_종목['df_초봉_매수봇'] = df_초봉
             dic_매수신호 = Logic.make_매수신호(dic_매개변수=dic_매개변수_종목)
             b_매수신호 = dic_매수신호['b_매수신호_매수봇']
+            li_매수신호 = dic_매수신호['li_매수신호_매수봇']
 
             # 매개변수 업데이트
             dic_매개변수_종목['s_탐색시간_매수봇'] = pd.Timestamp('now').strftime('%H:%M:%S')
@@ -301,10 +302,11 @@ class Trader(QMainWindow, form_class):
         dic_매개변수_종목['n_현재가_매도봇'] = n_현재가
         dic_매도신호 = Logic.make_매도신호(dic_매개변수=dic_매개변수_종목)
         b_매도신호 = dic_매도신호['b_매도신호_매도봇']
+        li_매도신호 = dic_매도신호['li_매도신호_매도봇']
 
         # 매개변수 업데이트
         dic_매개변수_종목['s_탐색시간_매도봇'] = pd.Timestamp('now').strftime('%H:%M:%S')
-        dic_매개변수_종목 = {**dic_매개변수_종목, **b_매도신호}
+        dic_매개변수_종목 = {**dic_매개변수_종목, **dic_매도신호}
         self.dic_매개변수[s_종목코드] = dic_매개변수_종목
 
         # log 기록
