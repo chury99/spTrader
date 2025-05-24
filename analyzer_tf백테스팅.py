@@ -54,6 +54,7 @@ class Analyzer:
         self.n_멀티코어수 = mp.cpu_count() - 2
         self.li_전체일자 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
                         if 'dic_코드별_분봉' in 파일명 and '.pkl' in 파일명]
+        self.dic_매개변수 = dict()
 
         # 카카오 API 폴더 연결
         sys.path.append(dic_config['folder_kakao'])
@@ -85,16 +86,20 @@ class Analyzer:
 
             # 종목별 분석 진행
             li_대상종목 = list(dic_초봉.keys())
-            self.dic_정보_매수매도 = dict(n_초봉=n_초봉, s_일자=s_일자, dic_초봉=dic_초봉, dic_1초봉=dic_1초봉)
+            # self.dic_정보_매수매도 = dict(n_초봉=n_초봉, s_일자=s_일자, dic_초봉=dic_초봉, dic_1초봉=dic_1초봉)
+            self.dic_매개변수['n_초봉'] = n_초봉
+            self.dic_매개변수['s_일자'] = s_일자
+            self.dic_매개변수['dic_초봉'] = dic_초봉
+            self.dic_매개변수['dic_1초봉'] = dic_1초봉
             if self.b_멀티:
                 with mp.Pool(processes=self.n_멀티코어수) as pool:
-                    li_df_매수매도 = list(tqdm(pool.imap(self.검증_매수매도_종목별_backup, li_대상종목),
+                    li_df_매수매도 = list(tqdm(pool.imap(self.검증_매수매도_종목별, li_대상종목),
                                            total=len(li_대상종목), desc=f'매수매도-{n_초봉}초봉-{s_일자}'))
                 dic_매수매도 = dict(zip(li_대상종목, li_df_매수매도))
             else:
                 dic_매수매도 = dict()
                 for s_종목코드 in tqdm(li_대상종목, desc=f'매수매도-{n_초봉}초봉-{s_일자}'):
-                    df_매수매도 = self.검증_매수매도_종목별_backup(s_종목코드=s_종목코드)
+                    df_매수매도 = self.검증_매수매도_종목별(s_종목코드=s_종목코드)
                     dic_매수매도[s_종목코드] = df_매수매도
 
             # dic 저장
@@ -103,13 +108,54 @@ class Analyzer:
             # log 기록
             self.make_log(f'신호생성 완료({s_일자}, {n_초봉}초봉, {len(dic_매수매도):,}개 종목)')
 
+    # def 검증_매수매도(self, n_초봉):
+    #     """ 지표 추가된 초봉 데이터 기준 매수, 매도 검증 후 pkl, csv 저장 """
+    #     # 파일명 정의
+    #     s_파일명_기준 = 'dic_분봉확인'
+    #     s_파일명_생성 = 'dic_매수매도'
+    #
+    #     # 분석대상 일자 선정
+    #     li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_분봉확인)
+    #                 if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
+    #     li_일자_전체 = [일자 for 일자 in li_일자_전체 if 일자 >= self.s_시작일자] if self.s_시작일자 is not None else li_일자_전체
+    #     li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
+    #     li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매수매도)
+    #                 if s_파일명_생성 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
+    #     li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+    #
+    #     # 일자별 분석 진행
+    #     for s_일자 in li_일자_대상:
+    #         # 초봉 불러오기
+    #         dic_초봉 = pd.read_pickle(os.path.join(self.folder_분봉확인, f'dic_분봉확인_{s_일자}_{n_초봉}초봉.pkl'))
+    #         dic_1초봉 = pd.read_pickle(os.path.join(self.folder_분봉확인, f'dic_분봉확인_{s_일자}_1초봉.pkl'))
+    #
+    #         # 종목별 분석 진행
+    #         li_대상종목 = list(dic_초봉.keys())
+    #         self.dic_정보_매수매도 = dict(n_초봉=n_초봉, s_일자=s_일자, dic_초봉=dic_초봉, dic_1초봉=dic_1초봉)
+    #         if self.b_멀티:
+    #             with mp.Pool(processes=self.n_멀티코어수) as pool:
+    #                 li_df_매수매도 = list(tqdm(pool.imap(self.검증_매수매도_종목별_backup, li_대상종목),
+    #                                        total=len(li_대상종목), desc=f'매수매도-{n_초봉}초봉-{s_일자}'))
+    #             dic_매수매도 = dict(zip(li_대상종목, li_df_매수매도))
+    #         else:
+    #             dic_매수매도 = dict()
+    #             for s_종목코드 in tqdm(li_대상종목, desc=f'매수매도-{n_초봉}초봉-{s_일자}'):
+    #                 df_매수매도 = self.검증_매수매도_종목별_backup(s_종목코드=s_종목코드)
+    #                 dic_매수매도[s_종목코드] = df_매수매도
+    #
+    #         # dic 저장
+    #         pd.to_pickle(dic_매수매도, os.path.join(self.folder_매수매도, f'dic_매수매도_{s_일자}_{n_초봉}초봉.pkl'))
+    #
+    #         # log 기록
+    #         self.make_log(f'신호생성 완료({s_일자}, {n_초봉}초봉, {len(dic_매수매도):,}개 종목)')
+
     def 검증_매수매도_종목별(self, s_종목코드):
         """ 종목별 매수매도 정보 생성 후 df 리턴 """
         # 기준정보 정의
-        n_초봉 = self.dic_정보_매수매도['n_초봉']
-        s_일자 = self.dic_정보_매수매도['s_일자']
-        dic_초봉 = self.dic_정보_매수매도['dic_초봉']
-        dic_1초봉 = self.dic_정보_매수매도['dic_1초봉']
+        n_초봉 = self.dic_매개변수['n_초봉']
+        s_일자 = self.dic_매개변수['s_일자']
+        dic_초봉 = self.dic_매개변수['dic_초봉']
+        dic_1초봉 = self.dic_매개변수['dic_1초봉']
 
         # df 정의
         try:
@@ -118,89 +164,13 @@ class Analyzer:
         except KeyError:
             return pd.DataFrame(dict(종목코드=[s_종목코드]))
 
-        # 매수신호 검증
-        def 매수검증(i_시점):
-            df_초봉_시점 = df_초봉[:i_시점]
-            df_초봉_시점 = df_초봉_시점[-33:]
-            li_매수신호, dic_신호상세, df_초봉_기준봉 = Logic.make_매수신호(df_초봉=df_초봉_시점, dt_일자시간=i_시점)
-            return [li_매수신호, dic_신호상세, df_초봉_기준봉]
-        df_초봉['매수검증'] = df_초봉.reset_index()['dt일시'].apply(lambda dt: 매수검증(dt)).values
-        df_초봉['매수신호'] = df_초봉['매수검증'].apply(lambda li: sum(li[0]) == len(li[0]))
-        df_초봉.loc[df_초봉['시가'].isna(), '매수신호'] = False
-
-        # 매도신호 검증
-        li_df_매도검증 = list()
-        for dt_매수시점 in df_초봉[df_초봉['매수신호']].index:
-            # 검증용 데이터 정의
-            df_1초봉_매수시점 = df_1초봉[df_1초봉.index >= dt_매수시점]
-            df_초봉_매도검증 = df_초봉[df_초봉.index >= dt_매수시점]
-            li_매수검증 = df_초봉_매도검증['매수검증'].values[0]
-            s_매수시간 = df_초봉_매도검증['체결시간'].values[0]
-            n_매수가 = df_1초봉_매수시점['고가'].values[1]
-            df_초봉_기준봉 = li_매수검증[2]
-
-            # 초봉별 검증
-            li_df_매도검증_매수별 = list()
-            for dt_매도검증 in df_초봉_매도검증.index:
-                df_1초봉_시점 = df_1초봉[df_1초봉.index >= dt_매도검증]
-                df_초봉_시점 = df_초봉_매도검증[df_초봉_매도검증.index <= dt_매도검증]
-                li_매도신호, dic_신호상세 = Logic.make_매도신호(df_초봉=df_초봉_시점, df_초봉_기준봉=df_초봉_기준봉,
-                                                            n_매수가=n_매수가, s_매수시간=s_매수시간,
-                                                            dt_일자시간=dt_매도검증)
-                # 결과 데이터 생성
-                b_매도신호 = sum(li_매도신호) > 0
-                b_보유신호 = True
-                n_매도가 = df_1초봉_시점['저가'].values[1] if b_매도신호 else None
-                s_매도시간 = df_초봉_시점['체결시간'].values[-1] if b_매도신호 else None
-                s_매도사유 = [dic_신호상세['li_신호종류'][i] for i in range(len(li_매도신호)) if li_매도신호[i]][0]\
-                                if b_매도신호 else None
-                n_수익률 = (df_1초봉_시점['저가'].values[1] / n_매수가 - 1) * 100 - 0.2
-
-                # 결과 df 정리
-                df_초봉_결과 = df_초봉_시점[-1:].copy()
-                df_초봉_결과['매도신호'] = b_매도신호
-                df_초봉_결과['보유신호'] = b_보유신호
-                df_초봉_결과['매수가'] = n_매수가
-                df_초봉_결과['매도가'] = n_매도가
-                df_초봉_결과['매수시간'] = s_매수시간
-                df_초봉_결과['매도시간'] = s_매도시간
-                df_초봉_결과['매도사유'] = s_매도사유
-                df_초봉_결과['수익률%'] = n_수익률
-                li_df_매도검증_매수별.append(df_초봉_결과)
-
-                # 매도 시 종료
-                if b_매도신호:
-                    break
-
-            # 매도검증 df 생성
-            df_매도검증_매수별 = pd.concat(li_df_매도검증_매수별, axis=0).drop_duplicates('체결시간').sort_index()
-            li_df_매도검증.append(df_매도검증_매수별)
-
-        # df 생성
-        df_매수매도 = pd.concat(li_df_매도검증 + [df_초봉], axis=0).drop_duplicates('체결시간').sort_index()
-
-        # csv 저장
-        s_폴더 = os.path.join(self.folder_매수매도, f'종목별_{s_일자}')
-        os.makedirs(s_폴더, exist_ok=True)
-        df_매수매도.to_csv(os.path.join(s_폴더, f'df_매수매도_{s_일자}_{n_초봉}초봉_{s_종목코드}.csv'),
-                       index=False, encoding='cp949')
-
-        return df_매수매도
-
-    def 검증_매수매도_종목별_backup(self, s_종목코드):
-        """ 종목별 매수매도 정보 생성 후 df 리턴 """
-        # 기준정보 정의
-        n_초봉 = self.dic_정보_매수매도['n_초봉']
-        s_일자 = self.dic_정보_매수매도['s_일자']
-        dic_초봉 = self.dic_정보_매수매도['dic_초봉']
-        dic_1초봉 = self.dic_정보_매수매도['dic_1초봉']
-
-        # df 정의
-        try:
-            df_초봉 = dic_초봉[s_종목코드].sort_index().copy()
-            df_1초봉 = dic_1초봉[s_종목코드].sort_index().copy()
-        except KeyError:
-            return pd.DataFrame(dict(종목코드=[s_종목코드]))
+        # 종목별 매개변수 생성
+        dic_매개변수_종목 = self.dic_매개변수[s_종목코드] if s_종목코드 in self.dic_매개변수 else dict()
+        dic_매개변수_종목['s_종목코드'] = s_종목코드
+        dic_매개변수_종목['s_종목명'] = df_초봉['종목명'].values[0]
+        dic_매개변수_종목['s_일자'] = s_일자
+        dic_매개변수_종목['n_초봉'] = n_초봉
+        dic_매개변수_종목['s_선정사유'] = df_초봉['선정사유'].values[0]
 
         # 검증 초기값 생성
         b_매수신호 = False
@@ -221,39 +191,62 @@ class Analyzer:
             df_초봉_시점 = df_초봉[:i_시점]
             df_초봉_시점 = df_초봉_시점[-50:] if not b_보유신호 else df_초봉_시점[pd.Timestamp(f'{s_일자} {s_매수시간}'):]
 
+            # 현재가 확인
+            df_1초봉_시점 = df_1초봉[df_1초봉.index >= i_시점]
+            n_현재가 = df_1초봉_시점['시가'].values[0]
+
             # 매수검증
             if not b_보유신호:
                 # 매수신호 검증
-                li_매수신호, dic_신호상세, df_초봉_기준봉 = Logic.make_매수신호(df_초봉=df_초봉_시점, dt_일자시간=i_시점)
-                li_신호종류 = dic_신호상세['li_신호종류'] if 'li_신호종류' in dic_신호상세.keys() else list()
-                b_매수신호 = sum(li_매수신호) == len(li_매수신호)
+                dic_매개변수_종목['df_초봉_매수봇'] = df_초봉_시점
+                dic_매수신호 = Logic.make_매수신호(dic_매개변수=dic_매개변수_종목, dt_일자시간=i_시점)
+                # li_매수신호, dic_신호상세, df_초봉_기준봉 = Logic.make_매수신호(df_초봉=df_초봉_시점, dt_일자시간=i_시점)
+                b_매수신호 = dic_매수신호['b_매수신호_매수봇']
+                li_매수신호 = dic_매수신호['li_매수신호_매수봇']
+                # li_신호종류 = dic_신호상세['li_신호종류'] if 'li_신호종류' in dic_신호상세.keys() else list()
+                # b_매수신호 = sum(li_매수신호) == len(li_매수신호)
+
+                # 매개변수 업데이트
+                dic_매개변수_종목['s_탐색시간_매수봇'] = i_시점.strftime('%H:%M:%S')
+                dic_매개변수_종목['n_현재가_매수봇'] = n_현재가
+                dic_매개변수_종목 = {**dic_매개변수_종목, **dic_매수신호}
+                self.dic_매개변수[s_종목코드] = dic_매개변수_종목
 
                 # 매수 정보 생성
                 if b_매수신호:
-                    # n_시가 = df_초봉_시점['시가'].values[-1]
-                    # n_고가 = df_초봉_시점['고가'].values[-1]
                     df_1초봉_시점 = df_1초봉[df_1초봉.index > i_시점]
                     n_고가 = df_1초봉_시점['고가'].values[0] if len(df_1초봉_시점) > 0 else df_초봉_시점['고가'].values[-1]
                     n_매수가 = n_고가 if pd.notna(n_고가) else None
                     s_매수시간 = df_초봉_시점['체결시간'].values[-1] if n_매수가 is not None else None
-                    # s_매수시간 = df_1초봉_시점['체결시간'].values[0] if n_매수가 is not None else None
                     b_보유신호 = True if n_매수가 is not None else False
                     b_매수신호 = b_매수신호 if n_매수가 is not None else False
-                    df_초봉_기준봉 = df_초봉_기준봉 if n_매수가 is not None else False
+                    df_초봉_기준봉 = dic_매개변수_종목['df_초봉_기준봉_매수봇'] if n_매수가 is not None else False
+                    dic_매개변수_종목['s_주문시간_매수봇'] = s_매수시간
+                    dic_매개변수_종목['n_매수단가_매도봇'] = n_매수가
+                    # dic_매개변수_종목['n_보유수량_매도봇'] = 1
 
             # 매도검증
             if b_보유신호:
                 # 매도신호 검증
-                li_매도신호, dic_신호상세 = Logic.make_매도신호(df_초봉=df_초봉_시점, df_초봉_기준봉=df_초봉_기준봉,
-                                                            n_매수가=n_매수가, s_매수시간=s_매수시간,
-                                                            dt_일자시간=i_시점)
-                li_신호종류 = dic_신호상세['li_신호종류'] if 'li_신호종류' in dic_신호상세.keys() else list()
-                b_매도신호 = sum(li_매도신호) > 0
+                # li_매도신호, dic_신호상세 = Logic.make_매도신호(df_초봉=df_초봉_시점, df_초봉_기준봉=df_초봉_기준봉,
+                #                                             n_매수가=n_매수가, s_매수시간=s_매수시간,
+                #                                             dt_일자시간=i_시점)
+                dic_매개변수_종목['df_초봉_매도봇'] = df_초봉_시점
+                dic_매개변수_종목['n_현재가_매도봇'] = n_현재가
+                dic_매도신호 = Logic.make_매도신호(dic_매개변수=dic_매개변수_종목, dt_일자시간=i_시점)
+                b_매도신호 = dic_매도신호['b_매도신호_매도봇']
+                li_매도신호 = dic_매도신호['li_매도신호_매도봇']
+                li_신호종류 = dic_매도신호['li_신호종류_매도봇']
+                # li_신호종류 = dic_신호상세['li_신호종류'] if 'li_신호종류' in dic_신호상세.keys() else list()
+                # b_매도신호 = sum(li_매도신호) > 0
+
+                # 매개변수 업데이트
+                dic_매개변수_종목['s_탐색시간_매도봇'] = i_시점.strftime('%H:%M:%S')
+                dic_매개변수_종목 = {**dic_매개변수_종목, **dic_매도신호}
+                self.dic_매개변수[s_종목코드] = dic_매개변수_종목
 
                 # 매도 정보 생성
                 if b_매도신호:
-                    # n_시가 = df_초봉_시점['시가'].values[-1]
-                    # n_저가 = df_초봉_시점['저가'].values[-1]
                     df_1초봉_시점 = df_1초봉[df_1초봉.index > i_시점]
                     n_저가 = df_1초봉_시점['저가'].values[0] if len(df_1초봉_시점) > 0 else df_초봉_시점['저가'].values[-1]
                     n_매도가 = n_저가 if pd.notna(n_저가) else None
@@ -297,6 +290,117 @@ class Analyzer:
                        index=False, encoding='cp949')
 
         return df_매수매도
+
+    # def 검증_매수매도_종목별(self, s_종목코드):
+    #     """ 종목별 매수매도 정보 생성 후 df 리턴 """
+    #     # 기준정보 정의
+    #     n_초봉 = self.dic_정보_매수매도['n_초봉']
+    #     s_일자 = self.dic_정보_매수매도['s_일자']
+    #     dic_초봉 = self.dic_정보_매수매도['dic_초봉']
+    #     dic_1초봉 = self.dic_정보_매수매도['dic_1초봉']
+    #
+    #     # df 정의
+    #     try:
+    #         df_초봉 = dic_초봉[s_종목코드].sort_index().copy()
+    #         df_1초봉 = dic_1초봉[s_종목코드].sort_index().copy()
+    #     except KeyError:
+    #         return pd.DataFrame(dict(종목코드=[s_종목코드]))
+    #
+    #     # 검증 초기값 생성
+    #     b_매수신호 = False
+    #     b_매도신호 = False
+    #     b_보유신호 = False
+    #     df_초봉_기준봉 = False
+    #     n_매수가 = None
+    #     n_매도가 = None
+    #     s_매수시간 = None
+    #     s_매도시간 = None
+    #     s_매도사유 = None
+    #
+    #     # 시간별 검증
+    #     li_df_매수매도 = list()
+    #     dic_신호상세 = dict()
+    #     for i_시점 in df_초봉.index:
+    #         # 초봉 데이터 준비
+    #         df_초봉_시점 = df_초봉[:i_시점]
+    #         df_초봉_시점 = df_초봉_시점[-50:] if not b_보유신호 else df_초봉_시점[pd.Timestamp(f'{s_일자} {s_매수시간}'):]
+    #
+    #         # 매수검증
+    #         if not b_보유신호:
+    #             # 매수신호 검증
+    #             li_매수신호, dic_신호상세, df_초봉_기준봉 = Logic.make_매수신호(df_초봉=df_초봉_시점, dt_일자시간=i_시점)
+    #             li_신호종류 = dic_신호상세['li_신호종류'] if 'li_신호종류' in dic_신호상세.keys() else list()
+    #             b_매수신호 = sum(li_매수신호) == len(li_매수신호)
+    #
+    #             # 매수 정보 생성
+    #             if b_매수신호:
+    #                 # n_시가 = df_초봉_시점['시가'].values[-1]
+    #                 # n_고가 = df_초봉_시점['고가'].values[-1]
+    #                 df_1초봉_시점 = df_1초봉[df_1초봉.index > i_시점]
+    #                 n_고가 = df_1초봉_시점['고가'].values[0] if len(df_1초봉_시점) > 0 else df_초봉_시점['고가'].values[-1]
+    #                 n_매수가 = n_고가 if pd.notna(n_고가) else None
+    #                 s_매수시간 = df_초봉_시점['체결시간'].values[-1] if n_매수가 is not None else None
+    #                 # s_매수시간 = df_1초봉_시점['체결시간'].values[0] if n_매수가 is not None else None
+    #                 b_보유신호 = True if n_매수가 is not None else False
+    #                 b_매수신호 = b_매수신호 if n_매수가 is not None else False
+    #                 df_초봉_기준봉 = df_초봉_기준봉 if n_매수가 is not None else False
+    #
+    #         # 매도검증
+    #         if b_보유신호:
+    #             # 매도신호 검증
+    #             li_매도신호, dic_신호상세 = Logic.make_매도신호(df_초봉=df_초봉_시점, df_초봉_기준봉=df_초봉_기준봉,
+    #                                                         n_매수가=n_매수가, s_매수시간=s_매수시간,
+    #                                                         dt_일자시간=i_시점)
+    #             li_신호종류 = dic_신호상세['li_신호종류'] if 'li_신호종류' in dic_신호상세.keys() else list()
+    #             b_매도신호 = sum(li_매도신호) > 0
+    #
+    #             # 매도 정보 생성
+    #             if b_매도신호:
+    #                 # n_시가 = df_초봉_시점['시가'].values[-1]
+    #                 # n_저가 = df_초봉_시점['저가'].values[-1]
+    #                 df_1초봉_시점 = df_1초봉[df_1초봉.index > i_시점]
+    #                 n_저가 = df_1초봉_시점['저가'].values[0] if len(df_1초봉_시점) > 0 else df_초봉_시점['저가'].values[-1]
+    #                 n_매도가 = n_저가 if pd.notna(n_저가) else None
+    #                 s_매도시간 = df_초봉_시점['체결시간'].values[-1] if n_매도가 is not None else None
+    #                 # s_매도시간 = df_1초봉_시점['체결시간'].values[0] if n_매도가 is not None else None
+    #                 s_매도사유 = [li_신호종류[i] for i in range(len(li_매도신호)) if li_매도신호[i]][0]
+    #
+    #         # df 정리
+    #         df_매수매도 = df_초봉_시점[-1:].copy()
+    #         df_매수매도['매수신호'] = b_매수신호
+    #         df_매수매도['매도신호'] = b_매도신호
+    #         df_매수매도['보유신호'] = b_보유신호
+    #         df_매수매도['매수가'] = n_매수가
+    #         df_매수매도['매도가'] = n_매도가
+    #         df_매수매도['매수시간'] = s_매수시간
+    #         df_매수매도['매도시간'] = s_매도시간
+    #         df_매수매도['매도사유'] = s_매도사유
+    #         df_매수매도['수익률%'] = (df_매수매도['시가'] / df_매수매도['매수가'] - 1) * 100 - 0.2\
+    #                                 if '시가' in df_매수매도.columns and '매수가' in df_매수매도.columns else None
+    #         li_df_매수매도.append(df_매수매도)
+    #
+    #         # 초기화
+    #         if b_매도신호 and n_매도가 is not None:
+    #             b_매수신호 = False
+    #             b_매도신호 = False
+    #             b_보유신호 = False
+    #             df_초봉_기준봉 = False
+    #             n_매수가 = None
+    #             n_매도가 = None
+    #             s_매수시간 = None
+    #             s_매도시간 = None
+    #             s_매도사유 = None
+    #
+    #     # df 생성
+    #     df_매수매도 = pd.concat(li_df_매수매도, axis=0).sort_index() if len(li_df_매수매도) > 0 else pd.DataFrame()
+    #
+    #     # csv 저장
+    #     s_폴더 = os.path.join(self.folder_매수매도, f'종목별_{s_일자}')
+    #     os.makedirs(s_폴더, exist_ok=True)
+    #     df_매수매도.to_csv(os.path.join(s_폴더, f'df_매수매도_{s_일자}_{n_초봉}초봉_{s_종목코드}.csv'),
+    #                    index=False, encoding='cp949')
+    #
+    #     return df_매수매도
 
     def 검증_결과정리(self, n_초봉):
         """ 매수 매도 신호 기준으로 결과 정리 후 pkl, csv 저장 """
