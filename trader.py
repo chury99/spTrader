@@ -236,7 +236,18 @@ class Trader(QMainWindow, form_class):
                 self.flag_종목보유 = len(self.df_계좌잔고_종목별) > 0
 
                 # 초봉 저장
-                s_파일명 = f'{self.n_초봉}초봉_{self.s_오늘}_{s_종목코드}_{s_종목명}'
+                li_빈칸 = [None] * (len(df_초봉) - 1)
+                df_초봉['체결강도'] = li_빈칸 + [dic_매개변수_종목['n_체결강도_매수봇']]
+                df_초봉['z_매수'] = li_빈칸 + [dic_매개변수_종목['n_z매수량_매수봇']]
+                df_초봉['z_매도'] = li_빈칸 + [dic_매개변수_종목['n_z매도량_매수봇']]
+                df_초봉['만원_매수'] = li_빈칸 + [dic_매개변수_종목['n_매수금액_매수봇']]
+                df_초봉['선정사유'] = li_빈칸 + [dic_매개변수_종목['s_선정사유']]
+                df_초봉['매수신호'] = li_빈칸 + [b_매수신호]
+                for i, b_매수신호 in enumerate(li_매수신호):
+                    s_신호종류 = li_신호종류[i]
+                    df_초봉[f'{i}_{s_신호종류}'] = li_빈칸 + [b_매수신호]
+                df_초봉['현재가'] = li_빈칸 + [n_현재가]
+                s_파일명 = f'{self.n_초봉}초봉_{self.s_오늘}_{s_종목코드}_{s_종목명}_{pd.Timestamp("now").strftime("%H%M%S")}'
                 df_초봉.to_pickle(os.path.join(self.folder_초봉정보, f'{s_파일명}.pkl'))
                 df_초봉.to_csv(os.path.join(self.folder_초봉정보, f'{s_파일명}.csv'), index=False, encoding='cp949')
 
@@ -245,6 +256,7 @@ class Trader(QMainWindow, form_class):
                 pd.to_pickle(self.dic_매개변수, self.path_매개변수)
 
                 # 매수 탐색 종료
+                b_매수신호 = False
                 break
 
             # 매수탐색 파일 업데이트
