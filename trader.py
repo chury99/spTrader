@@ -122,12 +122,12 @@ class Trader(QMainWindow, form_class):
             self.dic_대상종목, self.df_대상종목_매매, self.dic_코드2종목명 = self.get_대상종목(li_매매대상=self.li_매매대상)
 
         # 매수봇 호출 (초봉 주기)
-        if self.flag_종목보유 is False:
+        if not self.flag_종목보유:
             if n_현재_초 % self.n_초봉 == 1 and s_현재 < '15:10:00':
                 self.run_매수봇()
 
         # 매도봇 호출 (1초 주기)
-        if self.flag_종목보유 is True:
+        if self.flag_종목보유:
             if n_현재_초 % 1 == 0:
                 self.run_매도봇()
 
@@ -247,7 +247,8 @@ class Trader(QMainWindow, form_class):
                     s_신호종류 = li_신호종류[i]
                     df_초봉[f'{i}_{s_신호종류}'] = li_빈칸 + [b_매수신호]
                 df_초봉['현재가'] = li_빈칸 + [n_현재가]
-                s_파일명 = f'{self.n_초봉}초봉_{self.s_오늘}_{s_종목코드}_{s_종목명}_{pd.Timestamp("now").strftime("%H%M%S")}'
+                s_현재시각 = pd.Timestamp("now").strftime("%H%M%S")
+                s_파일명 = f'{self.n_초봉}초봉_{self.s_오늘}_{s_종목코드}_{s_종목명}_{s_현재시각}_매수'
                 df_초봉.to_pickle(os.path.join(self.folder_초봉정보, f'{s_파일명}.pkl'))
                 df_초봉.to_csv(os.path.join(self.folder_초봉정보, f'{s_파일명}.csv'), index=False, encoding='cp949')
 
@@ -255,8 +256,8 @@ class Trader(QMainWindow, form_class):
                 self.dic_매개변수[s_종목코드] = dic_매개변수_종목
                 pd.to_pickle(self.dic_매개변수, self.path_매개변수)
 
-                # 매수 탐색 종료
-                b_매수신호 = False
+                # # 매수 탐색 종료
+                # b_매수신호 = False
                 break
 
             # 매수탐색 파일 업데이트
@@ -283,14 +284,14 @@ class Trader(QMainWindow, form_class):
         dic_매개변수_종목['n_매수단가_매도봇'] = n_매수단가
         dic_매개변수_종목['n_보유수량_매도봇'] = n_보유수량
 
-        # 매수시간 확인 (주문정보 확인)
-        try:
-            df_주문정보 = pd.read_pickle(os.path.join(self.folder_주문정보, f'주문정보_{self.s_오늘}.pkl'))
-            df_주문정보 = df_주문정보[df_주문정보['주문구분'] == '매수']
-            df_주문정보 = df_주문정보[df_주문정보['종목코드'] == s_종목코드].sort_values('주문시간')
-            s_매수시간 = df_주문정보['주문시간'].values[-1] if len(df_주문정보) > 0 else '00:00:00'
-        except FileNotFoundError:
-            s_매수시간 = '00:00:00'
+        # # 매수시간 확인 (주문정보 확인)
+        # try:
+        #     df_주문정보 = pd.read_pickle(os.path.join(self.folder_주문정보, f'주문정보_{self.s_오늘}.pkl'))
+        #     df_주문정보 = df_주문정보[df_주문정보['주문구분'] == '매수']
+        #     df_주문정보 = df_주문정보[df_주문정보['종목코드'] == s_종목코드].sort_values('주문시간')
+        #     s_매수시간 = df_주문정보['주문시간'].values[-1] if len(df_주문정보) > 0 else '00:00:00'
+        # except FileNotFoundError:
+        #     s_매수시간 = '00:00:00'
 
         # 초봉 데이터 생성
         li_체결정보 = self.api.dic_실시간_체결[s_종목코드] if s_종목코드 in self.api.dic_실시간_체결.keys() else list()
@@ -356,7 +357,9 @@ class Trader(QMainWindow, form_class):
             self.flag_종목보유 = len(self.df_계좌잔고_종목별) > 0
 
             # 초봉 저장
-            s_파일명 = f'{self.n_초봉}초봉_{self.s_오늘}_{s_종목코드}_{s_종목명}'
+            # s_파일명 = f'{self.n_초봉}초봉_{self.s_오늘}_{s_종목코드}_{s_종목명}'
+            s_현재시각 = pd.Timestamp("now").strftime("%H%M%S")
+            s_파일명 = f'{self.n_초봉}초봉_{self.s_오늘}_{s_종목코드}_{s_종목명}_{s_현재시각}_매도'
             df_초봉.to_pickle(os.path.join(self.folder_초봉정보, f'{s_파일명}.pkl'))
             df_초봉.to_csv(os.path.join(self.folder_초봉정보, f'{s_파일명}.csv'), index=False, encoding='cp949')
 
