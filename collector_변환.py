@@ -8,6 +8,8 @@ import sqlite3
 import pandas.errors
 from tqdm import tqdm
 
+import analyzer_tf알고리즘 as Logic
+
 
 # noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
 # noinspection PyShadowingNames
@@ -767,31 +769,51 @@ class Collector:
             # 종목 분리
             df_체결정보_종목 = df_체결정보[df_체결정보['종목코드'] == s_종목코드].copy()
 
-            # 매수매도 분리
-            df_체결정보_종목_매수 = df_체결정보_종목[df_체결정보_종목['매수매도'] == '매수']
-            df_체결정보_종목_매도 = df_체결정보_종목[df_체결정보_종목['매수매도'] == '매도']
-
-            # 초봉 생성
-            df_리샘플 = df_체결정보_종목.resample(f'{n_초봉}s')
-            df_리샘플_매수 = df_체결정보_종목_매수.resample(f'{n_초봉}s')
-            df_리샘플_매도 = df_체결정보_종목_매도.resample(f'{n_초봉}s')
-            df_초봉 = df_리샘플_매수.first().loc[:, '종목코드':'체결시간']
-            df_초봉['종목코드'] = s_종목코드
-            df_초봉['체결시간'] = df_초봉.index.strftime('%H:%M:%S')
-            df_초봉['시가'] = df_리샘플['체결단가'].first()
-            df_초봉['고가'] = df_리샘플['체결단가'].max()
-            df_초봉['저가'] = df_리샘플['체결단가'].min()
-            df_초봉['종가'] = df_리샘플['체결단가'].last()
-            df_초봉['거래량'] = df_리샘플['체결량'].sum()
-            df_초봉['매수량'] = df_리샘플_매수['체결량'].sum()
-            df_초봉['매도량'] = df_리샘플_매도['체결량'].sum()
-            df_초봉['매수량'] = df_초봉['매수량'].fillna(0).astype(int)
-            df_초봉['매도량'] = df_초봉['매도량'].fillna(0).astype(int)
+            # 초봉데이터 생성
+            df_초봉 = Logic.make_초봉데이터(df_체결정보=df_체결정보_종목, n_초봉=n_초봉, s_종목코드=s_종목코드)
 
             # dict 입력
             dic_초봉[s_종목코드] = df_초봉
 
         return dic_초봉
+
+    # @staticmethod
+    # def make_초봉데이터(df_체결정보, n_초봉):
+    #     """ 체결정보 기준 초봉 데이터로 생성 후 dic_초봉 리턴 """
+    #     # df 정의
+    #     df_체결정보 = df_체결정보.copy()
+    #
+    #     # 종목별 데이터 처리
+    #     dic_초봉 = dict()
+    #     for s_종목코드 in df_체결정보['종목코드'].unique():
+    #         # 종목 분리
+    #         df_체결정보_종목 = df_체결정보[df_체결정보['종목코드'] == s_종목코드].copy()
+    #
+    #         # 매수매도 분리
+    #         df_체결정보_종목_매수 = df_체결정보_종목[df_체결정보_종목['매수매도'] == '매수']
+    #         df_체결정보_종목_매도 = df_체결정보_종목[df_체결정보_종목['매수매도'] == '매도']
+    #
+    #         # 초봉 생성
+    #         df_리샘플 = df_체결정보_종목.resample(f'{n_초봉}s')
+    #         df_리샘플_매수 = df_체결정보_종목_매수.resample(f'{n_초봉}s')
+    #         df_리샘플_매도 = df_체결정보_종목_매도.resample(f'{n_초봉}s')
+    #         df_초봉 = df_리샘플_매수.first().loc[:, '종목코드':'체결시간']
+    #         df_초봉['종목코드'] = s_종목코드
+    #         df_초봉['체결시간'] = df_초봉.index.strftime('%H:%M:%S')
+    #         df_초봉['시가'] = df_리샘플['체결단가'].first()
+    #         df_초봉['고가'] = df_리샘플['체결단가'].max()
+    #         df_초봉['저가'] = df_리샘플['체결단가'].min()
+    #         df_초봉['종가'] = df_리샘플['체결단가'].last()
+    #         df_초봉['거래량'] = df_리샘플['체결량'].sum()
+    #         df_초봉['매수량'] = df_리샘플_매수['체결량'].sum()
+    #         df_초봉['매도량'] = df_리샘플_매도['체결량'].sum()
+    #         df_초봉['매수량'] = df_초봉['매수량'].fillna(0).astype(int)
+    #         df_초봉['매도량'] = df_초봉['매도량'].fillna(0).astype(int)
+    #
+    #         # dict 입력
+    #         dic_초봉[s_종목코드] = df_초봉
+    #
+    #     return dic_초봉
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
