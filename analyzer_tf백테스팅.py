@@ -133,20 +133,11 @@ class Analyzer:
         b_매수신호 = False
         b_매도신호 = False
         b_보유신호 = False
-        # df_초봉_기준봉 = False
-        # n_매수가 = None
-        # n_매도가 = None
-        # s_매수시간 = None
-        # s_매도시간 = None
-        # s_매도사유 = None
 
         # 시간별 검증
-        # li_df_매수매도 = list()
         dic_매수매도 = dict()
-        # dic_신호상세 = dict()
         for dt_시점 in df_1초봉.index:
             # 무효시간 필터링
-            # if not b_보유신호 and dt_시점 not in df_초봉.index:
             if not b_보유신호 and dt_시점.second % n_초봉 != 1 and n_초봉 != 1:
                 continue
 
@@ -215,10 +206,28 @@ class Analyzer:
             dic_매수매도.setdefault('매도신호', list()).append(b_매도신호)
             dic_매수매도.setdefault('보유신호', list()).append(b_보유신호)
             dic_매수매도.setdefault('현재시점', list()).append(dt_시점.strftime('%H:%M:%S'))
-            for i, b_매수신호_상세 in enumerate(dic_매개변수_종목['li_매수신호_매수봇']):
-                s_신호종류 = dic_매개변수_종목['li_신호종류_매수봇'][i]
-                dic_매수매도.setdefault(f'{i}_{s_신호종류}', list()).append(b_매수신호_상세)
+            # for i, b_매수신호_상세 in enumerate(dic_매개변수_종목['li_매수신호_매수봇']):
+            #     s_신호종류 = dic_매개변수_종목['li_신호종류_매수봇'][i]
+            #     dic_매수매도.setdefault(f'매수_{s_신호종류}', list()).append(b_매수신호_상세)
+            # for s_신호종류, b_매수신호_상세 in zip(dic_매개변수_종목['li_신호종류_매수봇'], dic_매개변수_종목['li_매수신호_매수봇']):
+            #     dic_매수매도.setdefault(f'매수_{s_신호종류}', list()).append(b_매수신호_상세)
+            for i, s_신호종류 in enumerate(dic_매개변수_종목['li_신호종류_매수봇']):
+                dic_매수매도.setdefault(f'매수_{s_신호종류}', list()).append(dic_매개변수_종목['li_매수신호_매수봇'][i])
             dic_매수매도.setdefault('현재가', list()).append(n_현재가)
+            # li_매도신호 = dic_매개변수_종목['li_매도신호_매도봇'] if 'li_매도신호_매도봇' in dic_매개변수_종목 else list()
+            # for i, b_매도신호_상세 in enumerate(li_매도신호):
+            #     s_신호종류 = dic_매개변수_종목['li_신호종류_매도봇'][i]
+            #     dic_매수매도.setdefault(f'매도_{s_신호종류}', list()).append(b_매도신호_상세)
+            # li_신호종류_매도 = Logic.make_매도신호(dic_매개변수=None, s_리턴값='li_신호종류')
+            # li_매도신호 = dic_매개변수_종목['li_매도신호_매도봇']\
+            #             if 'li_매도신호_매도봇' in dic_매개변수_종목 else [None] * len(li_신호종류_매도)
+            # for s_신호종류, b_매도신호_상세 in zip(li_신호종류_매도, li_매도신호):
+            #     dic_매수매도.setdefault(f'매도_{s_신호종류}', list()).append(b_매도신호_상세)
+            for i, s_신호종류 in enumerate(['매도우세', '매수피크', '하락한계', '타임아웃']):
+                # li_매도신호_수치_매도봇 = dic_매개변수_종목['li_매도신호_수치_매도봇']\
+                #                         if 'li_매도신호_수치_매도봇' in dic_매개변수_종목 else [None] * (i + 1)
+                dic_매수매도.setdefault(f'매도_{s_신호종류}', list()).append(dic_매개변수_종목['li_매도신호_수치_매도봇'][i]
+                                                                                            if b_보유신호 else None)
             dic_매수매도.setdefault('매수가', list()).append(dic_매개변수_종목['n_매수단가_매도봇'] if b_보유신호 else None)
             dic_매수매도.setdefault('매도가', list()).append(dic_매개변수_종목['n_주문단가_매도봇'] if b_매도신호 else None)
             dic_매수매도.setdefault('매수시간', list()).append(dic_매개변수_종목['s_주문시간_매수봇'] if b_보유신호 else None)
@@ -237,9 +246,10 @@ class Analyzer:
         df_매수매도 = df_매수매도.set_index('dt일시').sort_index()
 
         # csv 저장
-        s_폴더 = os.path.join(self.folder_매수매도, f'종목별_{s_일자}')
+        # s_폴더 = os.path.join(self.folder_매수매도, f'종목별_{s_일자}')
+        s_폴더 = os.path.join(f'{self.folder_매수매도}_종목별', f'매수매도_{s_일자}')
         os.makedirs(s_폴더, exist_ok=True)
-        df_매수매도.to_csv(os.path.join(s_폴더, f'df_매수매도_{s_일자}_{n_초봉}초봉_{s_종목코드}.csv'),
+        df_매수매도.to_csv(os.path.join(s_폴더, f'df_매수매도_{s_일자}_{n_초봉}초봉_{s_종목코드}_{s_종목명}.csv'),
                        index=False, encoding='cp949')
 
         return df_매수매도
@@ -466,7 +476,8 @@ class Analyzer:
                     ax_매수매도 = self.make_ax_매수매도(ax=ax_매수매도, dic_기준정보=dic_기준정보)
 
             # 리포트 파일 저장
-            folder_리포트 = os.path.join(self.folder_수익요약, '리포트')
+            # folder_리포트 = os.path.join(self.folder_수익요약, '리포트')
+            folder_리포트 = f'{self.folder_수익요약}_리포트'
             os.makedirs(folder_리포트, exist_ok=True)
             s_파일명_리포트 = f'백테스팅_리포트_{s_일자}.png'
             fig.savefig(os.path.join(folder_리포트, s_파일명_리포트), dpi=600)
@@ -614,7 +625,7 @@ class Analyzer:
 
 #######################################################################################################################
 if __name__ == "__main__":
-    a = Analyzer(b_멀티=True, s_시작일자='20241201', n_분석일수=20)
+    a = Analyzer(b_멀티=False, s_시작일자='20241201', n_분석일수=20)
     li_초봉 = [3, 5, 10]
     [a.검증_매수매도(n_초봉=n_초봉) for n_초봉 in li_초봉]
     [a.검증_결과정리(n_초봉=n_초봉) for n_초봉 in li_초봉]
