@@ -182,7 +182,8 @@ class Trader(QMainWindow, form_class):
             s_기준시간 = (pd.Timestamp('now') - pd.Timedelta(seconds=n_기준시간)).strftime('%H:%M:%S')
             li_체결정보 = [li_체결 for li_체결 in self.api.dic_실시간_체결[s_종목코드] if li_체결[1] > s_기준시간] \
                             if s_종목코드 in self.api.dic_실시간_체결.keys() else list()
-            df_초봉 = Logic.make_초봉데이터(li_체결정보=li_체결정보, s_오늘=self.s_오늘, n_초봉=self.n_초봉)
+            df_초봉 = Logic.make_초봉데이터_trader(li_체결정보=li_체결정보,
+                                            s_오늘=self.s_오늘, n_초봉=self.n_초봉, s_종목코드=s_종목코드)
             n_현재가 = df_초봉['종가'].dropna().values[-1] if len(df_초봉['종가'].dropna()) > 0 else None
 
             # 마지막 데이터 잘라내기
@@ -295,7 +296,8 @@ class Trader(QMainWindow, form_class):
 
         # 초봉 데이터 생성
         li_체결정보 = self.api.dic_실시간_체결[s_종목코드] if s_종목코드 in self.api.dic_실시간_체결.keys() else list()
-        df_초봉 = Logic.make_초봉데이터(li_체결정보=li_체결정보, s_오늘=self.s_오늘, n_초봉=self.n_초봉)
+        df_초봉 = Logic.make_초봉데이터_trader(li_체결정보=li_체결정보,
+                                        s_오늘=self.s_오늘, n_초봉=self.n_초봉, s_종목코드=s_종목코드)
 
         # 마지막 데이터 잘라내기
         dt_마지막 = pd.Timestamp('now') - pd.Timedelta(seconds=self.n_초봉)
