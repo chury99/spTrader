@@ -185,6 +185,8 @@ class Trader(QMainWindow, form_class):
             df_초봉 = Logic.make_초봉데이터_trader(li_체결정보=li_체결정보,
                                             s_오늘=self.s_오늘, n_초봉=self.n_초봉, s_종목코드=s_종목코드)
             n_현재가 = df_초봉['종가'].dropna().values[-1] if len(df_초봉['종가'].dropna()) > 0 else None
+            if len(df_초봉) == 0:
+                continue
 
             # 마지막 데이터 잘라내기
             dt_마지막 = pd.Timestamp('now') - pd.Timedelta(seconds=self.n_초봉)
@@ -257,8 +259,7 @@ class Trader(QMainWindow, form_class):
                 self.dic_매개변수[s_종목코드] = dic_매개변수_종목
                 pd.to_pickle(self.dic_매개변수, self.path_매개변수)
 
-                # # 매수 탐색 종료
-                # b_매수신호 = False
+                # 매수 탐색 종료 (매수 주문 시)
                 break
 
             # 매수탐색 파일 업데이트
@@ -284,15 +285,6 @@ class Trader(QMainWindow, form_class):
         dic_매개변수_종목['s_종목명'] = s_종목명
         dic_매개변수_종목['n_매수단가_매도봇'] = n_매수단가
         dic_매개변수_종목['n_보유수량_매도봇'] = n_보유수량
-
-        # # 매수시간 확인 (주문정보 확인)
-        # try:
-        #     df_주문정보 = pd.read_pickle(os.path.join(self.folder_주문정보, f'주문정보_{self.s_오늘}.pkl'))
-        #     df_주문정보 = df_주문정보[df_주문정보['주문구분'] == '매수']
-        #     df_주문정보 = df_주문정보[df_주문정보['종목코드'] == s_종목코드].sort_values('주문시간')
-        #     s_매수시간 = df_주문정보['주문시간'].values[-1] if len(df_주문정보) > 0 else '00:00:00'
-        # except FileNotFoundError:
-        #     s_매수시간 = '00:00:00'
 
         # 초봉 데이터 생성
         li_체결정보 = self.api.dic_실시간_체결[s_종목코드] if s_종목코드 in self.api.dic_실시간_체결.keys() else list()
@@ -359,7 +351,6 @@ class Trader(QMainWindow, form_class):
             self.flag_종목보유 = len(self.df_계좌잔고_종목별) > 0
 
             # 초봉 저장
-            # s_파일명 = f'{self.n_초봉}초봉_{self.s_오늘}_{s_종목코드}_{s_종목명}'
             s_현재시각 = pd.Timestamp("now").strftime("%H%M%S")
             s_파일명 = f'{self.n_초봉}초봉_{self.s_오늘}_{s_종목코드}_{s_종목명}_{s_현재시각}_매도'
             df_초봉.to_pickle(os.path.join(self.folder_초봉정보, f'{s_파일명}.pkl'))
@@ -381,8 +372,6 @@ class Trader(QMainWindow, form_class):
 
     def get_전일날짜(self):
         """ 캐시변환 폴더에서 전일 날짜 찾아서 s_전일 리턴 """
-        # li_일자 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
-        #          if 'dic_코드별_분봉' in 파일명 and '.pkl' in 파일명]
         li_일자 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
                  if 'dic_코드별_분봉' in 파일명 and '.pkl' in 파일명]
         li_일자 = [일자 for 일자 in li_일자 if 일자 < self.s_오늘]
@@ -433,17 +422,7 @@ class Trader(QMainWindow, form_class):
             li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_수익요약) if 'df_수익요약' in 파일명 and '.pkl' in 파일명]
             df_수익요약 = pd.read_pickle(os.path.join(self.folder_수익요약, max(li_파일명)))
 
-        # # 최근 10일 중 수익률 0% 4개 이상 제외
-        # df_수익요약10 = df_수익요약[2:12]
-        # sri_0카운트 = (df_수익요약10 == 0).sum()
-        # li_0컬럼명 = list(sri_0카운트[sri_0카운트 > 3].index)
-        # li_컬럼명 = [컬럼명 for 컬럼명 in df_수익요약.columns if 컬럼명 not in li_0컬럼명]
-        # df_수익요약_0제외 = df_수익요약.loc[:, li_컬럼명]
-
         # 성능 기준 max 찾기
-        # df_성능 = df_수익요약_0제외.set_index('일자').T
-        # df_성능 = df_수익요약.set_index('일자').T
-        # s_성능 = df_성능[df_성능['10성능%'] == df_성능['10성능%'].max()].index[0]
         s_성능 = df_수익요약.set_index('일자').T['10성능%'].idxmax()
 
         # 초봉, 매매대상 생성
