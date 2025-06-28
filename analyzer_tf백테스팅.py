@@ -36,6 +36,7 @@ class Analyzer:
         self.folder_캐시변환 = dic_폴더정보['데이터|캐시변환']
         self.folder_체결잔고 = dic_폴더정보['이력|체결잔고']
         self.folder_대상종목 = dic_폴더정보['이력|대상종목']
+        self.folder_주문정보 = dic_폴더정보['이력|주문정보']
         self.folder_분봉확인 = dic_폴더정보['tf초봉분석|20_분봉확인']
         self.folder_매수매도 = dic_폴더정보['tf백테스팅|10_매수매도']
         self.folder_결과정리 = dic_폴더정보['tf백테스팅|20_결과정리']
@@ -206,26 +207,10 @@ class Analyzer:
             dic_매수매도.setdefault('매도신호', list()).append(b_매도신호)
             dic_매수매도.setdefault('보유신호', list()).append(b_보유신호)
             dic_매수매도.setdefault('현재시점', list()).append(dt_시점.strftime('%H:%M:%S'))
-            # for i, b_매수신호_상세 in enumerate(dic_매개변수_종목['li_매수신호_매수봇']):
-            #     s_신호종류 = dic_매개변수_종목['li_신호종류_매수봇'][i]
-            #     dic_매수매도.setdefault(f'매수_{s_신호종류}', list()).append(b_매수신호_상세)
-            # for s_신호종류, b_매수신호_상세 in zip(dic_매개변수_종목['li_신호종류_매수봇'], dic_매개변수_종목['li_매수신호_매수봇']):
-            #     dic_매수매도.setdefault(f'매수_{s_신호종류}', list()).append(b_매수신호_상세)
             for i, s_신호종류 in enumerate(dic_매개변수_종목['li_신호종류_매수봇']):
                 dic_매수매도.setdefault(f'매수_{s_신호종류}', list()).append(dic_매개변수_종목['li_매수신호_매수봇'][i])
             dic_매수매도.setdefault('현재가', list()).append(n_현재가)
-            # li_매도신호 = dic_매개변수_종목['li_매도신호_매도봇'] if 'li_매도신호_매도봇' in dic_매개변수_종목 else list()
-            # for i, b_매도신호_상세 in enumerate(li_매도신호):
-            #     s_신호종류 = dic_매개변수_종목['li_신호종류_매도봇'][i]
-            #     dic_매수매도.setdefault(f'매도_{s_신호종류}', list()).append(b_매도신호_상세)
-            # li_신호종류_매도 = Logic.make_매도신호(dic_매개변수=None, s_리턴값='li_신호종류')
-            # li_매도신호 = dic_매개변수_종목['li_매도신호_매도봇']\
-            #             if 'li_매도신호_매도봇' in dic_매개변수_종목 else [None] * len(li_신호종류_매도)
-            # for s_신호종류, b_매도신호_상세 in zip(li_신호종류_매도, li_매도신호):
-            #     dic_매수매도.setdefault(f'매도_{s_신호종류}', list()).append(b_매도신호_상세)
             for i, s_신호종류 in enumerate(['매도우세', '매수피크', '하락한계', '타임아웃']):
-                # li_매도신호_수치_매도봇 = dic_매개변수_종목['li_매도신호_수치_매도봇']\
-                #                         if 'li_매도신호_수치_매도봇' in dic_매개변수_종목 else [None] * (i + 1)
                 dic_매수매도.setdefault(f'매도_{s_신호종류}', list()).append(dic_매개변수_종목['li_매도신호_수치_매도봇'][i]
                                                                                             if b_보유신호 else None)
             dic_매수매도.setdefault('매수가', list()).append(dic_매개변수_종목['n_매수단가_매도봇'] if b_보유신호 else None)
@@ -246,7 +231,6 @@ class Analyzer:
         df_매수매도 = df_매수매도.set_index('dt일시').sort_index()
 
         # csv 저장
-        # s_폴더 = os.path.join(self.folder_매수매도, f'종목별_{s_일자}')
         s_폴더 = os.path.join(f'{self.folder_매수매도}_종목별', f'매수매도_{s_일자}')
         os.makedirs(s_폴더, exist_ok=True)
         df_매수매도.to_csv(os.path.join(s_폴더, f'df_매수매도_{s_일자}_{n_초봉}초봉_{s_종목코드}_{s_종목명}.csv'),
@@ -371,7 +355,7 @@ class Analyzer:
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_결과요약)
                     if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
-        li_일자_전체 = list(dict.fromkeys(li_일자_전체))
+        li_일자_전체 = list(dict.fromkeys(li_일자_전체))    # 중복제거
         li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_수익요약)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
@@ -384,7 +368,7 @@ class Analyzer:
                      if s_일자 in 파일명 and '.pkl' in 파일명]
             li_초봉 = sorted(li_초봉, key=lambda x: int(x.replace('초봉', '')))
 
-            # 초봉별 정리
+            # 초봉별 수익요약 생성
             li_df_수익요약 = list()
             li_선정사유 = ['일봉변동', 'vi발동', '거래량급증']
             for s_초봉 in li_초봉:
@@ -429,54 +413,13 @@ class Analyzer:
             df_수익요약.to_csv(os.path.join(self.folder_수익요약, f'df_수익요약_{s_일자}.csv'),
                           index=False, encoding='cp949')
 
-            # 리포트 기준정보 생성
-            df_대상종목_매매 = pd.read_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{s_일자}_매매.pkl'))\
-                                if f'df_대상종목_{s_일자}_매매.pkl' in os.listdir(self.folder_대상종목) else None
-            n_초봉 = df_대상종목_매매['초봉'].values[-1] if df_대상종목_매매 is not None else 5
-            s_선정사유 = df_대상종목_매매['선정사유'].values[-1] if df_대상종목_매매 is not None else 'vi발동'
-            dic_초봉 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_{n_초봉}초봉_{s_일자}.pkl'))
-            try:
-                df_체결잔고 = pd.read_csv(os.path.join(self.folder_체결잔고, f'체결잔고_{s_일자}.csv'), encoding='cp949')
-            except FileNotFoundError:
-                li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_체결잔고) if '체결잔고' in 파일명 and '.csv' in 파일명]
-                df_체결잔고 = pd.read_csv(os.path.join(self.folder_체결잔고, max(li_파일명)), encoding='cp949')[:0]
-            df_체결잔고 = df_체결잔고[df_체결잔고['주문상태'] == '체결']
-            dic_기준정보 = dict(df_수익요약=df_수익요약, n_초봉=n_초봉, s_선정사유=s_선정사유, df_체결잔고=df_체결잔고)
-
-            # 리포트 데이터 정의
-            df_체결잔고_매수 = df_체결잔고[df_체결잔고['주문구분'] == '매수']
-            li_종목코드 = [종목코드.replace('A', '') for 종목코드 in df_체결잔고_매수['종목코드'].unique()]
-            n_종목수 = len(li_종목코드)
-            n_거래수 = max(df_체결잔고_매수.groupby('종목코드')['주문구분'].count()) if len(df_체결잔고_매수) > 0 else 0
-            n_테이블크기 = 4
-            n_차트_세로 = n_테이블크기 + n_종목수
-            n_차트_가로 = n_거래수 if n_거래수 > 0 else 1
-            fig = plt.Figure(figsize=(16, n_차트_세로 * 2), tight_layout=False)
-
-            # 리포트 생성 - 수익요약
-            ax_수익요약 = fig.add_subplot(n_차트_세로, n_차트_가로, (1, n_테이블크기 * n_차트_가로))
-            ax_수익요약 = self.make_ax_수익요약(ax=ax_수익요약, dic_기준정보=dic_기준정보)
-
-            # 리포트 생성 - 매수매도
-            for i_세로, s_종목코드 in enumerate(li_종목코드):
-                dic_기준정보['s_종목코드'] = s_종목코드
-                # 스케일 설정
-                df_초봉 = dic_초봉[s_종목코드]
-                dic_기준정보['df_초봉'] = df_초봉
-                dic_기준정보['n_시세_max'] = df_초봉['고가'].max()
-                dic_기준정보['n_시세_min'] = df_초봉['저가'].min()
-                dic_기준정보['n_거래_max'] = max(df_초봉['매수량'].max(), df_초봉['매도량'].max())
-                dic_기준정보['n_거래_min'] = min(df_초봉['매수량'].min(), df_초봉['매도량'].min())
-                for i_가로 in range(n_거래수):
-                    if i_가로 >= len(df_체결잔고_매수[df_체결잔고_매수['종목코드'] == f'A{s_종목코드}']):
-                        continue
-                    dic_기준정보['n_거래순번'] = i_가로
-                    n_차트위치 = n_테이블크기 * n_차트_가로 + i_세로 * n_차트_가로 + i_가로 + 1
-                    ax_매수매도 = fig.add_subplot(n_차트_세로, n_차트_가로, n_차트위치)
-                    ax_매수매도 = self.make_ax_매수매도(ax=ax_매수매도, dic_기준정보=dic_기준정보)
+            # 리포트 생성
+            dic_수익정보 = dict(s_일자=s_일자, df_수익요약=df_수익요약,
+                            folder_대상종목=self.folder_대상종목, folder_캐시변환=self.folder_캐시변환,
+                            folder_체결잔고=self.folder_체결잔고, folder_주문정보=self.folder_주문정보)
+            fig = Logic.make_수익리포트(s_대상='실거래', dic_수익정보=dic_수익정보)
 
             # 리포트 파일 저장
-            # folder_리포트 = os.path.join(self.folder_수익요약, '리포트')
             folder_리포트 = f'{self.folder_수익요약}_리포트'
             os.makedirs(folder_리포트, exist_ok=True)
             s_파일명_리포트 = f'백테스팅_리포트_{s_일자}.png'
@@ -499,109 +442,6 @@ class Analyzer:
 
             # log 기록
             self.make_log(f'수익요약 완료({s_일자})')
-
-    @staticmethod
-    def make_ax_수익요약(ax, dic_기준정보):
-        """ df_수익요약 기준으로 리포트 테이블 변환 후 ax 리턴 """
-        # 기준정보 정의
-        df_수익요약 = dic_기준정보['df_수익요약']
-
-        # df_리포트 생성
-        df_리포트 = pd.DataFrame()
-        df_리포트['일자'] = df_수익요약['일자']
-        li_컬럼명 = [컬럼명 for 컬럼명 in df_수익요약.columns if '일자' not in 컬럼명]
-        for s_컬럼명 in li_컬럼명:
-            df_리포트[s_컬럼명] = df_수익요약[s_컬럼명].apply(lambda x: f'{x:.1f}' if x is not None else x)
-
-        # ax 생성
-        ax.set_title('[ 수익요약 ]', loc='center', fontsize=10, fontweight='bold')
-        ax.axis('tight')
-        ax.axis('off')
-        obj_테이블 = ax.table(cellText=df_리포트.values, colLabels=df_리포트.columns, cellLoc='center', loc='center')
-        obj_테이블.set_fontsize(8)
-        obj_테이블.scale(1.0, 1.6)
-
-        # 선정 조건에 배경색 표기
-        try:
-            for n_col in range(len(df_수익요약.columns)):
-                obj_테이블[2, n_col].set_facecolor('lightgrey')
-            n_max위치 = df_수익요약.set_index('일자').T['10성능%'].argmax() + 1
-            for n_row in range(len(df_수익요약) + 1):
-                obj_테이블[n_row, n_max위치].set_facecolor('yellow')
-            obj_테이블[0, n_max위치].set_text_props(fontweight='bold')
-            obj_테이블[2, n_max위치].set_text_props(fontweight='bold')
-        except TypeError:
-            pass
-
-        return ax
-
-    @staticmethod
-    def make_ax_매수매도(ax, dic_기준정보):
-        """ df_체결잔고 기준으로 주가 변화 및 매수매도 시점 표기 후 ax 리턴 """
-        # 기준정보 정의
-        n_초봉 = dic_기준정보['n_초봉']
-        s_선정사유 = dic_기준정보['s_선정사유']
-        s_종목코드 = dic_기준정보['s_종목코드']
-        n_거래순번 = dic_기준정보['n_거래순번']
-        df_초봉 = dic_기준정보['df_초봉']
-        s_일자 = df_초봉.index[-1].strftime('%Y%m%d')
-        df_체결잔고 = dic_기준정보['df_체결잔고']
-        df_체결잔고['종목코드'] = df_체결잔고['종목코드'].apply(lambda x: x.replace('A', ''))
-        df_체결잔고_종목 = df_체결잔고[df_체결잔고['종목코드'] == s_종목코드].copy()
-        df_체결잔고_종목['dt일시'] = df_체결잔고_종목['시간'].apply(lambda x: pd.Timestamp(f'{s_일자} {x}'))
-        df_체결잔고_종목 = df_체결잔고_종목.set_index('dt일시')
-        s_종목명 = df_체결잔고_종목['종목명'].values[-1].strip()
-        n_시세_max = dic_기준정보['n_시세_max']
-        n_시세_min = dic_기준정보['n_시세_min']
-        n_거래_max = dic_기준정보['n_거래_max']
-        n_거래_min = dic_기준정보['n_거래_min']
-
-        # 기본색상코드 정의
-        dic_색상 = {'파랑': 'C0', '주황': 'C1', '녹색': 'C2', '빨강': 'C3', '보라': 'C4',
-                  '고동': 'C5', '분홍': 'C6', '회색': 'C7', '올리브': 'C8', '하늘': 'C9'}
-
-        # 데이터 정리
-        df_체결잔고_종목_매수 = df_체결잔고_종목[df_체결잔고_종목['주문구분'] == '매수']
-        df_체결잔고_종목_매도 = df_체결잔고_종목[df_체결잔고_종목['주문구분'] == '매도']
-        dt_매수시점 = df_체결잔고_종목_매수.index[n_거래순번]
-        dt_매도시점 = df_체결잔고_종목_매도[df_체결잔고_종목_매도.index >= dt_매수시점].index[0]\
-                        if len(df_체결잔고_종목_매도) > 0 else None
-        dt_타임아웃 = dt_매수시점 + pd.Timedelta(minutes=5) if dt_매수시점 is not None else None
-        n_매수가 = df_체결잔고_종목_매수['체결가'][dt_매수시점]\
-                    if len(df_체결잔고_종목_매수[df_체결잔고_종목_매수.index == dt_매수시점]) == 1\
-                    else max(df_체결잔고_종목_매수['체결가'][dt_매수시점])
-        if dt_매도시점 is not None:
-            n_매도가 = df_체결잔고_종목_매도['체결가'][dt_매도시점]\
-                        if len(df_체결잔고_종목_매도[df_체결잔고_종목_매도.index == dt_매도시점]) == 1\
-                        else max(df_체결잔고_종목_매도['체결가'][dt_매도시점])
-        else:
-            n_매도가 = None
-        df_초봉_차트 = df_초봉[df_초봉.index >= dt_매수시점 - pd.Timedelta(minutes=1)]
-        df_초봉_차트 = df_초봉_차트[df_초봉_차트.index <= dt_매수시점 + pd.Timedelta(minutes=9)]
-
-        # ax 생성
-        s_차트명 = f'[ {s_종목명}({s_종목코드}) ] {n_초봉}초봉|{s_선정사유}' if n_거래순번 == 0 else ''
-        ax.set_title(s_차트명, loc='left', fontsize=10, fontweight='bold')
-        ax.vlines(df_초봉_차트.index, df_초봉_차트['저가'], df_초봉_차트['고가'], lw=0.5, color='black')
-        ax_거래량 = ax.twinx()
-        ax_거래량.plot(df_초봉_차트.index, df_초봉_차트['매수량'], lw=0.5, alpha=0.7, color=dic_색상['빨강'])
-        ax_거래량.plot(df_초봉_차트.index, df_초봉_차트['매도량'], lw=0.5, alpha=0.7, color=dic_색상['파랑'])
-
-        # 매수매도 시점 표기
-        ax.axvline(dt_매수시점, lw=1, alpha=0.5, color=dic_색상['녹색']) if dt_매수시점 is not None else None
-        ax.axvline(dt_매도시점, lw=1, alpha=0.5, color=dic_색상['보라']) if dt_매도시점 is not None else None
-        ax.axvline(dt_타임아웃, lw=1, alpha=0.5, color=dic_색상['회색']) if dt_타임아웃 is not None else None
-        ax.axhline(n_매수가, lw=1, alpha=0.5, color=dic_색상['녹색']) if n_매수가 is not None else None
-        ax.axhline(n_매도가, lw=1, alpha=0.5, color=dic_색상['보라']) if n_매도가 is not None else None
-
-        # 스케일 설정
-        ax.set_ylim(n_시세_min, n_시세_max)
-        ax.set_yticks([])
-        ax.set_xticks([dt_매수시점], labels=[dt_매수시점.strftime('%H:%M:%S')])
-        ax_거래량.set_ylim(n_거래_min, n_거래_max)
-        ax_거래량.set_yticks([])
-
-        return ax
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
