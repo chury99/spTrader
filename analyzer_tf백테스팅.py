@@ -416,8 +416,9 @@ class Analyzer:
             # 리포트 생성
             dic_수익정보 = dict(s_일자=s_일자, df_수익요약=df_수익요약,
                             folder_대상종목=self.folder_대상종목, folder_캐시변환=self.folder_캐시변환,
-                            folder_체결잔고=self.folder_체결잔고, folder_주문정보=self.folder_주문정보)
-            fig = Logic.make_수익리포트(s_대상='실거래', dic_수익정보=dic_수익정보)
+                            folder_체결잔고=self.folder_체결잔고, folder_주문정보=self.folder_주문정보,
+                            folder_결과정리=self.folder_결과정리)
+            fig = Chart.make_수익리포트(s_대상='실거래', dic_수익정보=dic_수익정보)
 
             # 리포트 파일 저장
             folder_리포트 = f'{self.folder_수익요약}_리포트'
@@ -465,7 +466,7 @@ class Analyzer:
 
 #######################################################################################################################
 if __name__ == "__main__":
-    a = Analyzer(b_멀티=False, s_시작일자='20241201', n_분석일수=20)
+    a = Analyzer(b_멀티=True, s_시작일자='20241201', n_분석일수=20)
     li_초봉 = [3, 5, 10]
     [a.검증_매수매도(n_초봉=n_초봉) for n_초봉 in li_초봉]
     [a.검증_결과정리(n_초봉=n_초봉) for n_초봉 in li_초봉]
