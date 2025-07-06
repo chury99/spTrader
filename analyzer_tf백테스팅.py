@@ -42,10 +42,12 @@ class Analyzer:
         self.folder_결과정리 = dic_폴더정보['tf백테스팅|20_결과정리']
         self.folder_결과요약 = dic_폴더정보['tf백테스팅|30_결과요약']
         self.folder_수익요약 = dic_폴더정보['tf백테스팅|40_수익요약']
+        self.folder_매매이력 = dic_폴더정보['tf백테스팅|50_매매이력']
         os.makedirs(self.folder_매수매도, exist_ok=True)
         os.makedirs(self.folder_결과정리, exist_ok=True)
         os.makedirs(self.folder_결과요약, exist_ok=True)
         os.makedirs(self.folder_수익요약, exist_ok=True)
+        os.makedirs(self.folder_매매이력, exist_ok=True)
 
         # 변수 설정
         self.n_보관기간_analyzer = int(dic_config['파일보관기간(일)_analyzer'])
@@ -346,7 +348,7 @@ class Analyzer:
             # log 기록
             self.make_log(f'결과요약 완료({s_일자}, {n_초봉}초봉, 누적 수익률: {df_결과요약["수익률%"].sum():,.1f}%)')
 
-    def 검증_수익요약(self, b_카톡):
+    def 검증_수익요약(self):
         """ 결과요약 데이터 기준 초봉별 수익률 정리 후 pkl, csv 저장 """
         # 파일명 정의
         s_파일명_기준 = 'df_결과요약'
@@ -413,41 +415,115 @@ class Analyzer:
             df_수익요약.to_csv(os.path.join(self.folder_수익요약, f'df_수익요약_{s_일자}.csv'),
                           index=False, encoding='cp949')
 
-            # 리포트 생성
-            dic_수익정보 = dict(s_일자=s_일자, df_수익요약=df_수익요약,
-                            folder_대상종목=self.folder_대상종목, folder_캐시변환=self.folder_캐시변환,
-                            folder_체결잔고=self.folder_체결잔고, folder_주문정보=self.folder_주문정보,
-                            folder_결과정리=self.folder_결과정리)
-            fig = Chart.make_수익리포트(s_대상='실거래', dic_수익정보=dic_수익정보)
+            # log 기록
+            self.make_log(f'수익요약 완료({s_일자})')
 
-            # 리포트 파일 저장
-            folder_리포트 = f'{self.folder_수익요약}_리포트'
+    def 검증_매매이력(self, b_카톡):
+        """ 매매이력 데이터 정리 후 pkl, csv 저장 + 리포트 생성 """
+        # 파일명 정의
+        s_파일명_기준 = 'df_수익요약'
+        s_파일명_생성 = 'df_매매이력'
+
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_수익요약)
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
+        li_일자_전체 = list(dict.fromkeys(li_일자_전체))    # 중복제거
+        li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매매이력)
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
+        li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료 and s_일자 >= self.s_시작일자]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # dic_수익정보 생성
+            # dic_매매정보 = dict(s_일자=s_일자,
+            #                 folder_대상종목=self.folder_대상종목, folder_캐시변환=self.folder_캐시변환,
+            #                 folder_체결잔고=self.folder_체결잔고, folder_주문정보=self.folder_주문정보,
+            #                 folder_결과정리=self.folder_결과정리)
+
+            # 수익요약 데이터 불러오기
+            df_수익요약 = pd.read_pickle(os.path.join(self.folder_수익요약, f'{s_파일명_기준}_{s_일자}.pkl'))
+            dic_매매정보 = dict(s_일자=s_일자, df_수익요약=df_수익요약)
+            # dic_매매정보['df_수익요약'] = df_수익요약
+
+            # 실거래 적용 초봉 및 선정기준 확인
+            df_대상종목_매매 = pd.read_pickle(os.path.join(self.folder_대상종목, f'df_대상종목_{s_일자}_매매.pkl')) \
+                if f'df_대상종목_{s_일자}_매매.pkl' in os.listdir(self.folder_대상종목) else None
+            n_초봉 = df_대상종목_매매['초봉'].values[-1] if df_대상종목_매매 is not None else 5
+            s_선정사유 = df_대상종목_매매['선정사유'].values[-1] if df_대상종목_매매 is not None else 'vi발동'
+            dic_매매정보['n_초봉'] = n_초봉
+            dic_매매정보['s_선정사유'] = s_선정사유
+
+            # # df_거래정보 생성 - 실거래
+            # df_실거래 = self.검증_매매이력_실거래(dic_매매정보=dic_매매정보)
+            # df_백테스팅 = self.검증_매매이력_백테스팅(n_초봉=n_초봉, s_선정사유=s_선정사유, dic_매매정보=dic_매매정보)
+            # df_거래정보_실거래 = pd.concat([df_실거래, df_백테스팅], axis=0).sort_values(['매수시간'])
+            #
+            # # 거래정보 생성 - 백테스팅
+            # df_백테스팅 = self.검증_매매이력_백테스팅(n_초봉=n_초봉, s_선정사유='all', dic_매매정보=dic_매매정보)
+            # df_거래정보_백테스팅 = df_백테스팅.sort_values(['선정사유', '매수시간'])
+
+            # 거래정보 생성 - 실거래
+            df_실거래 = self.검증_매매이력_실거래(dic_매매정보=dic_매매정보)
+            df_백테스팅 = self.검증_매매이력_백테스팅(n_초봉=n_초봉, dic_매매정보=dic_매매정보)
+            df_백테스팅_선정사유 = df_백테스팅[df_백테스팅['선정사유'] == s_선정사유]
+            df_거래정보_실거래 = pd.concat([df_실거래, df_백테스팅_선정사유], axis=0).sort_values(['매수시간'])
+
+            # 파일 저장 - 실거래
+            df_거래정보_실거래.to_pickle(os.path.join(self.folder_매매이력, f'{s_파일명_생성}_{s_일자}.pkl'))
+            df_거래정보_실거래.to_csv(os.path.join(self.folder_매매이력, f'{s_파일명_생성}_{s_일자}.csv'),
+                               index=False, encoding='cp949')
+
+            # 거래정보 생성 및 저장 - 백테스팅
+            dic_거래정보_백테스팅 = dict()
+            li_초봉 = [3, 5, 10]
+            for n_초봉_백테스팅 in li_초봉:
+                df_거래정보_백테스팅 = (self.검증_매매이력_백테스팅(n_초봉=n_초봉_백테스팅, dic_매매정보=dic_매매정보)
+                                        .sort_values(['선정사유', '매수시간']))
+                dic_거래정보_백테스팅[n_초봉_백테스팅] = df_거래정보_백테스팅
+
+                # 파일 저장 - 백테스팅
+                s_파일명 = f'{s_파일명_생성}_{s_일자}_백테스팅_{n_초봉_백테스팅}초봉'
+                df_거래정보_백테스팅.to_pickle(os.path.join(self.folder_매매이력, f'{s_파일명}.pkl'))
+                df_거래정보_백테스팅.to_csv(os.path.join(self.folder_매매이력, f'{s_파일명}.csv'),
+                                    index=False, encoding='cp949')
+            # 리포트 생성 - 실거래
+            # dic_수익정보 = dict(s_일자=s_일자, df_수익요약=df_수익요약,
+            #                 folder_대상종목=self.folder_대상종목, folder_캐시변환=self.folder_캐시변환,
+            #                 folder_체결잔고=self.folder_체결잔고, folder_주문정보=self.folder_주문정보,
+            #                 folder_결과정리=self.folder_결과정리)
+            dic_매매정보['folder_캐시변환'] = self.folder_캐시변환
+            dic_매매정보['df_거래정보_실거래'] = df_거래정보_실거래
+            fig = Chart.make_수익리포트(df_거래정보=df_거래정보_실거래, dic_매매정보=dic_매매정보)
+
+            # 리포트 파일 저장 - 실거래
+            folder_리포트 = f'{self.folder_매매이력}_리포트'
             os.makedirs(folder_리포트, exist_ok=True)
             s_파일명_리포트 = f'백테스팅_리포트_{s_일자}.png'
             fig.savefig(os.path.join(folder_리포트, s_파일명_리포트), dpi=600)
             plt.close(fig)
 
-            # 리포트 복사 to 서버
+            # 리포트 복사 to 서버 - 실거래
             import UT_배치worker
             w = UT_배치worker.Worker()
             folder_서버 = 'kakao/tf분석_백테스팅'
             w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
 
-            # 백테스팅 리포트 생성
-            for n_초봉 in [3, 5, 10]:
-                # fig 생성
-                dic_수익정보['n_초봉'] = n_초봉
-                fig = Chart.make_수익리포트(s_대상='백테스팅', dic_수익정보=dic_수익정보)
+            # 리포트 생성 및 저장 - 백테스팅
+            for n_초봉_백테스팅 in li_초봉:
+                # 리포트 생성
+                dic_매매정보['n_초봉'] = n_초봉_백테스팅
+                fig = Chart.make_수익리포트(df_거래정보=dic_거래정보_백테스팅[n_초봉_백테스팅], dic_매매정보=dic_매매정보)
 
-                # fig 저장
-                s_파일명_리포트_백테스팅 = f'백테스팅_리포트_{s_일자}_백테스팅_{n_초봉}초봉.png'
+                # 리포트 파일 저장
+                s_파일명_리포트_백테스팅 = f'백테스팅_리포트_{s_일자}_백테스팅_{n_초봉_백테스팅}초봉.png'
                 try:
                     fig.savefig(os.path.join(folder_리포트, s_파일명_리포트_백테스팅), dpi=200)
                 except ValueError:
                     fig.savefig(os.path.join(folder_리포트, s_파일명_리포트_백테스팅), dpi=100)
                 plt.close(fig)
 
-                # fig 복사 to 서버
+                # 리포트 복사 to 서버
                 w.to_ftp(s_파일명=s_파일명_리포트_백테스팅, folder_로컬=folder_리포트, folder_서버=folder_서버)
 
             # 카톡 보내기
@@ -459,7 +535,109 @@ class Analyzer:
                                         s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
 
             # log 기록
-            self.make_log(f'수익요약 완료({s_일자})')
+            self.make_log(f'매매이력 검증 완료({s_일자})')
+
+    def 검증_매매이력_실거래(self, dic_매매정보):
+        """ 실거래 정보 조회하여 df_거래정보 생성 후 리턴"""
+        # 기준정보 정의
+        s_일자 = dic_매매정보['s_일자']
+        n_초봉 = dic_매매정보['n_초봉']
+        s_선정사유 = dic_매매정보['s_선정사유']
+
+        # 체결잔고 데이터 불러오기 - 실거래 확인
+        df_체결잔고 = pd.read_csv(os.path.join(self.folder_체결잔고, f'체결잔고_{s_일자}.csv'), encoding='cp949') \
+            if f'체결잔고_{s_일자}.csv' in os.listdir(self.folder_체결잔고) \
+            else pd.DataFrame(dict(주문상태=list(), 계좌번호=list()))
+        df_체결잔고_체결 = df_체결잔고[df_체결잔고['주문상태'] == '체결'].copy()
+        df_체결잔고_체결 = df_체결잔고_체결[df_체결잔고_체결['계좌번호'] == 5292685210]
+        if len(df_체결잔고_체결) == 0:
+            return pd.DataFrame()
+
+        # df_거래정보 생성
+        li_컬럼명 = ['종목코드', '종목명', '시간', '주문구분', '체결가']
+        df_거래정보 = df_체결잔고_체결.loc[:, li_컬럼명].copy()
+        df_거래정보['종목코드'] = df_거래정보['종목코드'].apply(lambda x: x.replace('A', ''))
+        df_거래정보['종목명'] = df_거래정보['종목명'].apply(lambda x: x.replace(' ', ''))
+
+        # 매도사유 추가
+        df_주문정보 = pd.read_pickle(os.path.join(self.folder_주문정보, f'주문정보_{s_일자}.pkl')) \
+            if f'주문정보_{s_일자}.pkl' in os.listdir(self.folder_주문정보) \
+            else pd.DataFrame(dict(일자=list(), 주문시간=list()))
+        df_주문정보['dt일시'] = pd.to_datetime(df_주문정보['일자'] + ' ' + df_주문정보['주문시간'])
+        df_주문정보 = df_주문정보.set_index('dt일시')
+        df_주문정보_매도 = df_주문정보[df_주문정보['주문구분'] == '매도'] if len(df_주문정보) > 0 else None
+        li_매도사유 = list()
+        for i in range(len(df_거래정보)):
+            s_종목코드 = df_거래정보['종목코드'].values[i]
+            dt_거래시간 = pd.Timestamp(f'{s_일자} {df_거래정보["시간"].values[i]}')
+            s_주문구분 = df_거래정보['주문구분'].values[i]
+            if s_주문구분 == '매수' or df_주문정보_매도 is None:
+                li_매도사유.append(None)
+                continue
+            if s_주문구분 == '매도':
+                df_주문정보_매도_종목 = df_주문정보_매도[df_주문정보_매도['종목코드'] == s_종목코드]
+                df_주문정보_매도_종목 = df_주문정보_매도_종목[df_주문정보_매도_종목.index <= dt_거래시간]
+                df_주문정보_매도_종목 = df_주문정보_매도_종목[df_주문정보_매도_종목.index >= dt_거래시간 - pd.Timedelta(seconds=1)]
+                s_매도사유 = df_주문정보_매도_종목['매도사유'].values[-1] if len(df_주문정보_매도_종목) > 0 else None
+                li_매도사유.append(s_매도사유)
+                continue
+        df_거래정보['매도사유'] = li_매도사유
+
+        # 양식 변경 - 매수매도 한번에
+        df_거래정보 = df_거래정보.sort_values(['종목코드', '시간'])
+        dic_거래정보_매수 = dict()
+        dic_거래정보_매도 = dict()
+        li_컬럼명 = ['종목코드', '종목명', '매수시간', '매도시간', '매수가', '매도가', '매도사유']
+        for i in range(len(df_거래정보)):
+            s_주문구분 = df_거래정보['주문구분'].values[i]
+            if s_주문구분 == '매수':
+                dic_거래정보_매수.setdefault('종목코드', list()).append(df_거래정보['종목코드'].values[i])
+                dic_거래정보_매수.setdefault('종목명', list()).append(df_거래정보['종목명'].values[i])
+                dic_거래정보_매수.setdefault('매수시간', list()).append(df_거래정보['시간'].values[i])
+                dic_거래정보_매수.setdefault('매수가', list()).append(df_거래정보['체결가'].values[i])
+            if s_주문구분 == '매도':
+                # dic_거래정보_매도.setdefault('종목코드', list()).append(df_거래정보['종목코드'].values[i])
+                # dic_거래정보_매도.setdefault('종목명', list()).append(df_거래정보['종목명'].values[i])
+                dic_거래정보_매도.setdefault('매도시간', list()).append(df_거래정보['시간'].values[i])
+                dic_거래정보_매도.setdefault('매도가', list()).append(df_거래정보['체결가'].values[i])
+                dic_거래정보_매도.setdefault('매도사유', list()).append(df_거래정보['매도사유'].values[i])
+        df_거래정보_매수 = pd.DataFrame(dic_거래정보_매수)
+        df_거래정보_매도 = pd.DataFrame(dic_거래정보_매도)
+        df_거래정보_양식변경 = pd.concat([df_거래정보_매수, df_거래정보_매도], axis=1).loc[:, li_컬럼명] \
+            if len(df_거래정보_매수) == len(df_거래정보_매도) else pd.DataFrame()
+
+        # 추가정보 생성
+        df_거래정보_양식변경['초봉'] = n_초봉 if len(df_거래정보_양식변경) > 0 else df_거래정보_양식변경
+        df_거래정보_양식변경['선정사유'] = s_선정사유 if len(df_거래정보_양식변경) > 0 else df_거래정보_양식변경
+        df_거래정보_양식변경['거래구분'] = '실거래' if len(df_거래정보_양식변경) > 0 else df_거래정보_양식변경
+
+        return df_거래정보_양식변경
+
+    def 검증_매매이력_백테스팅(self, n_초봉, dic_매매정보):
+        """ 백테스팅 정보 조회하여 df_거래정보 생성 후 리턴"""
+        # 기준정보 정의
+        s_일자 = dic_매매정보['s_일자']
+
+        # 백테스팅 결과 불러오기
+        df_백테결과 = pd.read_pickle(os.path.join(self.folder_결과정리, f'df_결과정리_{s_일자}_{n_초봉}초봉.pkl')) \
+            if f'df_결과정리_{s_일자}_{n_초봉}초봉.pkl' in os.listdir(self.folder_결과정리) else pd.DataFrame()
+        # if s_선정사유 != 'all':
+        #     df_백테결과 = df_백테결과[df_백테결과['선정사유'] == s_선정사유]
+
+        # df_거래정보 생성
+        df_거래정보 = pd.DataFrame()
+        df_거래정보['종목코드'] = df_백테결과['종목코드'].values
+        df_거래정보['종목명'] = df_백테결과['종목명'].values
+        df_거래정보['매수시간'] = df_백테결과['매수시간'].values
+        df_거래정보['매도시간'] = df_백테결과['매도시간'].values
+        df_거래정보['매수가'] = df_백테결과['매수가'].values
+        df_거래정보['매도가'] = df_백테결과['매도가'].values
+        df_거래정보['매도사유'] = df_백테결과['매도사유'].values
+        df_거래정보['초봉'] = n_초봉
+        df_거래정보['선정사유'] = df_백테결과['선정사유'].values
+        df_거래정보['거래구분'] = '백테스팅'
+
+        return df_거래정보
 
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
@@ -483,9 +661,10 @@ class Analyzer:
 
 #######################################################################################################################
 if __name__ == "__main__":
-    a = Analyzer(b_멀티=True, s_시작일자='20241201', n_분석일수=20)
+    a = Analyzer(b_멀티=True, s_시작일자='20250623', n_분석일수=20)
     li_초봉 = [3, 5, 10]
     [a.검증_매수매도(n_초봉=n_초봉) for n_초봉 in li_초봉]
     [a.검증_결과정리(n_초봉=n_초봉) for n_초봉 in li_초봉]
     [a.검증_결과요약(n_초봉=n_초봉) for n_초봉 in li_초봉]
-    a.검증_수익요약(b_카톡=True)
+    a.검증_수익요약()
+    a.검증_매매이력(b_카톡=True)
