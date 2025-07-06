@@ -1,5 +1,8 @@
 import os
 
+import matplotlib
+matplotlib.use('TkAgg')
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import re
@@ -189,7 +192,8 @@ def make_수익리포트(s_대상, dic_수익정보):
     # 거래정보 생성 - 백테스팅
     if s_대상 == '백테스팅':
         n_초봉 = dic_수익정보['n_초봉']
-        pass
+        df_거래정보_백테스팅 = make_수익리포트_거래정보_백테스팅(n_초봉=n_초봉, s_선정사유='all', dic_수익정보=dic_수익정보)
+        df_거래정보 = df_거래정보_백테스팅.sort_values(['선정사유', '매수시간'])
 
     # 초봉 읽어오기
     dic_초봉 = pd.read_pickle(os.path.join(folder_캐시변환, f'dic_코드별_{n_초봉}초봉_{s_일자}.pkl'))
@@ -197,7 +201,8 @@ def make_수익리포트(s_대상, dic_수익정보):
     # 리포트 데이터 정의
     # df_거래정보_매수 = df_거래정보[df_거래정보['주문구분'] == '매수']
     # li_종목코드 = [종목코드.replace('A', '') for 종목코드 in df_거래정보_매수['종목코드'].unique()]
-    li_종목코드 = list(df_거래정보['종목코드'].unique())
+    # li_종목코드 = list(df_거래정보['종목코드'].unique())
+    li_종목코드 = [종목코드 for 종목코드 in df_거래정보['종목코드'].unique() if 종목코드 is not None]
     dic_종목코드2종목명 = df_거래정보.set_index('종목코드')['종목명'].to_dict()
     n_테이블_세로 = 4
     n_차트_가로 = 4
@@ -335,19 +340,20 @@ def make_수익리포트_거래정보_백테스팅(n_초봉, s_선정사유, dic
     # 백테스팅 결과 불러오기
     df_백테결과 = pd.read_pickle(os.path.join(folder_결과정리, f'df_결과정리_{s_일자}_{n_초봉}초봉.pkl')) \
                     if f'df_결과정리_{s_일자}_{n_초봉}초봉.pkl' in os.listdir(folder_결과정리) else pd.DataFrame()
-    df_백테결과_선정사유 = df_백테결과[df_백테결과['선정사유'] == s_선정사유]
+    if s_선정사유 != 'all':
+        df_백테결과 = df_백테결과[df_백테결과['선정사유'] == s_선정사유]
 
     # df_거래정보 생성
     df_거래정보 = pd.DataFrame()
-    df_거래정보['종목코드'] = df_백테결과_선정사유['종목코드'].values
-    df_거래정보['종목명'] = df_백테결과_선정사유['종목명'].values
-    df_거래정보['매수시간'] = df_백테결과_선정사유['매수시간'].values
-    df_거래정보['매도시간'] = df_백테결과_선정사유['매도시간'].values
-    df_거래정보['매수가'] = df_백테결과_선정사유['매수가'].values
-    df_거래정보['매도가'] = df_백테결과_선정사유['매도가'].values
-    df_거래정보['매도사유'] = df_백테결과_선정사유['매도사유'].values
+    df_거래정보['종목코드'] = df_백테결과['종목코드'].values
+    df_거래정보['종목명'] = df_백테결과['종목명'].values
+    df_거래정보['매수시간'] = df_백테결과['매수시간'].values
+    df_거래정보['매도시간'] = df_백테결과['매도시간'].values
+    df_거래정보['매수가'] = df_백테결과['매수가'].values
+    df_거래정보['매도가'] = df_백테결과['매도가'].values
+    df_거래정보['매도사유'] = df_백테결과['매도사유'].values
     df_거래정보['초봉'] = n_초봉
-    df_거래정보['선정사유'] = s_선정사유
+    df_거래정보['선정사유'] = df_백테결과['선정사유'].values
     df_거래정보['거래구분'] = '백테스팅'
 
     return df_거래정보
