@@ -433,6 +433,23 @@ class Analyzer:
             folder_서버 = 'kakao/tf분석_백테스팅'
             w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
 
+            # 백테스팅 리포트 생성
+            for n_초봉 in [3, 5, 10]:
+                # fig 생성
+                dic_수익정보['n_초봉'] = n_초봉
+                fig = Chart.make_수익리포트(s_대상='백테스팅', dic_수익정보=dic_수익정보)
+
+                # fig 저장
+                s_파일명_리포트_백테스팅 = f'백테스팅_리포트_{s_일자}_백테스팅_{n_초봉}초봉.png'
+                try:
+                    fig.savefig(os.path.join(folder_리포트, s_파일명_리포트_백테스팅), dpi=200)
+                except ValueError:
+                    fig.savefig(os.path.join(folder_리포트, s_파일명_리포트_백테스팅), dpi=100)
+                plt.close(fig)
+
+                # fig 복사 to 서버
+                w.to_ftp(s_파일명=s_파일명_리포트_백테스팅, folder_로컬=folder_리포트, folder_서버=folder_서버)
+
             # 카톡 보내기
             if b_카톡 and s_일자 == li_일자_대상[-1]:
                 import API_kakao
