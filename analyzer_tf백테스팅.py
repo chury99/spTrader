@@ -435,12 +435,6 @@ class Analyzer:
 
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
-            # dic_수익정보 생성
-            # dic_매매정보 = dict(s_일자=s_일자,
-            #                 folder_대상종목=self.folder_대상종목, folder_캐시변환=self.folder_캐시변환,
-            #                 folder_체결잔고=self.folder_체결잔고, folder_주문정보=self.folder_주문정보,
-            #                 folder_결과정리=self.folder_결과정리)
-
             # 수익요약 데이터 불러오기
             df_수익요약 = pd.read_pickle(os.path.join(self.folder_수익요약, f'{s_파일명_기준}_{s_일자}.pkl'))
             dic_매매정보 = dict(s_일자=s_일자, df_수익요약=df_수익요약)
@@ -454,14 +448,9 @@ class Analyzer:
             dic_매매정보['n_초봉'] = n_초봉
             dic_매매정보['s_선정사유'] = s_선정사유
 
-            # # df_거래정보 생성 - 실거래
-            # df_실거래 = self.검증_매매이력_실거래(dic_매매정보=dic_매매정보)
-            # df_백테스팅 = self.검증_매매이력_백테스팅(n_초봉=n_초봉, s_선정사유=s_선정사유, dic_매매정보=dic_매매정보)
-            # df_거래정보_실거래 = pd.concat([df_실거래, df_백테스팅], axis=0).sort_values(['매수시간'])
-            #
-            # # 거래정보 생성 - 백테스팅
-            # df_백테스팅 = self.검증_매매이력_백테스팅(n_초봉=n_초봉, s_선정사유='all', dic_매매정보=dic_매매정보)
-            # df_거래정보_백테스팅 = df_백테스팅.sort_values(['선정사유', '매수시간'])
+            # 백테스팅 초봉 확인
+            li_초봉_백테스팅 = [int(컬럼.split('초|')[0]) for 컬럼 in df_수익요약.columns if '초|' in 컬럼]
+            li_초봉_백테스팅 = list(dict.fromkeys(li_초봉_백테스팅))
 
             # 거래정보 생성 - 실거래
             df_실거래 = self.검증_매매이력_실거래(dic_매매정보=dic_매매정보)
@@ -476,8 +465,7 @@ class Analyzer:
 
             # 거래정보 생성 및 저장 - 백테스팅
             dic_거래정보_백테스팅 = dict()
-            li_초봉 = [3, 5, 10]
-            for n_초봉_백테스팅 in li_초봉:
+            for n_초봉_백테스팅 in li_초봉_백테스팅:
                 df_거래정보_백테스팅 = (self.검증_매매이력_백테스팅(n_초봉=n_초봉_백테스팅, dic_매매정보=dic_매매정보)
                                         .sort_values(['선정사유', '매수시간']))
                 dic_거래정보_백테스팅[n_초봉_백테스팅] = df_거래정보_백테스팅
@@ -488,10 +476,6 @@ class Analyzer:
                 df_거래정보_백테스팅.to_csv(os.path.join(self.folder_매매이력, f'{s_파일명}.csv'),
                                     index=False, encoding='cp949')
             # 리포트 생성 - 실거래
-            # dic_수익정보 = dict(s_일자=s_일자, df_수익요약=df_수익요약,
-            #                 folder_대상종목=self.folder_대상종목, folder_캐시변환=self.folder_캐시변환,
-            #                 folder_체결잔고=self.folder_체결잔고, folder_주문정보=self.folder_주문정보,
-            #                 folder_결과정리=self.folder_결과정리)
             dic_매매정보['folder_캐시변환'] = self.folder_캐시변환
             dic_매매정보['df_거래정보_실거래'] = df_거래정보_실거래
             fig = Chart.make_수익리포트(df_거래정보=df_거래정보_실거래, dic_매매정보=dic_매매정보)
@@ -510,7 +494,7 @@ class Analyzer:
             w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
 
             # 리포트 생성 및 저장 - 백테스팅
-            for n_초봉_백테스팅 in li_초봉:
+            for n_초봉_백테스팅 in li_초봉_백테스팅:
                 # 리포트 생성
                 dic_매매정보['n_초봉'] = n_초봉_백테스팅
                 fig = Chart.make_수익리포트(df_거래정보=dic_거래정보_백테스팅[n_초봉_백테스팅], dic_매매정보=dic_매매정보)
@@ -596,8 +580,6 @@ class Analyzer:
                 dic_거래정보_매수.setdefault('매수시간', list()).append(df_거래정보['시간'].values[i])
                 dic_거래정보_매수.setdefault('매수가', list()).append(df_거래정보['체결가'].values[i])
             if s_주문구분 == '매도':
-                # dic_거래정보_매도.setdefault('종목코드', list()).append(df_거래정보['종목코드'].values[i])
-                # dic_거래정보_매도.setdefault('종목명', list()).append(df_거래정보['종목명'].values[i])
                 dic_거래정보_매도.setdefault('매도시간', list()).append(df_거래정보['시간'].values[i])
                 dic_거래정보_매도.setdefault('매도가', list()).append(df_거래정보['체결가'].values[i])
                 dic_거래정보_매도.setdefault('매도사유', list()).append(df_거래정보['매도사유'].values[i])
@@ -621,8 +603,6 @@ class Analyzer:
         # 백테스팅 결과 불러오기
         df_백테결과 = pd.read_pickle(os.path.join(self.folder_결과정리, f'df_결과정리_{s_일자}_{n_초봉}초봉.pkl')) \
             if f'df_결과정리_{s_일자}_{n_초봉}초봉.pkl' in os.listdir(self.folder_결과정리) else pd.DataFrame()
-        # if s_선정사유 != 'all':
-        #     df_백테결과 = df_백테결과[df_백테결과['선정사유'] == s_선정사유]
 
         # df_거래정보 생성
         df_거래정보 = pd.DataFrame()
