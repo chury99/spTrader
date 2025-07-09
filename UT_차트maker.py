@@ -170,31 +170,7 @@ def make_수익리포트(df_거래정보, dic_매매정보):
     s_일자 = dic_매매정보['s_일자']
     n_초봉 = dic_매매정보['n_초봉']
     df_수익요약 = dic_매매정보['df_수익요약']
-    # folder_대상종목 = dic_매매정보['folder_대상종목']
     folder_캐시변환 = dic_매매정보['folder_캐시변환']
-
-    # # 거래정보 생성 - 실거래
-    # n_초봉 = None
-    # df_거래정보 = pd.DataFrame()
-    # if s_대상 == '실거래':
-    #     # 실거래 적용 초봉 및 선정기준 확인
-    #     df_대상종목_매매 = pd.read_pickle(os.path.join(folder_대상종목, f'df_대상종목_{s_일자}_매매.pkl')) \
-    #                         if f'df_대상종목_{s_일자}_매매.pkl' in os.listdir(folder_대상종목) else None
-    #     n_초봉 = df_대상종목_매매['초봉'].values[-1] if df_대상종목_매매 is not None else 5
-    #     s_선정사유 = df_대상종목_매매['선정사유'].values[-1] if df_대상종목_매매 is not None else 'vi발동'
-    #
-    #     # df_거래정보 생성
-    #     dic_수익정보['n_초봉'] = n_초봉
-    #     dic_수익정보['s_선정사유'] = s_선정사유
-    #     df_거래정보_실거래 = make_수익리포트_거래정보_실거래(dic_수익정보=dic_수익정보)
-    #     df_거래정보_백테스팅 = make_수익리포트_거래정보_백테스팅(n_초봉=n_초봉, s_선정사유=s_선정사유, dic_수익정보=dic_수익정보)
-    #     df_거래정보 = pd.concat([df_거래정보_실거래, df_거래정보_백테스팅], axis=0).sort_values(['매수시간'])
-    #
-    # # 거래정보 생성 - 백테스팅
-    # if s_대상 == '백테스팅':
-    #     n_초봉 = dic_수익정보['n_초봉']
-    #     df_거래정보_백테스팅 = make_수익리포트_거래정보_백테스팅(n_초봉=n_초봉, s_선정사유='all', dic_수익정보=dic_수익정보)
-    #     df_거래정보 = df_거래정보_백테스팅.sort_values(['선정사유', '매수시간'])
 
     # 초봉 읽어오기
     dic_초봉 = pd.read_pickle(os.path.join(folder_캐시변환, f'dic_코드별_{n_초봉}초봉_{s_일자}.pkl'))
@@ -243,196 +219,8 @@ def make_수익리포트(df_거래정보, dic_매매정보):
     return fig
 
 
-# def make_수익리포트(s_대상, dic_수익정보):
-#     """ 수익요약 데이터 기준으로 리포트 생성하여 리턴 """
-#     # 기준정보 정의
-#     s_일자 = dic_수익정보['s_일자']
-#     df_수익요약 = dic_수익정보['df_수익요약']
-#     folder_대상종목 = dic_수익정보['folder_대상종목']
-#     folder_캐시변환 = dic_수익정보['folder_캐시변환']
-#
-#     # # 거래정보 생성 - 실거래
-#     # n_초봉 = None
-#     # df_거래정보 = pd.DataFrame()
-#     # if s_대상 == '실거래':
-#     #     # 실거래 적용 초봉 및 선정기준 확인
-#     #     df_대상종목_매매 = pd.read_pickle(os.path.join(folder_대상종목, f'df_대상종목_{s_일자}_매매.pkl')) \
-#     #                         if f'df_대상종목_{s_일자}_매매.pkl' in os.listdir(folder_대상종목) else None
-#     #     n_초봉 = df_대상종목_매매['초봉'].values[-1] if df_대상종목_매매 is not None else 5
-#     #     s_선정사유 = df_대상종목_매매['선정사유'].values[-1] if df_대상종목_매매 is not None else 'vi발동'
-#     #
-#     #     # df_거래정보 생성
-#     #     dic_수익정보['n_초봉'] = n_초봉
-#     #     dic_수익정보['s_선정사유'] = s_선정사유
-#     #     df_거래정보_실거래 = make_수익리포트_거래정보_실거래(dic_수익정보=dic_수익정보)
-#     #     df_거래정보_백테스팅 = make_수익리포트_거래정보_백테스팅(n_초봉=n_초봉, s_선정사유=s_선정사유, dic_수익정보=dic_수익정보)
-#     #     df_거래정보 = pd.concat([df_거래정보_실거래, df_거래정보_백테스팅], axis=0).sort_values(['매수시간'])
-#     #
-#     # # 거래정보 생성 - 백테스팅
-#     # if s_대상 == '백테스팅':
-#     #     n_초봉 = dic_수익정보['n_초봉']
-#     #     df_거래정보_백테스팅 = make_수익리포트_거래정보_백테스팅(n_초봉=n_초봉, s_선정사유='all', dic_수익정보=dic_수익정보)
-#     #     df_거래정보 = df_거래정보_백테스팅.sort_values(['선정사유', '매수시간'])
-#
-#     # 초봉 읽어오기
-#     dic_초봉 = pd.read_pickle(os.path.join(folder_캐시변환, f'dic_코드별_{n_초봉}초봉_{s_일자}.pkl'))
-#
-#     # 리포트 데이터 정의
-#     li_종목코드 = [종목코드 for 종목코드 in df_거래정보['종목코드'].unique() if 종목코드 is not None]
-#     dic_종목코드2종목명 = df_거래정보.set_index('종목코드')['종목명'].to_dict()
-#     n_테이블_세로 = 4
-#     n_차트_가로 = 4
-#     li_차트_세로 = [(len(df_거래정보[df_거래정보['종목코드'] == 종목코드])
-#                     + (n_차트_가로 - 1)) // n_차트_가로 for 종목코드 in li_종목코드]
-#     n_차트_세로 = n_테이블_세로 + sum(li_차트_세로)
-#     fig = plt.Figure(figsize=(16, n_차트_세로 * 2), tight_layout=False)
-#
-#     # 리포트 생성 - 수익요약
-#     ax_수익요약 = fig.add_subplot(n_차트_세로, n_차트_가로, (1, n_테이블_세로 * n_차트_가로))
-#     ax_수익요약 = make_수익리포트_ax_수익요약(ax=ax_수익요약, df_수익요약=df_수익요약)
-#
-#     # 리포트 생성 - 매수매도
-#     li_종목별줄수 = list()
-#     for i_종목순번, s_종목코드 in enumerate(li_종목코드):
-#         # 그래프용 데이터 생성
-#         df_초봉 = dic_초봉[s_종목코드]
-#         s_종목명 = dic_종목코드2종목명[s_종목코드]
-#         dic_수익정보['s_종목코드'] = s_종목코드
-#         dic_수익정보['s_종목명'] = s_종목명
-#         dic_수익정보['df_초봉'] = df_초봉
-#         dic_수익정보['df_거래정보_종목'] = df_거래정보[df_거래정보['종목코드'] == s_종목코드]
-#
-#         # 매수매도 그래프 설정
-#         n_거래수_종목 = len(df_거래정보[df_거래정보['종목코드'] == s_종목코드])
-#         for i_거래순번 in range(n_거래수_종목):
-#             # 위치 설정
-#             dic_수익정보['n_거래순번'] = i_거래순번
-#             n_종목줄수 = sum(li_종목별줄수)
-#             n_차트위치 = (n_테이블_세로 * n_차트_가로) + (n_종목줄수 * n_차트_가로) + i_거래순번 + 1
-#
-#             # 차트 생성
-#             ax_매수매도 = fig.add_subplot(n_차트_세로, n_차트_가로, n_차트위치)
-#             ax_매수매도 = make_수익리포트_ax_매수매도(ax=ax_매수매도, dic_수익정보=dic_수익정보)
-#
-#             # 위치 카운트용 정보 업데이트
-#             if i_거래순번 + 1 == n_거래수_종목:
-#                 li_종목별줄수.append((n_거래수_종목 + (n_차트_가로 - 1)) // n_차트_가로)
-#
-#     return fig
-
-
-# def make_수익리포트_거래정보_실거래(dic_수익정보):
-#     """ 실거래 정보 조회하여 df_거래정보 생성 후 리턴"""
-#     # 기준정보 정의
-#     s_일자 = dic_수익정보['s_일자']
-#     n_초봉 = dic_수익정보['n_초봉']
-#     s_선정사유 = dic_수익정보['s_선정사유']
-#     folder_체결잔고 = dic_수익정보['folder_체결잔고']
-#     folder_주문정보 = dic_수익정보['folder_주문정보']
-#
-#     # 체결잔고 데이터 불러오기 - 실거래 확인
-#     df_체결잔고 = pd.read_csv(os.path.join(folder_체결잔고, f'체결잔고_{s_일자}.csv'), encoding='cp949') \
-#                     if f'체결잔고_{s_일자}.csv' in os.listdir(folder_체결잔고)\
-#                     else pd.DataFrame(dict(주문상태=list(), 계좌번호=list()))
-#     df_체결잔고_체결 = df_체결잔고[df_체결잔고['주문상태'] == '체결'].copy()
-#     df_체결잔고_체결 = df_체결잔고_체결[df_체결잔고_체결['계좌번호'] == 5292685210]
-#     if len(df_체결잔고_체결) == 0:
-#         return pd.DataFrame()
-#
-#     # df_거래정보 생성
-#     li_컬럼명 = ['종목코드', '종목명', '시간', '주문구분', '체결가']
-#     df_거래정보 = df_체결잔고_체결.loc[:, li_컬럼명].copy()
-#     df_거래정보['종목코드'] = df_거래정보['종목코드'].apply(lambda x: x.replace('A', ''))
-#     df_거래정보['종목명'] = df_거래정보['종목명'].apply(lambda x: x.replace(' ', ''))
-#
-#     # 매도사유 추가
-#     df_주문정보 = pd.read_pickle(os.path.join(folder_주문정보, f'주문정보_{s_일자}.pkl')) \
-#                     if f'주문정보_{s_일자}.pkl' in os.listdir(folder_주문정보)\
-#                     else pd.DataFrame(dict(일자=list(), 주문시간=list()))
-#     df_주문정보['dt일시'] = pd.to_datetime(df_주문정보['일자'] + ' ' + df_주문정보['주문시간'])
-#     df_주문정보 = df_주문정보.set_index('dt일시')
-#     df_주문정보_매도 = df_주문정보[df_주문정보['주문구분'] == '매도'] if len(df_주문정보) > 0 else None
-#     li_매도사유 = list()
-#     for i in range(len(df_거래정보)):
-#         s_종목코드 = df_거래정보['종목코드'].values[i]
-#         dt_거래시간 = pd.Timestamp(f'{s_일자} {df_거래정보["시간"].values[i]}')
-#         s_주문구분 = df_거래정보['주문구분'].values[i]
-#         if s_주문구분 == '매수' or df_주문정보_매도 is None:
-#             li_매도사유.append(None)
-#             continue
-#         if s_주문구분 == '매도':
-#             df_주문정보_매도_종목 = df_주문정보_매도[df_주문정보_매도['종목코드'] == s_종목코드]
-#             df_주문정보_매도_종목 = df_주문정보_매도_종목[df_주문정보_매도_종목.index <= dt_거래시간]
-#             df_주문정보_매도_종목 = df_주문정보_매도_종목[df_주문정보_매도_종목.index >= dt_거래시간 - pd.Timedelta(seconds=1)]
-#             s_매도사유 = df_주문정보_매도_종목['매도사유'].values[-1] if len(df_주문정보_매도_종목) > 0 else None
-#             li_매도사유.append(s_매도사유)
-#             continue
-#     df_거래정보['매도사유'] = li_매도사유
-#
-#     # 양식 변경 - 매수매도 한번에
-#     df_거래정보 = df_거래정보.sort_values(['종목코드', '시간'])
-#     dic_거래정보_매수 = dict()
-#     dic_거래정보_매도 = dict()
-#     li_컬럼명 = ['종목코드', '종목명', '매수시간', '매도시간', '매수가', '매도가', '매도사유']
-#     for i in range(len(df_거래정보)):
-#         s_주문구분 = df_거래정보['주문구분'].values[i]
-#         if s_주문구분 == '매수':
-#             dic_거래정보_매수.setdefault('종목코드', list()).append(df_거래정보['종목코드'].values[i])
-#             dic_거래정보_매수.setdefault('종목명', list()).append(df_거래정보['종목명'].values[i])
-#             dic_거래정보_매수.setdefault('매수시간', list()).append(df_거래정보['시간'].values[i])
-#             dic_거래정보_매수.setdefault('매수가', list()).append(df_거래정보['체결가'].values[i])
-#         if s_주문구분 == '매도':
-#             # dic_거래정보_매도.setdefault('종목코드', list()).append(df_거래정보['종목코드'].values[i])
-#             # dic_거래정보_매도.setdefault('종목명', list()).append(df_거래정보['종목명'].values[i])
-#             dic_거래정보_매도.setdefault('매도시간', list()).append(df_거래정보['시간'].values[i])
-#             dic_거래정보_매도.setdefault('매도가', list()).append(df_거래정보['체결가'].values[i])
-#             dic_거래정보_매도.setdefault('매도사유', list()).append(df_거래정보['매도사유'].values[i])
-#     df_거래정보_매수 = pd.DataFrame(dic_거래정보_매수)
-#     df_거래정보_매도 = pd.DataFrame(dic_거래정보_매도)
-#     df_거래정보_양식변경 = pd.concat([df_거래정보_매수, df_거래정보_매도], axis=1).loc[:, li_컬럼명] \
-#                             if len(df_거래정보_매수) == len(df_거래정보_매도) else pd.DataFrame()
-#
-#     # 추가정보 생성
-#     df_거래정보_양식변경['초봉'] = n_초봉 if len(df_거래정보_양식변경) > 0 else df_거래정보_양식변경
-#     df_거래정보_양식변경['선정사유'] = s_선정사유 if len(df_거래정보_양식변경) > 0 else df_거래정보_양식변경
-#     df_거래정보_양식변경['거래구분'] = '실거래' if len(df_거래정보_양식변경) > 0 else df_거래정보_양식변경
-#
-#     return df_거래정보_양식변경
-
-
-# def make_수익리포트_거래정보_백테스팅(n_초봉, s_선정사유, dic_수익정보):
-#     """ 백테스팅 정보 조회하여 df_거래정보 생성 후 리턴"""
-#     # 기준정보 정의
-#     s_일자 = dic_수익정보['s_일자']
-#     folder_결과정리 = dic_수익정보['folder_결과정리']
-#
-#     # 백테스팅 결과 불러오기
-#     df_백테결과 = pd.read_pickle(os.path.join(folder_결과정리, f'df_결과정리_{s_일자}_{n_초봉}초봉.pkl')) \
-#                     if f'df_결과정리_{s_일자}_{n_초봉}초봉.pkl' in os.listdir(folder_결과정리) else pd.DataFrame()
-#     if s_선정사유 != 'all':
-#         df_백테결과 = df_백테결과[df_백테결과['선정사유'] == s_선정사유]
-#
-#     # df_거래정보 생성
-#     df_거래정보 = pd.DataFrame()
-#     df_거래정보['종목코드'] = df_백테결과['종목코드'].values
-#     df_거래정보['종목명'] = df_백테결과['종목명'].values
-#     df_거래정보['매수시간'] = df_백테결과['매수시간'].values
-#     df_거래정보['매도시간'] = df_백테결과['매도시간'].values
-#     df_거래정보['매수가'] = df_백테결과['매수가'].values
-#     df_거래정보['매도가'] = df_백테결과['매도가'].values
-#     df_거래정보['매도사유'] = df_백테결과['매도사유'].values
-#     df_거래정보['초봉'] = n_초봉
-#     df_거래정보['선정사유'] = df_백테결과['선정사유'].values
-#     df_거래정보['거래구분'] = '백테스팅'
-#
-#     return df_거래정보
-
-
 def make_수익리포트_ax_수익요약(ax, df_수익요약):
     """ df_수익요약 기준으로 리포트 테이블 변환 후 ax 리턴 """
-    # 기준정보 정의
-    # df_수익요약 = dic_기준정보['df_수익요약']
-
     # df_리포트 생성
     df_리포트 = pd.DataFrame()
     df_리포트['일자'] = df_수익요약['일자']
@@ -463,61 +251,6 @@ def make_수익리포트_ax_수익요약(ax, df_수익요약):
     return ax
 
 
-# def make_수익리포트_ax_매수매도_데이터(dic_수익정보):
-#     """" dic_기준정보를 입력받아 매수매도 그래프용 데이터 생성 후 dic_매수매도 리턴 """
-#     # 기준정보 정의
-#     folder_대상종목 = dic_수익정보['folder_대상종목']
-#     folder_캐시변환 = dic_수익정보['folder_캐시변환']
-#     folder_체결잔고 = dic_수익정보['folder_체결잔고']
-#     folder_주문정보 = dic_수익정보['folder_주문정보']
-#     df_초봉 = dic_수익정보['df_초봉']
-#     df_거래정보 = dic_수익정보['df_거래정보']
-#
-#
-#
-#
-#
-#     # dic_매수매도 생성
-#     if s_대상 == "실거래":
-#         df_대상종목_매매 = pd.read_pickle(os.path.join(folder_대상종목, f'df_대상종목_{s_일자}_매매.pkl'))\
-#                             if f'df_대상종목_{s_일자}_매매.pkl' in os.listdir(folder_대상종목) else None
-#         n_초봉 = df_대상종목_매매['초봉'].values[-1] if df_대상종목_매매 is not None else 5
-#         s_선정사유 = df_대상종목_매매['선정사유'].values[-1] if df_대상종목_매매 is not None else 'vi발동'
-#         dic_초봉 = pd.read_pickle(os.path.join(folder_캐시변환, f'dic_코드별_{n_초봉}초봉_{s_일자}.pkl'))
-#         try:
-#             df_체결잔고 = pd.read_csv(os.path.join(folder_체결잔고, f'체결잔고_{s_일자}.csv'), encoding='cp949')
-#         except FileNotFoundError:
-#             li_파일명 = [파일명 for 파일명 in os.listdir(folder_체결잔고) if '체결잔고' in 파일명 and '.csv' in 파일명]
-#             df_체결잔고 = pd.read_csv(os.path.join(folder_체결잔고, max(li_파일명)), encoding='cp949')[:0]
-#         df_체결잔고 = df_체결잔고[df_체결잔고['주문상태'] == '체결']
-#         df_주문정보 = pd.read_pickle(os.path.join(folder_주문정보, f'주문정보_{s_일자}.pkl'))\
-#                             if f'주문정보_{s_일자}.pkl' in os.listdir(folder_주문정보) else None
-#         # li_매도컬럼 = ['매도1매도우세', '매도2매수피크', '매도3하락한계', '매도4타임아웃']
-#         # df_주문정보['매도사유'] = df_주문정보[li_매도컬럼].apply(lambda row: li_매도컬럼[row.tolist().index(True)][-4:]
-#         #                                                     if True in row.tolist() else None, axis=1)\
-#         #                         if li_매도컬럼[0] in df_주문정보.columns else None
-#     if s_대상 == "백테스팅":
-#         pass
-#     # dic_기준정보 = dict(s_일자=s_일자, n_초봉=n_초봉, s_선정사유=s_선정사유,
-#     #                 df_수익요약=df_수익요약,
-#     #                 df_체결잔고=df_체결잔고, df_주문정보=df_주문정보)
-#     dic_매수매도 = dict(s_일자=s_일자, n_초봉=n_초봉, s_선정사유=s_선정사유,
-#                     df_체결잔고=df_체결잔고, df_주문정보=df_주문정보)
-#
-#     # 스케일 설정
-#     df_초봉 = dic_초봉[s_종목코드]
-#     dic_매수매도['df_초봉'] = df_초봉
-#     dic_매수매도['s_종목코드'] = s_종목코드
-#     dic_매수매도['n_시세_max'] = df_초봉['고가'].max()
-#     dic_매수매도['n_시세_min'] = df_초봉['저가'].min()
-#     dic_매수매도['n_거래량_max'] = max(df_초봉['매수량'].max(), df_초봉['매도량'].max())
-#     dic_매수매도['n_거래량_min'] = min(df_초봉['매수량'].min(), df_초봉['매도량'].min())
-#     dic_매수매도['n_거래횟수_max'] = max(df_초봉['매수횟수'].max(), df_초봉['매도횟수'].max(), df_초봉['체결횟수'].max())
-#     dic_매수매도['n_거래횟수_min'] = min(df_초봉['매수횟수'].min(), df_초봉['매도횟수'].min(), df_초봉['체결횟수'].min())
-#
-#     return dic_매수매도
-
-
 def make_수익리포트_ax_매수매도(ax, dic_수익정보):
     """ df_체결잔고 기준으로 주가 변화 및 매수매도 시점 표기 후 ax 리턴 """
     # 기준정보 정의
@@ -527,7 +260,6 @@ def make_수익리포트_ax_매수매도(ax, dic_수익정보):
     n_거래순번 = dic_수익정보['n_거래순번']
     df_초봉 = dic_수익정보['df_초봉']
     df_거래정보_종목 = dic_수익정보['df_거래정보_종목']
-    # s_일자 = df_초봉.index[-1].strftime('%Y%m%d')
 
     # 매수매도 정보 정의
     dt_매수시점 = pd.Timestamp(f'{s_일자} {df_거래정보_종목["매수시간"].values[n_거래순번]}')
@@ -540,17 +272,6 @@ def make_수익리포트_ax_매수매도(ax, dic_수익정보):
     s_선정사유 = df_거래정보_종목['선정사유'].values[n_거래순번]
     s_거래구분 = df_거래정보_종목['거래구분'].values[n_거래순번]
 
-    # df_체결잔고 = dic_수익정보['df_체결잔고']
-    # df_체결잔고['종목코드'] = df_체결잔고['종목코드'].apply(lambda x: x.replace('A', ''))
-    # df_체결잔고_종목 = df_체결잔고[df_체결잔고['종목코드'] == s_종목코드].copy()
-    # df_체결잔고_종목['dt일시'] = df_체결잔고_종목['시간'].apply(lambda x: pd.Timestamp(f'{s_일자} {x}'))
-    # df_체결잔고_종목 = df_체결잔고_종목.set_index('dt일시')
-    # df_주문정보 = dic_수익정보['df_주문정보']
-    # df_주문정보_종목 = df_주문정보[df_주문정보['종목코드'] == s_종목코드].copy()
-    # df_주문정보_종목['dt일시'] = pd.to_datetime(df_주문정보_종목['일자'] + ' ' + df_주문정보_종목['주문시간'])
-    # df_주문정보_종목 = df_주문정보_종목.set_index('dt일시')
-    # s_종목명 = df_체결잔고_종목['종목명'].values[-1].strip()
-
     # 차트 정보 정의
     df_초봉_차트 = df_초봉[df_초봉.index >= dt_매수시점 - pd.Timedelta(minutes=2)]
     df_초봉_차트 = df_초봉_차트[df_초봉_차트.index <= dt_매수시점 + pd.Timedelta(minutes=8)]
@@ -562,41 +283,13 @@ def make_수익리포트_ax_매수매도(ax, dic_수익정보):
     n_거래량_min = min(df_초봉['매수량'].min(), df_초봉['매도량'].min())
     n_거래횟수_max = max(df_초봉['매수횟수'].max(), df_초봉['매도횟수'].max(), df_초봉['체결횟수'].max())
     n_거래횟수_min = min(df_초봉['매수횟수'].min(), df_초봉['매도횟수'].min(), df_초봉['체결횟수'].min())
-    # n_시세_max = dic_수익정보['n_시세_max']
-    # n_시세_min = dic_수익정보['n_시세_min']
-    # n_거래량_max = dic_수익정보['n_거래량_max']
-    # n_거래량_min = dic_수익정보['n_거래량_min']
-    # n_거래횟수_max = dic_수익정보['n_거래횟수_max']
 
     # 기본색상코드 정의
     dic_색상 = {'파랑': 'C0', '주황': 'C1', '녹색': 'C2', '빨강': 'C3', '보라': 'C4',
               '고동': 'C5', '분홍': 'C6', '회색': 'C7', '올리브': 'C8', '하늘': 'C9'}
 
-    # 데이터 정리
-    # df_체결잔고_종목_매수 = df_체결잔고_종목[df_체결잔고_종목['주문구분'] == '매수']
-    # df_체결잔고_종목_매도 = df_체결잔고_종목[df_체결잔고_종목['주문구분'] == '매도']
-    # dt_매수시점 = df_체결잔고_종목_매수.index[n_거래순번]
-    # dt_매도시점 = df_체결잔고_종목_매도[df_체결잔고_종목_매도.index >= dt_매수시점].index[0]\
-    #                 if len(df_체결잔고_종목_매도) > 0 else None
-    # dt_타임아웃 = dt_매수시점 + pd.Timedelta(minutes=5) if dt_매수시점 is not None else None
-    # n_매수가 = df_체결잔고_종목_매수['체결가'][dt_매수시점]\
-    #             if len(df_체결잔고_종목_매수[df_체결잔고_종목_매수.index == dt_매수시점]) == 1\
-    #             else max(df_체결잔고_종목_매수['체결가'][dt_매수시점])
-    # if dt_매도시점 is not None:
-    #     n_매도가 = df_체결잔고_종목_매도['체결가'][dt_매도시점]\
-    #                 if len(df_체결잔고_종목_매도[df_체결잔고_종목_매도.index == dt_매도시점]) == 1\
-    #                 else max(df_체결잔고_종목_매도['체결가'][dt_매도시점])
-    # else:
-    #     n_매도가 = None
-    # df_주문정보_종목_매도 = df_주문정보_종목[df_주문정보_종목.index <= dt_매도시점]
-    # df_주문정보_종목_매도 = df_주문정보_종목_매도[df_주문정보_종목_매도.index >= dt_매도시점 - pd.Timedelta(seconds=1)]
-    # s_매도사유 = df_주문정보_종목_매도['매도사유'].values[-1] if len(df_주문정보_종목_매도) > 0 else None
-    # df_초봉_차트 = df_초봉[df_초봉.index >= dt_매수시점 - pd.Timedelta(minutes=2)]
-    # df_초봉_차트 = df_초봉_차트[df_초봉_차트.index <= dt_매수시점 + pd.Timedelta(minutes=8)]
-
     # ax 생성
     s_차트명 = f'[ {s_종목명}({s_종목코드}) ] {n_초봉}초봉' if n_거래순번 == 0 else ''
-    # s_차트명 = f'[ {s_종목명}({s_종목코드}) ] {n_초봉}초봉|{s_선정사유}' if n_거래순번 == 0 else ''
     ax.set_title(s_차트명, loc='left', fontsize=10, fontweight='bold')
     ax.vlines(df_초봉_차트.index, df_초봉_차트['저가'], df_초봉_차트['고가'], lw=0.5, color='black')
     ax_거래량 = ax.twinx()
