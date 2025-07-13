@@ -163,6 +163,7 @@ def make_매도신호(dic_매개변수, dt_일자시간=None):
 
     # 데이터 정의
     n_매수량 = df_초봉['매수량'].values[-1]
+    n_매수량_1 = df_초봉['매수량'].values[-2]
     if n_현재가 is None:
         ary_종가 = df_초봉['종가'].dropna().values
         n_현재가 = ary_종가[-1] if len(ary_종가) > 0 else None
@@ -171,6 +172,7 @@ def make_매도신호(dic_매개변수, dt_일자시간=None):
     n_매수량_누적 = df_초봉_매수이후['매수량'].sum()
     n_매도량_누적 = df_초봉_매수이후['매도량'].sum()
     n_매수량max = df_초봉_매수이후[:-1]['매수량'].max()
+    n_매수량_기준봉 = df_초봉_기준봉['매수량'].values[-1]
 
     # 매도신호 검증
     li_매도신호 = list()
@@ -178,19 +180,20 @@ def make_매도신호(dic_매개변수, dt_일자시간=None):
 
     # 1) 매도우세 검증
     n_매도강도 = n_매도량_누적 / n_매수량_누적 * 100 if n_매수량_누적 != 0 else 0
-    b_매도우세 = n_매도강도 > 100
+    # b_매도우세 = n_매도강도 > 100
+    b_매도우세 = False
     li_매도신호.append(b_매도우세)
     li_매도신호_수치.append(f'{n_매도강도:.0f}%')
 
     # 2) 매수피크 검증
-    n_매수비율 = n_매수량 / n_매수량max * 100 if n_매수량max != 0 else 0
-    # b_매수피크 = 50 < n_매수비율 < 100
-    b_매수피크 = 70 < n_매수비율 < 100
+    # n_매수비율 = n_매수량 / n_매수량max * 100 if n_매수량max != 0 else 0
+    n_매수비율 = n_매수량 / n_매수량_기준봉 * 100 if n_매수량_기준봉 != 0 else 0
+    b_매수피크 = 70 < n_매수비율 < 100 and n_매수량 > n_매수량_1
     li_매도신호.append(b_매수피크)
     li_매도신호_수치.append(f'{n_매수비율:.0f}%')
 
     # 3) 하락한계 검증
-    b_하락한계 = n_수익률 < -1.2 if n_수익률 is not None else False
+    b_하락한계 = n_수익률 < -3.2 if n_수익률 is not None else False
     li_매도신호.append(b_하락한계)
     li_매도신호_수치.append(f'{n_수익률:.1f}%')
 
