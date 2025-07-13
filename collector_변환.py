@@ -757,6 +757,33 @@ class Collector:
             # log 기록
             self.make_log(f'{s_일자} 데이터 저장 완료')
 
+    def 실시간_n초봉(self, n_초봉, s_시작일자):
+        """ 저장된 체결정보 기준으로 1초봉 생성 후 pkl 파일 저장 """
+        # 파일명 정의
+        s_파일명_기준 = 'df_체결정보'
+        s_파일명_생성 = f'dic_코드별_{n_초봉}초봉'
+
+        # 분석대상 일자 선정
+        li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_체결정보)
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명]
+        li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_캐시변환)
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
+        li_일자_대상 = [일자 for 일자 in li_일자_전체 if 일자 not in li_일자_완료 and 일자 >= s_시작일자]
+
+        # 일자별 분석 진행
+        for s_일자 in li_일자_대상:
+            # 파일 읽어오기
+            df_체결정보 = pd.read_pickle(os.path.join(self.folder_체결정보, f'{s_파일명_기준}_{s_일자}.pkl'))
+
+            # 초봉 생성
+            dic_n초봉 = self.make_초봉데이터(df_체결정보=df_체결정보, n_초봉=n_초봉)
+
+            # dic 저장
+            pd.to_pickle(dic_n초봉, os.path.join(self.folder_캐시변환, f'{s_파일명_생성}_{s_일자}.pkl'))
+
+            # log 기록
+            self.make_log(f'{s_일자} 데이터 저장 완료')
+
     @staticmethod
     def make_초봉데이터(df_체결정보, n_초봉):
         """ 체결정보 기준 초봉 데이터로 생성 후 dic_초봉 리턴 """
@@ -847,8 +874,11 @@ if __name__ == "__main__":
     c.캐시저장_5분봉()
     c.캐시저장_10분봉()
     c.실시간_체결정보()
-    c.실시간_1초봉()
-    c.실시간_2초봉()
-    c.실시간_3초봉()
-    c.실시간_5초봉()
-    c.실시간_10초봉()
+    # c.실시간_1초봉()
+    # c.실시간_2초봉()
+    # c.실시간_3초봉()
+    # c.실시간_5초봉()
+    # c.실시간_10초봉()
+    li_초봉 = [1, 2, 3, 5, 10, 12, 15, 20, 30]
+    for n_초봉 in li_초봉:
+        c.실시간_n초봉(n_초봉=n_초봉, s_시작일자='20250623')
