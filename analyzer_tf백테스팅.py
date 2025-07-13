@@ -8,7 +8,7 @@ from tqdm import tqdm
 import multiprocessing as mp
 
 import UT_차트maker as Chart
-import analyzer_tf알고리즘 as Logic
+import analyzer_tf알고리즘_백테스팅 as Logic
 
 # 그래프 한글 설정
 import matplotlib.pyplot as plt
@@ -85,7 +85,8 @@ class Analyzer:
         for s_일자 in li_일자_대상:
             # 초봉 불러오기
             dic_초봉 = pd.read_pickle(os.path.join(self.folder_분봉확인, f'dic_분봉확인_{s_일자}_{n_초봉}초봉.pkl'))
-            dic_1초봉 = pd.read_pickle(os.path.join(self.folder_분봉확인, f'dic_분봉확인_{s_일자}_1초봉.pkl'))
+            # dic_1초봉 = pd.read_pickle(os.path.join(self.folder_분봉확인, f'dic_분봉확인_{s_일자}_1초봉.pkl'))
+            dic_1초봉 = pd.read_pickle(os.path.join(self.folder_캐시변환, f'dic_코드별_1초봉_{s_일자}.pkl'))
 
             # 종목별 분석 진행
             li_대상종목 = list(dic_초봉.keys())
@@ -408,7 +409,14 @@ class Analyzer:
                 li_df_수익요약.append(df_요약.set_index('일자'))
 
             # 수익요약 데이터 생성
-            df_수익요약 = pd.concat(li_df_수익요약, axis=1).reset_index()
+            li_일자 = list(li_df_수익요약[0].index)
+            li_df_수익요약 = [df_수익요약.reset_index(drop=True) for df_수익요약 in li_df_수익요약]
+            # df_수익요약 = pd.concat(li_df_수익요약, axis=1).reset_index()
+            df_수익요약 = pd.concat(li_df_수익요약, axis=1)
+            df_수익요약.insert(loc=0, column='일자', value=li_일자)
+            # li_컬럼명 = list(df_수익요약.columns)
+            # df_수익요약['일자'] = li_일자
+            # df_수익요약 = df_수익요약.loc[:, ['일자'] + li_컬럼명]
 
             # 파일 저장
             df_수익요약.to_pickle(os.path.join(self.folder_수익요약, f'df_수익요약_{s_일자}.pkl'))
@@ -478,7 +486,7 @@ class Analyzer:
             # 리포트 생성 - 실거래
             dic_매매정보['folder_캐시변환'] = self.folder_캐시변환
             dic_매매정보['df_거래정보_실거래'] = df_거래정보_실거래
-            fig = Chart.make_수익리포트(df_거래정보=df_거래정보_실거래, dic_매매정보=dic_매매정보)
+            fig = Chart.make_수익리포트(df_거래정보=df_거래정보_실거래, dic_매매정보=dic_매매정보, li_컬럼명_강조=None)
 
             # 리포트 파일 저장 - 실거래
             folder_리포트 = f'{self.folder_매매이력}_리포트'
@@ -497,7 +505,8 @@ class Analyzer:
             for n_초봉_백테스팅 in li_초봉_백테스팅:
                 # 리포트 생성
                 dic_매매정보['n_초봉'] = n_초봉_백테스팅
-                fig = Chart.make_수익리포트(df_거래정보=dic_거래정보_백테스팅[n_초봉_백테스팅], dic_매매정보=dic_매매정보)
+                fig = Chart.make_수익리포트(df_거래정보=dic_거래정보_백테스팅[n_초봉_백테스팅], dic_매매정보=dic_매매정보,
+                                            li_컬럼명_강조=[f'{n_초봉_백테스팅}초|전체'])
 
                 # 리포트 파일 저장
                 s_파일명_리포트_백테스팅 = f'백테스팅_리포트_{s_일자}_백테스팅_{n_초봉_백테스팅}초봉.png'
@@ -642,7 +651,7 @@ class Analyzer:
 #######################################################################################################################
 if __name__ == "__main__":
     a = Analyzer(b_멀티=True, s_시작일자='20250623', n_분석일수=20)
-    li_초봉 = [3, 5, 10]
+    li_초봉 = [3, 5, 10, 12, 15, 20, 30]
     [a.검증_매수매도(n_초봉=n_초봉) for n_초봉 in li_초봉]
     [a.검증_결과정리(n_초봉=n_초봉) for n_초봉 in li_초봉]
     [a.검증_결과요약(n_초봉=n_초봉) for n_초봉 in li_초봉]
