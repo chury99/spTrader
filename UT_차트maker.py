@@ -164,7 +164,7 @@ def make_차트(df_ohlcv, n_봉수=None):
     return fig
 
 
-def make_수익리포트(df_거래정보, dic_매매정보):
+def make_수익리포트(df_거래정보, dic_매매정보, li_컬럼명_강조):
     """ 수익요약 데이터 기준으로 리포트 생성하여 리턴 """
     # 기준정보 정의
     s_일자 = dic_매매정보['s_일자']
@@ -187,7 +187,7 @@ def make_수익리포트(df_거래정보, dic_매매정보):
 
     # 리포트 생성 - 수익요약
     ax_수익요약 = fig.add_subplot(n_차트_세로, n_차트_가로, (1, n_테이블_세로 * n_차트_가로))
-    ax_수익요약 = make_수익리포트_ax_수익요약(ax=ax_수익요약, df_수익요약=df_수익요약)
+    ax_수익요약 = make_수익리포트_ax_수익요약(ax=ax_수익요약, df_수익요약=df_수익요약, li_컬럼명_강조=li_컬럼명_강조)
 
     # 리포트 생성 - 매수매도
     li_종목별줄수 = list()
@@ -219,7 +219,7 @@ def make_수익리포트(df_거래정보, dic_매매정보):
     return fig
 
 
-def make_수익리포트_ax_수익요약(ax, df_수익요약):
+def make_수익리포트_ax_수익요약(ax, df_수익요약, li_컬럼명_강조=None):
     """ df_수익요약 기준으로 리포트 테이블 변환 후 ax 리턴 """
     # df_리포트 생성
     df_리포트 = pd.DataFrame()
@@ -236,17 +236,34 @@ def make_수익리포트_ax_수익요약(ax, df_수익요약):
     obj_테이블.set_fontsize(8)
     obj_테이블.scale(1.0, 1.6)
 
-    # 선정 조건에 배경색 표기
+    # 선정 조건에 배경색 표기 - 회색
     try:
         for n_col in range(len(df_수익요약.columns)):
             obj_테이블[2, n_col].set_facecolor('lightgrey')
-        n_max위치 = df_수익요약.set_index('일자').T['10성능%'].argmax() + 1
-        for n_row in range(len(df_수익요약) + 1):
-            obj_테이블[n_row, n_max위치].set_facecolor('yellow')
-        obj_테이블[0, n_max위치].set_text_props(fontweight='bold')
-        obj_테이블[2, n_max위치].set_text_props(fontweight='bold')
+        # n_max위치 = df_수익요약.set_index('일자').T['10성능%'].argmax() + 1
+        # for n_row in range(len(df_수익요약) + 1):
+        #     obj_테이블[n_row, n_max위치].set_facecolor('yellow')
+        # obj_테이블[0, n_max위치].set_text_props(fontweight='bold')
+        # obj_테이블[2, n_max위치].set_text_props(fontweight='bold')
     except TypeError:
         pass
+
+    # 강조할 컬럼 표기 - 노란색
+    li_컬럼명 = list(df_수익요약.columns)
+    if li_컬럼명_강조 is None:
+        # li_컬럼명_강조 = [li_컬럼명[df_수익요약.set_index('일자').T['10성능%'].argmax()]]
+        li_컬럼명_일자제외 = [컬럼명 for 컬럼명 in li_컬럼명 if '일자' not in 컬럼명]
+        # df_수익요약.loc[:, li_컬럼명_일자제외] = df_수익요약.loc[:, li_컬럼명_일자제외].astype(float)
+        for s_컬럼명 in li_컬럼명_일자제외:
+            df_수익요약[s_컬럼명] = df_수익요약[s_컬럼명].astype(float)
+        li_컬럼명_강조 = list(df_수익요약.loc[df_수익요약['일자'] == '10성능%', li_컬럼명_일자제외].T.idxmax())
+        # li_컬럼명_강조 = [df_수익요약[df_수익요약['일자'] == '10성능%'].iloc[0].idxmax()]
+    for s_컬럼명 in li_컬럼명_강조:
+        n_컬럼_강조 = li_컬럼명.index(s_컬럼명)
+        for n_row in range(len(df_수익요약) + 1):
+            obj_테이블[n_row, n_컬럼_강조].set_facecolor('yellow')
+        obj_테이블[0, n_컬럼_강조].set_text_props(fontweight='bold')
+        obj_테이블[2, n_컬럼_강조].set_text_props(fontweight='bold')
 
     return ax
 
