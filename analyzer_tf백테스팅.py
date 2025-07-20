@@ -37,7 +37,7 @@ class Analyzer:
         self.folder_체결잔고 = dic_폴더정보['이력|체결잔고']
         self.folder_대상종목 = dic_폴더정보['이력|대상종목']
         self.folder_주문정보 = dic_폴더정보['이력|주문정보']
-        self.folder_분봉확인 = dic_폴더정보['tf초봉분석|20_분봉확인']
+        self.folder_분봉확인 = dic_폴더정보['tf종목분석|20_분봉확인']
         self.folder_매수매도 = dic_폴더정보['tf백테스팅|10_매수매도']
         self.folder_결과정리 = dic_폴더정보['tf백테스팅|20_결과정리']
         self.folder_결과요약 = dic_폴더정보['tf백테스팅|30_결과요약']
@@ -74,12 +74,13 @@ class Analyzer:
 
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_분봉확인)
-                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'_{n_초봉}초봉' in 파일명]
         li_일자_전체 = [일자 for 일자 in li_일자_전체 if 일자 >= self.s_시작일자] if self.s_시작일자 is not None else li_일자_전체
         li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매수매도)
-                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명 and f'_{n_초봉}초봉' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+        # li_일자_대상 = list(dict.fromkeys(li_일자_대상))
 
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
@@ -216,6 +217,8 @@ class Analyzer:
             for i, s_신호종류 in enumerate(['매도우세', '매수피크', '하락한계', '타임아웃']):
                 dic_매수매도.setdefault(f'매도_{s_신호종류}', list()).append(dic_매개변수_종목['li_매도신호_수치_매도봇'][i]
                                                                                             if b_보유신호 else None)
+            dic_매수매도.setdefault('피크_기준봉', list()).append(dic_매개변수_종목['n_매수량_기준봉_매도봇'] if b_보유신호 else None)
+            dic_매수매도.setdefault('피크_매수량', list()).append(dic_매개변수_종목['n_매수량_매도봇'] if b_보유신호 else None)
             dic_매수매도.setdefault('매수가', list()).append(dic_매개변수_종목['n_매수단가_매도봇'] if b_보유신호 else None)
             dic_매수매도.setdefault('매도가', list()).append(dic_매개변수_종목['n_주문단가_매도봇'] if b_매도신호 else None)
             dic_매수매도.setdefault('매수시간', list()).append(dic_매개변수_종목['s_주문시간_매수봇'] if b_보유신호 else None)
@@ -249,11 +252,12 @@ class Analyzer:
 
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매수매도)
-                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'_{n_초봉}초봉' in 파일명]
         li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_결과정리)
-                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명 and f'_{n_초봉}초봉' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+        # li_일자_대상 = list(dict.fromkeys(li_일자_대상))
 
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
@@ -298,17 +302,18 @@ class Analyzer:
 
         # 분석대상 일자 선정
         li_일자_전체 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_결과정리)
-                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명 and '_전체' not in 파일명]
+                    if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'_{n_초봉}초봉' in 파일명 and '_전체' not in 파일명]
         li_일자_전체 = li_일자_전체[-1 * self.n_분석일수:] if self.n_분석일수 is not None else li_일자_전체
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_결과요약)
-                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명]
+                    if s_파일명_생성 in 파일명 and '.pkl' in 파일명 and f'_{n_초봉}초봉' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+        # li_일자_대상 = list(dict.fromkeys(li_일자_대상))
 
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
             # 전체 결과정리 파일 확인
             li_파일일자 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_결과정리)
-                       if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'{n_초봉}초봉' in 파일명 and '_전체' not in 파일명]
+                       if s_파일명_기준 in 파일명 and '.pkl' in 파일명 and f'_{n_초봉}초봉' in 파일명 and '_전체' not in 파일명]
             li_파일일자 = [파일일자 for 파일일자 in li_파일일자 if 파일일자 <= s_일자]
 
             # 파일별 결과 요약
@@ -363,6 +368,7 @@ class Analyzer:
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_수익요약)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료]
+        # li_일자_대상 = list(dict.fromkeys(li_일자_대상))
 
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
@@ -373,6 +379,7 @@ class Analyzer:
 
             # 초봉별 수익요약 생성
             li_df_수익요약 = list()
+            li_li_일자 = list()
             li_선정사유 = ['일봉변동', 'vi발동', '거래량급증']
             for s_초봉 in li_초봉:
                 # 초 이름 정의
@@ -407,9 +414,11 @@ class Analyzer:
                 # 초봉별 요약 데이터 생성
                 df_요약 = pd.concat([df_요약_누적, df_요약_성능, df_요약_일별], axis=0)
                 li_df_수익요약.append(df_요약.set_index('일자'))
+                li_li_일자.append(df_요약['일자'].to_list())
 
             # 수익요약 데이터 생성
-            li_일자 = list(li_df_수익요약[0].index)
+            # li_일자 = list(li_df_수익요약[0].index)
+            li_일자 = max(li_li_일자, key=len)
             li_df_수익요약 = [df_수익요약.reset_index(drop=True) for df_수익요약 in li_df_수익요약]
             # df_수익요약 = pd.concat(li_df_수익요약, axis=1).reset_index()
             df_수익요약 = pd.concat(li_df_수익요약, axis=1)
@@ -440,6 +449,7 @@ class Analyzer:
         li_일자_완료 = [re.findall(r'\d{8}', 파일명)[0] for 파일명 in os.listdir(self.folder_매매이력)
                     if s_파일명_생성 in 파일명 and '.pkl' in 파일명]
         li_일자_대상 = [s_일자 for s_일자 in li_일자_전체 if s_일자 not in li_일자_완료 and s_일자 >= self.s_시작일자]
+        # li_일자_대상 = list(dict.fromkeys(li_일자_대상))
 
         # 일자별 분석 진행
         for s_일자 in li_일자_대상:
@@ -523,9 +533,15 @@ class Analyzer:
             if b_카톡 and s_일자 == li_일자_대상[-1]:
                 import API_kakao
                 k = API_kakao.KakaoAPI()
+                # 실거래 리포트
                 result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 백테스팅 완료',
                                         s_button_title=f'[tf분석] 백테스팅 리포트 - {s_일자}',
                                         s_url=f'http://goniee.com/{folder_서버}/{s_파일명_리포트}')
+
+                # 백테스팅 리포트 - 폴더
+                result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 백테스팅 완료',
+                                        s_button_title=f'[tf분석] 리포트 폴더 접속',
+                                        s_url=f'http://goniee.com/{folder_서버}/')
 
             # log 기록
             self.make_log(f'매매이력 검증 완료({s_일자})')
@@ -650,7 +666,7 @@ class Analyzer:
 
 #######################################################################################################################
 if __name__ == "__main__":
-    a = Analyzer(b_멀티=True, s_시작일자='20250623', n_분석일수=20)
+    a = Analyzer(b_멀티=True, s_시작일자='20250623', n_분석일수=None)
     li_초봉 = [3, 5, 10, 12, 15, 20, 30]
     [a.검증_매수매도(n_초봉=n_초봉) for n_초봉 in li_초봉]
     [a.검증_결과정리(n_초봉=n_초봉) for n_초봉 in li_초봉]
