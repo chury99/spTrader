@@ -329,7 +329,8 @@ def make_수익리포트_ax_매수매도(ax, dic_수익정보):
     ax.set_ylim(n_시세_min, n_시세_max)
     ax.set_yticks([])
     ax.set_xticks([dt_매수시점],
-                    labels=[f'{s_거래구분}|{s_선정사유}-{dt_매수시점.strftime("%H:%M:%S")}-{s_매도사유}'], ha='center')
+                    labels=[f'{s_거래구분}|{s_선정사유}-{dt_매수시점.strftime("%H:%M:%S")}-{n_매수가:,.0f}-{s_매도사유}'],
+                    ha='center')
     ax_거래량.set_ylim(n_거래량_min, n_거래량_max * 1.1)
     ax_거래량.set_yticks([])
     ax_체결횟수.set_ylim(0, n_거래횟수_max * 1.1)
