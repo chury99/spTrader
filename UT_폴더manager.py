@@ -96,11 +96,12 @@ dic_폴더정보['sr백테스팅|20_결과정리'] = os.path.join(folder_백테�
 folder_TransactionFlow = os.path.join(folder_work, 'analyzer_TransactionFlow')
 dic_폴더정보['tf분석'] = folder_TransactionFlow
 
-# 초봉분석 폴더 정의
-folder_초봉분석 = os.path.join(folder_TransactionFlow, '초봉분석')
-dic_폴더정보['tf초봉분석'] = folder_초봉분석
-dic_폴더정보['tf초봉분석|10_지표생성'] = os.path.join(folder_초봉분석, '10_지표생성')
-dic_폴더정보['tf초봉분석|20_분봉확인'] = os.path.join(folder_초봉분석, '20_분봉확인')
+# 종목분석 폴더 정의
+folder_종목분석 = os.path.join(folder_TransactionFlow, '종목분석')
+dic_폴더정보['tf종목분석'] = folder_종목분석
+dic_폴더정보['tf종목분석|00_일봉변동'] = os.path.join(folder_종목분석, '00_일봉변동')
+dic_폴더정보['tf종목분석|10_지표생성'] = os.path.join(folder_종목분석, '10_지표생성')
+dic_폴더정보['tf종목분석|20_분봉확인'] = os.path.join(folder_종목분석, '20_분봉확인')
 
 # 백테스팅 폴더 정의
 folder_백테스팅 = os.path.join(folder_TransactionFlow, '백테스팅')
