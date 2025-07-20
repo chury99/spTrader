@@ -44,7 +44,8 @@ class Trader(QMainWindow, form_class):
         self.folder_대상종목 = dic_폴더정보['이력|대상종목']
         self.folder_초봉정보 = dic_폴더정보['이력|초봉정보']
         self.folder_매개변수 = dic_폴더정보['이력|매개변수']
-        self.folder_일봉변동 = dic_폴더정보['sr종목선정|10_일봉변동']
+        # self.folder_일봉변동 = dic_폴더정보['sr종목선정|10_일봉변동']
+        self.folder_일봉변동 = dic_폴더정보['tf종목분석|00_일봉변동']
         self.folder_수익요약 = dic_폴더정보['tf백테스팅|40_수익요약']
         os.makedirs(self.folder_신호탐색, exist_ok=True)
         os.makedirs(self.folder_주문정보, exist_ok=True)
