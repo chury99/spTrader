@@ -128,13 +128,13 @@ class LauncherAnalyzer:
         # log 기록
         self.make_log(f'sr분석 백테스팅 완료 - {s_실행결과}')
 
-    def analyzer_tf초봉분석(self):
+    def analyzer_tf종목분석(self):
         """ 초봉 데이터 분석을 통해 최적 조건 확인 """
         # 파일 지정
-        path_실행 = os.path.join(os.getcwd(), 'analyzer_tf초봉분석.py')
+        path_실행 = os.path.join(os.getcwd(), 'analyzer_tf종목분석.py')
 
         # log 기록
-        self.make_log(f'tf분석 초봉분석 실행')
+        self.make_log(f'tf분석 종목분석 실행')
 
         # 프로세스 실행
         ret = subprocess.run([self.path_파이썬64, path_실행], shell=True)
@@ -146,7 +146,7 @@ class LauncherAnalyzer:
             self.k.send_message(s_user='알림봇', s_friend='여봉이', s_text=s_메세지)
 
         # log 기록
-        self.make_log(f'tf분석 초봉분석 완료 - {s_실행결과}')
+        self.make_log(f'tf분석 종목분석 완료 - {s_실행결과}')
 
     def analyzer_tf백테스팅(self):
         """ 매수매도 알고리즘 기준으로 백테스팅 진행 """
@@ -215,8 +215,8 @@ if __name__ == "__main__":
     # l.analyzer_rf분석1종목()
     # l.analyzer_rf분석2공통()
     # l.analyzer_rf백테스팅()
-    l.analyzer_sr종목선정()
-    l.analyzer_sr백테스팅()
-    l.analyzer_tf초봉분석()
+    # l.analyzer_sr종목선정()
+    # l.analyzer_sr백테스팅()
+    l.analyzer_tf종목분석()
     l.analyzer_tf백테스팅()
     l.UT_파일rotator()
