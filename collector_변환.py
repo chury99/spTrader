@@ -782,7 +782,8 @@ class Collector:
             pd.to_pickle(dic_n초봉, os.path.join(self.folder_캐시변환, f'{s_파일명_생성}_{s_일자}.pkl'))
 
             # log 기록
-            self.make_log(f'{s_일자} 데이터 저장 완료')
+            # self.make_log(f'{s_일자} 데이터 저장 완료')
+            self.make_log(f'{s_일자} {n_초봉}초봉 저장 완료')
 
     @staticmethod
     def make_초봉데이터(df_체결정보, n_초봉):
