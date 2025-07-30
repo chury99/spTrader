@@ -213,9 +213,12 @@ class Analyzer:
         df_초봉 = df_초봉[df_초봉['체결시간'] >= s_추가시점].copy()
         df_초봉['체결강도'] = (df_초봉['매수량'] / df_초봉['매도량'] * 100).apply(lambda x:
                                                                   99999 if x == float('inf') else x)
-        df_초봉['z_매수'] = df_초봉['매수량'].rolling(window=30, min_periods=20).apply(lambda x: Logic.cal_z스코어(x))
-        df_초봉['z_매도'] = df_초봉['매도량'].rolling(window=30, min_periods=20).apply(lambda x: Logic.cal_z스코어(x))
-        df_초봉['z_거래'] = df_초봉['거래량'].rolling(window=30, min_periods=20).apply(lambda x: Logic.cal_z스코어(x))
+        df_초봉['z_매수'] = df_초봉['매수량'].rolling(window=30, min_periods=20).apply(
+                                                                    lambda x: Logic.cal_z스코어(ary_데이터=x, n_윈도우=30))
+        df_초봉['z_매도'] = df_초봉['매도량'].rolling(window=30, min_periods=20).apply(
+                                                                    lambda x: Logic.cal_z스코어(ary_데이터=x, n_윈도우=30))
+        df_초봉['z_거래'] = df_초봉['거래량'].rolling(window=30, min_periods=20).apply(
+                                                                    lambda x: Logic.cal_z스코어(ary_데이터=x, n_윈도우=30))
         df_초봉['만원_매수'] = df_초봉['종가'] * df_초봉['매수량'] / 10000
         df_초봉['만원_매도'] = df_초봉['종가'] * df_초봉['매도량'] / 10000
         df_초봉['만원_거래'] = df_초봉['종가'] * df_초봉['거래량'] / 10000
