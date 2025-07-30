@@ -219,6 +219,7 @@ class Analyzer:
                                                                                             if b_보유신호 else None)
             dic_매수매도.setdefault('피크_기준봉', list()).append(dic_매개변수_종목['n_매수량_기준봉_매도봇'] if b_보유신호 else None)
             dic_매수매도.setdefault('피크_매수량', list()).append(dic_매개변수_종목['n_매수량_매도봇'] if b_보유신호 else None)
+            dic_매수매도.setdefault('피크_z매수량', list()).append(dic_매개변수_종목['n_z매수량_매도봇'] if b_보유신호 else None)
             dic_매수매도.setdefault('매수가', list()).append(dic_매개변수_종목['n_매수단가_매도봇'] if b_보유신호 else None)
             dic_매수매도.setdefault('매도가', list()).append(dic_매개변수_종목['n_주문단가_매도봇'] if b_매도신호 else None)
             dic_매수매도.setdefault('매수시간', list()).append(dic_매개변수_종목['s_주문시간_매수봇'] if b_보유신호 else None)
