@@ -1,15 +1,19 @@
-import os
-import sys
 import pandas as pd
 import numpy as np
 
 
-def cal_z스코어(데이터):
+def cal_z스코어(ary_데이터, n_윈도우):
     """ 입력 받은 데이터 기준으로 마지막 값의 z스코어 계산 후 리턴 """
     # nan 제거 (nan : 자기 자신과 같지 않음)
-    ary_데이터 = np.array([x for x in 데이터 if x == x])
-    if len(ary_데이터) < 20:
+    ary_데이터 = np.array([x for x in ary_데이터 if x == x])
+
+    # 데이터 길이 검증 - 윈도우별 별도 기준 적용
+    dic_길이제한 = dict(윈도우_30=20, 윈도우_10=2)
+    if len(ary_데이터) < dic_길이제한[f'윈도우_{n_윈도우}']:
         return np.nan
+
+    # 데이터 잘라내기 - 윈도우 기준
+    ary_데이터 = ary_데이터[-1 * n_윈도우:]
 
     # 데이터 계산
     n_평균값 = ary_데이터.mean()
@@ -37,7 +41,7 @@ def find_일봉변동_거래량(df_일봉, n_윈도우, n_z값):
 
     # z-score 생성
     try:
-        df_일봉변동['z값_거래량'] = cal_z스코어(df_일봉변동['거래량'])
+        df_일봉변동['z값_거래량'] = cal_z스코어(데이터=df_일봉변동['거래량'], n_윈도우=30)
     except ValueError:
         df_일봉변동['z값_거래량'] = 0
 
@@ -93,7 +97,6 @@ def make_초봉데이터(df_체결정보, n_초봉, s_종목코드):
     # 초봉 생성
     if len(df_체결정보) > 0:
         df_초봉 = df_리샘플.first().loc[:, '종목코드':'체결시간']
-        # df_초봉['종목코드'] = [코드 for 코드 in df_초봉['종목코드'].unique() if 코드 is not None][0]
         df_초봉['종목코드'] = s_종목코드
         df_초봉['체결시간'] = df_초봉.index.strftime('%H:%M:%S')
         df_초봉['시가'] = df_리샘플['체결단가'].first()
@@ -115,12 +118,17 @@ def make_초봉데이터(df_체결정보, n_초봉, s_종목코드):
     return df_초봉
 
 
+# noinspection PyTypeChecker
 def make_매수신호(dic_매개변수, dt_일자시간=None):
     """ 입력 받은 초봉 데이터 기준으로 매수신호 생성 후 리턴 """
     # 변수 정의
     li_신호종류 = ['z값', '금액', '강도']
     df_초봉 = dic_매개변수['df_초봉_매수봇']
     n_초봉 = dic_매개변수['n_초봉']
+    dic_매수신호 = dict(li_신호종류_매수봇=li_신호종류,
+                    b_매수신호_매수봇=None, li_매수신호_매수봇=None, n_z매수량_매수봇=None, n_z매도량_매수봇=None,
+                    n_매수금액_매수봇=None, n_체결강도_매수봇=None, n_매수횟수_매수봇=None, n_매도횟수_매수봇=None,
+                    n_체결횟수_0카운트=None, df_초봉_기준봉_매수봇=None)
 
     # 현재봉 제외
     df_초봉 = df_초봉[df_초봉.index < dt_일자시간].copy() if dt_일자시간 is not None else df_초봉
@@ -128,16 +136,16 @@ def make_매수신호(dic_매개변수, dt_일자시간=None):
     # 데이터 길이 검증
     if len(df_초봉) == 0:
         li_매수신호 = [False] * len(li_신호종류)
-        dic_매수신호 = dict(b_매수신호_매수봇=False, li_매수신호_매수봇=li_매수신호,
-                        n_z매수량_매수봇='', n_z매도량_매수봇='', n_매수금액_매수봇='', n_체결강도_매수봇='',
-                        li_신호종류_매수봇=li_신호종류, df_초봉_기준봉_매수봇=df_초봉[-1:])
+        dic_매수신호.update(b_매수신호_매수봇=False, li_매수신호_매수봇=li_매수신호, df_초봉_기준봉_매수봇=df_초봉[-1:])
         return dic_매수신호
 
     # 데이터 정의
-    ary_매수량 = df_초봉['매수량'].values[-30:]
-    ary_매도량 = df_초봉['매도량'].values[-30:]
+    ary_매수량 = df_초봉['매수량'].values
+    ary_매도량 = df_초봉['매도량'].values
+    ary_체결횟수 = df_초봉['체결횟수'].values
     n_매수량 = df_초봉['매수량'].values[-1]
     n_매도량 = df_초봉['매도량'].values[-1]
+    n_체결횟수 = df_초봉['체결횟수'].values[-1]
     n_매수횟수 = df_초봉['매수횟수'].values[-1]
     n_매도횟수 = df_초봉['매도횟수'].values[-1]
     n_종가 = df_초봉['종가'].values[-1]
@@ -147,35 +155,34 @@ def make_매수신호(dic_매개변수, dt_일자시간=None):
     li_매수신호 = list()
 
     # 1) z스코어 검증
-    n_z매수량 = cal_z스코어(ary_매수량)
-    n_z매도량 = cal_z스코어(ary_매도량)
-    # b_z스코어 = (n_z매수량 > 3 and n_z매도량 < 1)\
-    #             if len(df_초봉) >= 30 and n_z매수량 is not None and n_z매도량 is not None else False
+    n_z매수량 = cal_z스코어(ary_데이터=ary_매수량, n_윈도우=30)
+    n_z매도량 = cal_z스코어(ary_데이터=ary_매도량, n_윈도우=30)
     b_z스코어 = (n_z매수량 > 3 and n_z매도량 < 1) if (n_z매수량 is not None and n_z매도량 is not None) else False
     li_매수신호.append(b_z스코어)
+    dic_매수신호.update(n_z매수량_매수봇=n_z매수량, n_z매도량_매수봇=n_z매도량)
 
     # 2) 거래금액 검증
     n_매수금액 = n_종가 * n_매수량 / 10000
     b_거래금액 = n_매수금액 > 10000 * n_초봉
     li_매수신호.append(b_거래금액)
+    dic_매수신호.update(n_매수금액_매수봇=n_매수금액)
 
     # 3) 체결강도 검증
     n_체결강도 = (n_매수량 / n_매도량 * 100) if n_매도량 != 0 else 99999
-    b_체결강도 = n_체결강도 > 500
+    n_체결횟수_0카운트 = sum(0 == ary_체결횟수[-5:])
+    b_체결강도 = n_체결강도 > 500 and n_매수횟수 > 40 * n_초봉 and n_체결횟수_0카운트 == 0
     li_매수신호.append(b_체결강도)
+    dic_매수신호.update(n_체결강도_매수봇=n_체결강도,
+                    n_매수횟수_매수봇=n_매수횟수, n_매도횟수_매수봇=n_매도횟수, n_체결횟수_0카운트=n_체결횟수_0카운트)
 
     # 정보 전달용 dic 생성
     b_매수신호 = sum(li_매수신호) == len(li_매수신호)
-    dic_매수신호 = dict(b_매수신호_매수봇=b_매수신호, li_매수신호_매수봇=li_매수신호,
-                    n_z매수량_매수봇=n_z매수량, n_z매도량_매수봇=n_z매도량,
-                    n_매수금액_매수봇=n_매수금액,
-                    n_체결강도_매수봇=n_체결강도,
-                    n_매수횟수_매수봇=n_매수횟수, n_매도횟수_매수봇=n_매도횟수,
-                    li_신호종류_매수봇=li_신호종류, df_초봉_기준봉_매수봇=df_초봉_기준봉)
+    dic_매수신호.update(b_매수신호_매수봇=b_매수신호, li_매수신호_매수봇=li_매수신호, df_초봉_기준봉_매수봇=df_초봉_기준봉)
 
     return dic_매수신호
 
 
+# noinspection PyTypeChecker
 def make_매도신호(dic_매개변수, dt_일자시간=None):
     """ 입력 받은 초봉 데이터 기준으로 매수신호 생성 후 리턴 """
     # 변수 정의
@@ -185,6 +192,11 @@ def make_매도신호(dic_매개변수, dt_일자시간=None):
     s_매수시간 = dic_매개변수['s_주문시간_매수봇']
     n_매수가 = dic_매개변수['n_매수단가_매도봇']
     n_현재가 = dic_매개변수['n_현재가_매도봇']
+    dic_매도신호 = dict(li_신호종류_매도봇=li_신호종류,
+                    b_매도신호_매도봇=None, li_매도신호_매도봇=None, n_현재가_매도봇=None, n_수익률_매도봇=None,
+                    n_경과초_매도봇=None, n_매도량_누적_매도봇=None, n_매수량_누적_매도봇=None, n_z매수량_매도봇=None,
+                    n_매수량max_매도봇=None, n_매수량_기준봉_매도봇=None, n_매수량_매도봇=None,
+                    li_매도신호_수치_매도봇=None, s_매도사유_매도봇=None)
 
     # 기준봉 생성 (미입력 시)
     if df_초봉_기준봉 is None:
@@ -197,13 +209,14 @@ def make_매도신호(dic_매개변수, dt_일자시간=None):
     # 데이터 길이 검증
     if len(df_초봉) == 0:
         li_매도신호 = [False] * len(li_신호종류)
-        dic_매도신호 = dict(b_매도신호_매도봇=False, li_매도신호_매도봇=li_매도신호,
-                        n_현재가_매도봇='', n_수익률_매도봇='', n_경과초_매도봇='', n_매도량_누적_매도봇='', n_매수량_누적_매도봇='',
-                        n_매수량max_매도봇='', n_매수량_매도봇='', li_신호종류_매도봇='', li_매도신호_수치_매도봇='')
+        li_매도신호_수치 = [None] * len(li_신호종류)
+        dic_매도신호.update(b_매도신호_매도봇=False, li_매도신호_매도봇=li_매도신호, li_매도신호_수치_매도봇=li_매도신호_수치)
         return dic_매도신호
 
     # 데이터 정의
     n_매수량 = df_초봉['매수량'].values[-1]
+    n_매수량_1 = df_초봉['매수량'].values[-2]
+    n_매수량_1 = 0 if pd.isna(n_매수량_1) else n_매수량_1
     if n_현재가 is None:
         ary_종가 = df_초봉['종가'].dropna().values
         n_현재가 = ary_종가[-1] if len(ary_종가) > 0 else None
@@ -212,6 +225,9 @@ def make_매도신호(dic_매개변수, dt_일자시간=None):
     n_매수량_누적 = df_초봉_매수이후['매수량'].sum()
     n_매도량_누적 = df_초봉_매수이후['매도량'].sum()
     n_매수량max = df_초봉_매수이후[:-1]['매수량'].max()
+    n_매수량_기준봉 = df_초봉_기준봉['매수량'].values[-1]
+    ary_매수량 = df_초봉['매수량'].values
+    n_z매수량 = cal_z스코어(ary_데이터=ary_매수량, n_윈도우=10)
 
     # 매도신호 검증
     li_매도신호 = list()
@@ -219,21 +235,28 @@ def make_매도신호(dic_매개변수, dt_일자시간=None):
 
     # 1) 매도우세 검증
     n_매도강도 = n_매도량_누적 / n_매수량_누적 * 100 if n_매수량_누적 != 0 else 0
-    b_매도우세 = n_매도강도 > 100
+    # b_매도우세 = n_매도강도 > 100
+    b_매도우세 = False
     li_매도신호.append(b_매도우세)
     li_매도신호_수치.append(f'{n_매도강도:.0f}%')
+    dic_매도신호.update(n_매도량_누적_매도봇=n_매도량_누적, n_매수량_누적_매도봇=n_매수량_누적)
+    dic_매도신호.update(n_z매수량_매도봇=n_z매수량)
 
     # 2) 매수피크 검증
-    n_매수비율 = n_매수량 / n_매수량max * 100 if n_매수량max != 0 else 0
-    # b_매수피크 = 50 < n_매수비율 < 100
-    b_매수피크 = 70 < n_매수비율 < 100
+    # n_매수비율 = n_매수량 / n_매수량max * 100 if n_매수량max != 0 else 0
+    n_매수비율 = n_매수량 / n_매수량_기준봉 * 100 if n_매수량_기준봉 != 0 else 0
+    # b_매수피크 = 70 < n_매수비율 < 100 and n_매수량 > n_매수량_1
+    s_이전봉시간 = df_초봉['체결시간'].values[-1]
+    b_매수피크 = 70 < n_매수비율 and n_매수량 > n_매수량_1 and s_이전봉시간 > s_매수시간
     li_매도신호.append(b_매수피크)
     li_매도신호_수치.append(f'{n_매수비율:.0f}%')
+    dic_매도신호.update(n_매수량max_매도봇=n_매수량max, n_매수량_기준봉_매도봇=n_매수량_기준봉, n_매수량_매도봇=n_매수량)
 
     # 3) 하락한계 검증
-    b_하락한계 = n_수익률 < -1.2 if n_수익률 is not None else False
+    b_하락한계 = n_수익률 < -3.2 if n_수익률 is not None else False
     li_매도신호.append(b_하락한계)
     li_매도신호_수치.append(f'{n_수익률:.1f}%')
+    dic_매도신호.update(n_현재가_매도봇=n_현재가, n_수익률_매도봇=n_수익률)
 
     # 4) 타임아웃 검증
     n_타임아웃초 = 60 * 5
@@ -244,16 +267,12 @@ def make_매도신호(dic_매개변수, dt_일자시간=None):
     b_타임아웃 = n_경과초 > n_타임아웃초 or dt_현재.strftime('%H:%M:%S') >= '15:15:00'
     li_매도신호.append(b_타임아웃)
     li_매도신호_수치.append(f'{n_경과초:.0f}초')
+    dic_매도신호.update(n_경과초_매도봇=n_경과초)
 
     # 정보 전달용 dic 생성
     b_매도신호 = sum(li_매도신호) > 0
     s_매도사유 = li_신호종류[li_매도신호.index(True)] if b_매도신호 else None
-    dic_매도신호 = dict(b_매도신호_매도봇=b_매도신호, li_매도신호_매도봇=li_매도신호,
-                    n_현재가_매도봇=n_현재가, n_수익률_매도봇=n_수익률,
-                    n_경과초_매도봇=n_경과초,
-                    n_매도량_누적_매도봇=n_매도량_누적, n_매수량_누적_매도봇=n_매수량_누적,
-                    n_매수량max_매도봇=n_매수량max, n_매수량_매도봇=n_매수량,
-                    li_신호종류_매도봇=li_신호종류, li_매도신호_수치_매도봇=li_매도신호_수치,
-                    s_매도사유_매도봇=s_매도사유)
+    dic_매도신호.update(b_매도신호_매도봇=b_매도신호, li_매도신호_매도봇=li_매도신호,
+                    li_매도신호_수치_매도봇=li_매도신호_수치, s_매도사유_매도봇=s_매도사유)
 
     return dic_매도신호
