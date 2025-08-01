@@ -84,8 +84,8 @@ class Trader(QMainWindow, form_class):
         self.make_log(f'### Short Punch Trader 시작 ({self.s_접속서버}) ###')
 
         # 대상 정보 설정
-        self.n_초봉, self.li_매매대상 = self.get_대상선정(n_초봉=5, li_매매대상=['일봉변동'])
-        # self.n_초봉, self.li_매매대상 = self.get_대상선정()
+        # self.n_초봉, self.li_매매대상 = self.get_대상선정(n_초봉=5, li_매매대상=['일봉변동'])
+        self.n_초봉, self.li_매매대상 = self.get_대상선정()
         self.dic_대상종목, self.df_대상종목_매매, self.dic_코드2종목명 = self.get_대상종목(li_매매대상=self.li_매매대상)
 
         # 초기 설정
@@ -424,7 +424,7 @@ class Trader(QMainWindow, form_class):
             df_수익요약 = pd.read_pickle(os.path.join(self.folder_수익요약, max(li_파일명)))
 
         # 성능 기준 max 찾기
-        s_성능 = df_수익요약.set_index('일자').T['10성능%'].idxmax()
+        s_성능 = df_수익요약.set_index('일자').T['10성능%'].astype(float).idxmax()
 
         # 초봉, 매매대상 생성
         li_성능 = s_성능.split('|')
