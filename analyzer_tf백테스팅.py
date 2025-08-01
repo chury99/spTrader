@@ -214,7 +214,8 @@ class Analyzer:
             for i, s_신호종류 in enumerate(dic_매개변수_종목['li_신호종류_매수봇']):
                 dic_매수매도.setdefault(f'매수_{s_신호종류}', list()).append(dic_매개변수_종목['li_매수신호_매수봇'][i])
             dic_매수매도.setdefault('현재가', list()).append(n_현재가)
-            for i, s_신호종류 in enumerate(['매도우세', '매수피크', '하락한계', '타임아웃']):
+            # for i, s_신호종류 in enumerate(dic_매개변수_종목['li_신호종류_매도봇']):
+            for i, s_신호종류 in enumerate(['매수변동', '매수피크', '하락한계', '타임아웃']):
                 dic_매수매도.setdefault(f'매도_{s_신호종류}', list()).append(dic_매개변수_종목['li_매도신호_수치_매도봇'][i]
                                                                                             if b_보유신호 else None)
             dic_매수매도.setdefault('피크_기준봉', list()).append(dic_매개변수_종목['n_매수량_기준봉_매도봇'] if b_보유신호 else None)
