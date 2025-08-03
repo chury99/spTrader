@@ -288,6 +288,7 @@ def make_수익리포트_ax_매수매도(ax, dic_수익정보):
     n_초봉 = df_거래정보_종목['초봉'].values[n_거래순번]
     s_선정사유 = df_거래정보_종목['선정사유'].values[n_거래순번]
     s_거래구분 = df_거래정보_종목['거래구분'].values[n_거래순번]
+    n_수익률 = (n_매도가 / n_매수가 - 1) * 100 - 0.2 if n_매수가 is not None else 0
 
     # 차트 정보 정의
     df_초봉_차트 = df_초봉[df_초봉.index >= dt_매수시점 - pd.Timedelta(minutes=2)]
@@ -326,10 +327,10 @@ def make_수익리포트_ax_매수매도(ax, dic_수익정보):
     ax.axvspan(dt_타임아웃, df_초봉_차트.index[-1], alpha=0.3, color=dic_색상['회색']) if dt_타임아웃 is not None else None
 
     # 스케일 설정
-    ax.set_ylim(n_시세_min, n_시세_max)
+    ax.set_ylim(n_시세_min * 0.9, n_시세_max * 1.1)
     ax.set_yticks([])
     ax.set_xticks([dt_매수시점],
-                    labels=[f'{s_거래구분}|{s_선정사유}-{dt_매수시점.strftime("%H:%M:%S")}-{n_매수가:,.0f}-{s_매도사유}'],
+                    labels=[f'{s_거래구분}|{s_선정사유}-{dt_매수시점.strftime("%H:%M:%S")}-{n_매수가:,.0f}-{s_매도사유}|{n_수익률:.1f}%'],
                     ha='center')
     ax_거래량.set_ylim(n_거래량_min, n_거래량_max * 1.1)
     ax_거래량.set_yticks([])
