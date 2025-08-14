@@ -152,7 +152,7 @@ class Trader(QMainWindow, form_class):
     def run_매수봇(self):
         """ 매수 조건 확인하여 조건 만족 시 매수 주문 실행 """
         # icloud 내 로그 업데이트 위한 신호 생성
-        b_로그 = pd.Timestamp('now').second != 1 and self.n_초봉 not in [1, 2, 3]
+        b_로그 = pd.Timestamp('now').second != 1 and self.n_초봉 not in [1, 2]
 
         # ui 상태 업데이트 및 log 기록
         self.lb_run_buybot.setText('[ 매수봇 ] 동작중')
@@ -430,7 +430,7 @@ class Trader(QMainWindow, form_class):
         li_성능 = s_성능.split('|')
         n_초봉 = int(li_성능[0].replace('초', ''))
         dic_매매대상 = dict(일봉='일봉변동', vi='vi발동', 거래='거래량급증')
-        li_매매대상 = [dic_매매대상[li_성능[1]]]
+        li_매매대상 = [dic_매매대상[li_성능[1]]] if li_성능[1] != '전체' else ['일봉변동', 'vi발동', '거래량급증']
 
         return n_초봉, li_매매대상
 
