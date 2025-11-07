@@ -18,8 +18,7 @@ import UT_차트maker as Chart
 form_class = uic.loadUiType(os.path.join(os.getcwd(), 'trader_ui.ui'))[0]
 
 
-# noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
-# noinspection PyShadowingNames,PyUnboundLocalVariable
+# noinspection PyPep8Naming,NonAsciiCharacters,PyArgumentList,PyUnresolvedReferences,PyAttributeOutsideInit,SpellCheckingInspection
 class Trader(QMainWindow, form_class):
     def __init__(self):
         # 이전 클래스 상속
@@ -165,6 +164,8 @@ class Trader(QMainWindow, form_class):
         # 대상 종목별 매수신호 탐색
         dic_코드2선정사유 = self.df_대상종목_매매.set_index('종목코드').to_dict()['선정사유']
         for s_종목코드 in self.df_대상종목_매매['종목코드']:
+            # 에러 대응용 코드
+            # s_종목코드 = s_종목코드 if type(s_종목코드) == str else f'{s_종목코드:06.0f}'
             # 기초정보 정의
             s_종목명 = self.dic_코드2종목명[s_종목코드]
             s_선정사유 = dic_코드2선정사유[s_종목코드]
@@ -294,7 +295,7 @@ class Trader(QMainWindow, form_class):
 
         # 마지막 데이터 잘라내기
         dt_마지막 = pd.Timestamp('now') - pd.Timedelta(seconds=self.n_초봉)
-        df_초봉 = df_초봉[df_초봉.index <= dt_마지막]
+        df_초봉 = df_초봉[df_초봉.index <= dt_마지막] if len(df_초봉) > 0 else df_초봉
 
         # 현재가 확인 (실처리 미존재 시 tr 요청 => 현재가 확인 + 실시간 등록)
         try:
@@ -418,7 +419,8 @@ class Trader(QMainWindow, form_class):
 
         # 수익요약 파일 읽어오기
         try:
-            df_수익요약 = pd.read_pickle(os.path.join(self.folder_수익요약, f'df_수익요약_{self.s_전일}.pkl'))
+            # df_수익요약 = pd.read_pickle(os.path.join(self.folder_수익요약, f'df_수익요약_{self.s_전일}.pkl'))
+            df_수익요약 = pd.read_csv(os.path.join(self.folder_수익요약, f'df_수익요약_{self.s_전일}.csv'), encoding='cp949')
         except FileNotFoundError:
             li_파일명 = [파일명 for 파일명 in os.listdir(self.folder_수익요약) if 'df_수익요약' in 파일명 and '.pkl' in 파일명]
             df_수익요약 = pd.read_pickle(os.path.join(self.folder_수익요약, max(li_파일명)))
@@ -466,7 +468,8 @@ class Trader(QMainWindow, form_class):
 
             # 대상1) 일봉변동 추가 (전일)
             if s_선정사유 == '일봉변동':
-                df_대상종목_신규 = pd.read_pickle(os.path.join(self.folder_일봉변동, f'df_일봉변동_{self.s_전일}.pkl'))
+                # df_대상종목_신규 = pd.read_pickle(os.path.join(self.folder_일봉변동, f'df_일봉변동_{self.s_전일}.pkl'))
+                df_대상종목_신규 = pd.read_csv(os.path.join(self.folder_일봉변동, f'df_일봉변동_{self.s_전일}.csv'), encoding='cp949')
                 df_대상종목_신규['선정사유'] = s_선정사유
 
             # 대상2) 조건검색 추가 (실시간)
@@ -488,14 +491,19 @@ class Trader(QMainWindow, form_class):
         # 수집용 대상종목 생성
         li_df = [dic_대상종목[s_사유] for s_사유 in dic_대상종목.keys() if s_사유 in ['일봉변동', 'vi발동', '거래량급증']]
         df_대상종목_수집 = pd.concat(li_df, axis=0).drop_duplicates(subset='종목코드')
+        df_대상종목_수집['종목코드'] = df_대상종목_수집['종목코드'].apply(lambda x: f'{x:06.0f}' if type(x) is not str else x)
+
 
         # 매매용 대상종목 생성
         li_df = [dic_대상종목[s_사유] for s_사유 in dic_대상종목.keys() if s_사유 in li_매매대상]
         df_대상종목_매매 = pd.concat(li_df, axis=0).drop_duplicates(subset='종목코드')
+        df_대상종목_매매['종목코드'] = df_대상종목_매매['종목코드'].apply(lambda x: f'{x:06.0f}' if type(x) is not str else x)
         df_대상종목_매매['초봉'] = self.n_초봉
 
         # 실시간 종목등록
         s_대상종목_수집 = ';'.join(list(df_대상종목_수집['종목코드'])[:99])
+        # li_대상종목_수집 = [f'{종목코드:06}' for 종목코드 in df_대상종목_수집['종목코드']]
+        # s_대상종목_수집 = ';'.join(li_대상종목_수집[:99])
         self.api.set_실시간_종목등록(s_종목코드=s_대상종목_수집, s_등록형태='신규')
 
         # 파일 저장
@@ -635,7 +643,9 @@ class Trader(QMainWindow, form_class):
                 dic_신호탐색[f'매도{i + 1}{li_신호종류[i]}'] = li_매도신호[i]
             dic_신호탐색['주문단가'] = dic_매개변수['n_주문단가_매도봇'] if 'n_주문단가_매도봇' in dic_매개변수.keys() else None
             dic_신호탐색['주문수량'] = dic_매개변수['n_주문수량_매도봇'] if 'n_주문수량_매도봇' in dic_매개변수.keys() else None
-            dic_신호탐색['주문금액'] = dic_주문정보['주문단가'] * dic_주문정보['주문수량']\
+            # dic_신호탐색['주문금액'] = dic_주문정보['주문단가'] * dic_주문정보['주문수량']\
+            #     if dic_신호탐색['주문단가'] is not None and dic_신호탐색['주문수량'] is not None else None
+            dic_신호탐색['주문금액'] = dic_신호탐색['주문단가'] * dic_신호탐색['주문수량']\
                 if dic_신호탐색['주문단가'] is not None and dic_신호탐색['주문수량'] is not None else None
             dic_신호탐색['n_수익률'] = dic_매개변수['n_수익률_매도봇']
             dic_신호탐색['n_경과초'] = dic_매개변수['n_경과초_매도봇']
@@ -879,6 +889,7 @@ class Trader(QMainWindow, form_class):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    # noinspection PyArgumentList
     style_fusion = QStyleFactory.create('Fusion')
     app.setStyle(style_fusion)
 
