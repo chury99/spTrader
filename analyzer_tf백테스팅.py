@@ -18,8 +18,7 @@ rc('font', family=font_name)
 rcParams['axes.unicode_minus'] = False
 
 
-# noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
-# noinspection PyShadowingNames,PyUnusedLocal,PyTypeChecker
+# noinspection PyPep8Naming,NonAsciiCharacters,PyUnresolvedReferences
 class Analyzer:
     def __init__(self, b_멀티=False, s_시작일자=None, n_분석일수=None):
         # config 읽어 오기
@@ -104,6 +103,8 @@ class Analyzer:
                 dic_매수매도 = dict()
                 for s_종목코드 in tqdm(li_대상종목, desc=f'매수매도-{n_초봉}초봉-{s_일자}'):
                     df_매수매도 = self.검증_매수매도_종목별(s_종목코드=s_종목코드)
+                    if df_매수매도.empty:
+                        continue
                     dic_매수매도[s_종목코드] = df_매수매도
 
             # dic 저장
@@ -123,6 +124,8 @@ class Analyzer:
         # df 정의
         df_초봉 = dic_초봉[s_종목코드].sort_index().copy() if s_종목코드 in dic_초봉 else pd.DataFrame()
         df_1초봉 = dic_1초봉[s_종목코드].sort_index().copy() if s_종목코드 in dic_1초봉 else pd.DataFrame()
+        if df_초봉.empty or df_1초봉.empty:
+            return pd.DataFrame()
 
         # 종목별 매개변수 생성
         s_종목명 = df_초봉['종목명'].values[0] if '종목명' in df_초봉 else None
@@ -424,6 +427,7 @@ class Analyzer:
             li_df_수익요약 = [df_수익요약.reset_index(drop=True) for df_수익요약 in li_df_수익요약]
             # df_수익요약 = pd.concat(li_df_수익요약, axis=1).reset_index()
             df_수익요약 = pd.concat(li_df_수익요약, axis=1)
+            # noinspection PyTypeChecker
             df_수익요약.insert(loc=0, column='일자', value=li_일자)
             # li_컬럼명 = list(df_수익요약.columns)
             # df_수익요약['일자'] = li_일자
@@ -511,7 +515,8 @@ class Analyzer:
             import UT_배치worker
             w = UT_배치worker.Worker()
             folder_서버 = 'kakao/tf분석_백테스팅'
-            w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
+            # w.to_ftp(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
+            w.to_sftp서버(s_파일명=s_파일명_리포트, folder_로컬=folder_리포트, folder_서버=folder_서버)
 
             # 리포트 생성 및 저장 - 백테스팅
             for n_초봉_백테스팅 in li_초봉_백테스팅:
@@ -529,12 +534,15 @@ class Analyzer:
                 plt.close(fig)
 
                 # 리포트 복사 to 서버
-                w.to_ftp(s_파일명=s_파일명_리포트_백테스팅, folder_로컬=folder_리포트, folder_서버=folder_서버)
+                # w.to_ftp(s_파일명=s_파일명_리포트_백테스팅, folder_로컬=folder_리포트, folder_서버=folder_서버)
+                w.to_sftp서버(s_파일명=s_파일명_리포트_백테스팅, folder_로컬=folder_리포트, folder_서버=folder_서버)
 
             # 카톡 보내기
             if b_카톡 and s_일자 == li_일자_대상[-1]:
+                # 인스턴스 생성
                 import API_kakao
                 k = API_kakao.KakaoAPI()
+
                 # 실거래 리포트
                 result = k.send_message(s_user='알림봇', s_friend='여봉이', s_text=f'[{self.s_파일}] 백테스팅 완료',
                                         s_button_title=f'[tf분석] 백테스팅 리포트 - {s_일자}',
@@ -616,9 +624,10 @@ class Analyzer:
             if len(df_거래정보_매수) == len(df_거래정보_매도) else pd.DataFrame()
 
         # 추가정보 생성
-        df_거래정보_양식변경['초봉'] = n_초봉 if len(df_거래정보_양식변경) > 0 else df_거래정보_양식변경
-        df_거래정보_양식변경['선정사유'] = s_선정사유 if len(df_거래정보_양식변경) > 0 else df_거래정보_양식변경
-        df_거래정보_양식변경['거래구분'] = '실거래' if len(df_거래정보_양식변경) > 0 else df_거래정보_양식변경
+        if len(df_거래정보_양식변경) > 0:
+            df_거래정보_양식변경['초봉'] = n_초봉
+            df_거래정보_양식변경['선정사유'] = s_선정사유
+            df_거래정보_양식변경['거래구분'] = '실거래'
 
         return df_거래정보_양식변경
 
@@ -668,10 +677,13 @@ class Analyzer:
 
 #######################################################################################################################
 if __name__ == "__main__":
-    a = Analyzer(b_멀티=True, s_시작일자='20250623', n_분석일수=None)
-    li_초봉 = [3, 5, 10, 12, 15, 20, 30]
-    [a.검증_매수매도(n_초봉=n_초봉) for n_초봉 in li_초봉]
-    [a.검증_결과정리(n_초봉=n_초봉) for n_초봉 in li_초봉]
-    [a.검증_결과요약(n_초봉=n_초봉) for n_초봉 in li_초봉]
-    a.검증_수익요약()
-    a.검증_매매이력(b_카톡=True)
+    # noinspection PyPep8Naming,NonAsciiCharacters
+    def main():
+        a = Analyzer(b_멀티=True, s_시작일자='20250623', n_분석일수=None)
+        li_초봉 = [3, 5, 10, 12, 15, 20, 30]
+        [a.검증_매수매도(n_초봉=n_초봉) for n_초봉 in li_초봉]
+        [a.검증_결과정리(n_초봉=n_초봉) for n_초봉 in li_초봉]
+        [a.검증_결과요약(n_초봉=n_초봉) for n_초봉 in li_초봉]
+        a.검증_수익요약()
+        a.검증_매매이력(b_카톡=True)
+    main()
