@@ -5,8 +5,7 @@ import json
 import subprocess
 
 
-# noinspection PyPep8Naming,PyUnresolvedReferences,PyProtectedMember,PyAttributeOutsideInit,PyArgumentList
-# noinspection PyShadowingNames
+# noinspection PyUnresolvedReferences,NonAsciiCharacters,PyPep8Naming
 class LauncherAnalyzer:
     def __init__(self):
         # config 읽어 오기
@@ -188,6 +187,16 @@ class LauncherAnalyzer:
         # log 기록
         self.make_log(f'파일 Rotation 완료 - {s_실행결과}')
 
+    def UT_시스템종료(self, n_대기시간):
+        """ n_대기시간 동안 대기 후 시스템 종료 """
+        # 시스템 종료
+        ret = os.system(f'shutdown /s /t {n_대기시간}')
+
+        # log 기록
+        s_실행결과 = '요청성공' if ret == 0 else '실패'
+        self.make_log(f'{n_대기시간}sec 후 시스템 종료 요청 - {s_실행결과}')
+
+
     ###################################################################################################################
     def make_log(self, s_text, li_loc=None):
         """ 입력 받은 s_text에 시간 붙여서 self.path_log에 저장 """
@@ -217,6 +226,8 @@ if __name__ == "__main__":
     # l.analyzer_rf백테스팅()
     # l.analyzer_sr종목선정()
     # l.analyzer_sr백테스팅()
+
     l.analyzer_tf종목분석()
     l.analyzer_tf백테스팅()
     l.UT_파일rotator()
+    l.UT_시스템종료(n_대기시간=10)
